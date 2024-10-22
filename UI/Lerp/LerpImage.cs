@@ -8,16 +8,16 @@ public class LerpImage
     public Image image;
     public float speed = 0.2f;
 
+    public LerpAction action;
+
     private bool increase;
     private float lerpValue;
-    private LerpUIAction action;
 
-    public Action<float> callback;
+    public Action<float, float> callback;
     public float Data { get; private set; }
 
-    public void SetData(LerpUIAction _action, float _value)
+    public void SetData(float _value)
     {
-        action = _action;
         Data = _value;
 
         if (image.fillAmount < Data) increase = true;

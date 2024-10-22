@@ -8,16 +8,16 @@ public class LerpSprite
     public int maxSize;
     public float speed = 0.2f;
 
+    public LerpAction action;
+
     private bool increase;
     private float lerpValue;
-    private LerpAction action;
 
     public Action<float, float> callback;
     public float Data { get; private set; }
 
-    public void SetData(LerpAction _action, float _value)
+    public void SetData(float _value)
     {
-        action = _action;
         Data = _value * maxSize;
 
         if (sprite.size.x < Data) increase = true;

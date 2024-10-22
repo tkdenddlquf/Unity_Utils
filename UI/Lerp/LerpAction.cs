@@ -1,6 +1,6 @@
 using System;
 
-public class LerpUIAction
+public class LerpAction
 {
     public Action actions;
 
