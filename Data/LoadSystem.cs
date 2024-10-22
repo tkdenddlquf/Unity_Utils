@@ -14,7 +14,9 @@ public class LoadSystem : MonoBehaviour
 
     private void Start()
     {
+        percent.action = lerpAction;
         percent.callback = Callback;
+
         percent.speed = 0.1f;
         percent.slider.maxValue = 0.9f;
 
@@ -31,7 +33,7 @@ public class LoadSystem : MonoBehaviour
     public static void LoadScene(SceneNames _name)
     {
         if (sceneNames == _name) return;
-        
+
         SceneManager.LoadScene((int)SceneNames.Loading);
         sceneNames = _name;
     }
@@ -43,7 +45,7 @@ public class LoadSystem : MonoBehaviour
 
         while (!asyncOperation.isDone)
         {
-            percent.SetData(lerpAction, asyncOperation.progress);
+            percent.SetData(asyncOperation.progress);
 
             yield return null;
         }
@@ -53,14 +55,4 @@ public class LoadSystem : MonoBehaviour
     {
         if (_now == percent.slider.maxValue) asyncOperation.allowSceneActivation = true;
     }
-}
-
-public enum SceneNames
-{
-    CheckData,
-    Loading,
-    Prolog,
-    Title,
-    Main,
-    Dungeon
 }
