@@ -3,35 +3,32 @@ using UnityEngine;
 
 public class ObjectPool<T> where T : Object
 {
-    public System.Action<T> DeAction { private get; set; }
-    public System.Action<T> EnAction { private get; set; }
+    public System.Action<T> OnDequeue { private get; set; }
+    public System.Action<T> OnEnqueue { private get; set; }
 
-    private readonly Transform parent;
     private readonly T poolObject;
 
     private readonly Queue<T> poolObjects = new();
 
-    public ObjectPool(T _poolObject, Transform _parent)
+    public ObjectPool(T poolObject) => this.poolObject = poolObject;
+
+    public void CreateDefault(Transform parent = null) => Enqueue(Object.Instantiate(poolObject, parent));
+
+    public T Dequeue(Transform parent = null)
     {
-        poolObject = _poolObject;
-        parent = _parent;
+        T @object = poolObjects.Count == 0 ? Object.Instantiate(poolObject, parent) : poolObjects.Dequeue();
+
+        OnDequeue?.Invoke(@object);
+
+        return @object;
     }
 
-    public T Dequeue()
+    public void Enqueue(T @object)
     {
-        if (poolObjects.Count == 0) poolObjects.Enqueue(Object.Instantiate(poolObject, parent));
+        if (@object == null) return;
 
-        DeAction?.Invoke(poolObjects.Peek());
+        OnEnqueue?.Invoke(@object);
 
-        return poolObjects.Dequeue();
-    }
-
-    public void Enqueue(T _object)
-    {
-        if (_object == null) return;
-
-        EnAction?.Invoke(_object);
-
-        poolObjects.Enqueue(_object);
+        poolObjects.Enqueue(@object);
     }
 }

@@ -1,48 +1,9 @@
 using System.Security.Cryptography;
 using System;
-using UnityEngine;
-using System.IO;
 
-public class CryptData
+public static class Crypt
 {
-    private readonly Crypt CRYPT = new();
-
-    public void Save<T>(T _data, string _path, CryptType _type = CryptType.Local)
-    {
-        if (_type == CryptType.Local) _path = $"{Application.persistentDataPath}/{_path}";
-        else if (_type == CryptType.Resources) _path = $"Assets/Resources/{_path}";
-
-        File.WriteAllText(_path, CRYPT.Encrypt(JsonUtility.ToJson(_data)), System.Text.Encoding.UTF8);
-    }
-
-    public T Load<T>(string _path, CryptType _type = CryptType.Local)
-    {
-        if (_type == CryptType.Local) _path = $"{Application.persistentDataPath}/{_path}";
-        else if (_type == CryptType.Resources) return JsonUtility.FromJson<T>(CRYPT.Decrypt(Resources.Load<TextAsset>(_path).text));
-
-        if (File.Exists(_path)) return JsonUtility.FromJson<T>(CRYPT.Decrypt(File.ReadAllText(_path, System.Text.Encoding.UTF8)));
-
-        return default;
-    }
-
-    public void Remove(string _path, CryptType _type = CryptType.Local)
-    {
-        if (_type == CryptType.Local) _path = $"{Application.persistentDataPath}/{_path}";
-
-        File.Delete(_path);
-    }
-}
-
-public enum CryptType
-{
-    Local,
-    Resources,
-    None
-}
-
-public struct Crypt
-{
-    public readonly string Decrypt(string _text)
+    public static string Decrypt(string _text)
     {
         RijndaelManaged _rijndaelCipher = new()
         {
@@ -74,7 +35,7 @@ public struct Crypt
         return $"{System.Text.Encoding.UTF8.GetString(_plainText)}";
     }
 
-    public readonly string Encrypt(in string _text) // 암호화
+    public static string Encrypt(in string _text) // 암호화
     {
         RijndaelManaged _rijndaelCipher = new()
         {
