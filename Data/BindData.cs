@@ -2,13 +2,13 @@ using System;
 using UnityEngine;
 
 [Serializable]
-public class BindingValue<T>
+public class BindData<T>
 {
     [SerializeField] private T value;
 
     public BindCallback callback;
 
-    public T Data
+    public T Value
     {
         get => value;
         set
