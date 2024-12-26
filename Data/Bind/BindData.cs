@@ -6,16 +6,12 @@ public class BindData<T>
 {
     [SerializeField] private T value;
 
-    private BindCallback callback;
+    private BindCallback callback = (ref T currentValue, T newValue) => currentValue = newValue;
 
     public T Value
     {
         get => value;
-        set
-        {
-            if (callback == null) this.value = value;
-            else callback(ref this.value, value);
-        }
+        set => callback(ref this.value, value);
     }
 
     public void SetCallback(BindCallback callback, SetCallbackType type = SetCallbackType.Set)
@@ -33,6 +29,9 @@ public class BindData<T>
             case SetCallbackType.Remove:
                 this.callback -= callback;
                 break;
+
+            default:
+                return;
         }
 
         this.callback(ref value, value);
