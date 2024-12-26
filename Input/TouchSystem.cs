@@ -5,6 +5,8 @@ public static class TouchSystem
     private static Camera mainCamera;
 
 #if UNITY_EDITOR
+    private Vector3 clickPos;
+
     public static TouchInfo GetTouch(int index)
     {
         if (mainCamera == null) mainCamera = Camera.main;
@@ -13,7 +15,13 @@ public static class TouchSystem
 
         if (Input.GetMouseButton(index))
         {
-            info.phase = Input.GetMouseButtonDown(index) ? TouchPhase.Began : TouchPhase.Moved;
+            if (Input.GetMouseButtonDown(index))
+            {
+                info.phase = TouchPhase.Began;
+                clickPos = Input.mousePosition;
+            }
+            else info.phase = clickPos == Input.mousePosition ? TouchPhase.Stationary : TouchPhase.Moved;
+
             info.count = index + 1;
         }
 
@@ -25,7 +33,7 @@ public static class TouchSystem
 
             if (hit.collider is not null) info.gameObject = hit.collider.gameObject;
         }
-        else info.phase = TouchPhase.Ended;
+        else info.phase = clickPos == Input.mousePosition ? TouchPhase.Canceled : TouchPhase.Ended;
 
         return info;
     }
