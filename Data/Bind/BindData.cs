@@ -6,36 +6,65 @@ public class BindData<T>
 {
     [SerializeField] private T value;
 
-    private BindCallback callback = (ref T currentValue, T newValue) => currentValue = newValue;
+    private PrevCallback prevCallback = (ref T currentValue, T newValue) => currentValue = newValue;
+    private SubCallback subCallback;
 
     public T Value
     {
         get => value;
-        set => callback(ref this.value, value);
+        set
+        {
+            prevCallback?.Invoke(ref this.value, value);
+            subCallback?.Invoke(this.value);
+        }
     }
 
-    public void SetCallback(BindCallback callback, SetCallbackType type = SetCallbackType.Set)
+    public void SetCallback(PrevCallback callback, SetCallbackType type = SetCallbackType.Set)
     {
         switch (type)
         {
             case SetCallbackType.Set:
-                this.callback = callback;
+                prevCallback = callback;
                 break;
 
             case SetCallbackType.Add:
-                this.callback += callback;
+                prevCallback += callback;
                 break;
 
             case SetCallbackType.Remove:
-                this.callback -= callback;
+                prevCallback -= callback;
                 break;
 
             default:
                 return;
         }
 
-        this.callback(ref value, value);
+        callback?.Invoke(ref value, value);
     }
 
-    public delegate void BindCallback(ref T currentValue, T newValue);
+    public void SetCallback(SubCallback callback, SetCallbackType type = SetCallbackType.Set)
+    {
+        switch (type)
+        {
+            case SetCallbackType.Set:
+                subCallback = callback;
+                break;
+
+            case SetCallbackType.Add:
+                subCallback += callback;
+                break;
+
+            case SetCallbackType.Remove:
+                subCallback -= callback;
+                break;
+
+            default:
+                return;
+        }
+
+        callback?.Invoke(value);
+    }
+
+    public delegate void PrevCallback(ref T currentValue, T newValue);
+    public delegate void SubCallback(T newValue);
 }
