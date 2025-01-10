@@ -11,7 +11,12 @@ public static class TouchSystem
     {
         if (mainCamera == null) mainCamera = Camera.main;
 
-        TouchInfo info = new() { pos = mainCamera.ScreenToWorldPoint(Input.mousePosition) };
+        TouchInfo info = new();
+        Vector2 pos = Input.mousePosition;
+
+        if (pos.x > mainCamera.scaledPixelWidth || pos.y > mainCamera.scaledPixelHeight) return info;
+
+        info.pos = mainCamera.ScreenToWorldPoint(pos);
 
         if (Input.GetMouseButton(index))
         {
