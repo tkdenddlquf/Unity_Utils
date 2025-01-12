@@ -19,6 +19,10 @@ public class BindData<T>
         }
     }
 
+    public BindData() { }
+
+    public BindData(T value) { this.value = value; }
+
     public void SetCallback(PrevCallback callback, SetCallbackType type = SetCallbackType.Set)
     {
         switch (type)
