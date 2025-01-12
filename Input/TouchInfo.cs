@@ -8,5 +8,16 @@ public struct TouchInfo
     public int fingerId;
     public TouchPhase phase;
 
-    public GameObject gameObject;
+    public RaycastHit2D[] hits;
+
+    public readonly GameObject this[int index]
+    {
+        get
+        {
+            if (hits == null || hits.Length <= index) return null;
+
+            if (hits[index].collider == null) return null;
+            else return hits[index].collider.gameObject;
+        }
+    }
 }

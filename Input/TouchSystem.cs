@@ -31,12 +31,7 @@ public static class TouchSystem
             info.fingerId = -1;
         }
 
-        if (info.count > index)
-        {
-            RaycastHit2D hit = Physics2D.Raycast(info.pos, Vector2.zero, 1f, layerMask);
-
-            if (hit.collider != null) info.gameObject = hit.collider.gameObject;
-        }
+        if (info.count > index) info.hits = Physics2D.RaycastAll(info.pos, Vector2.zero, 1f, layerMask);
         else info.phase = TouchBeganPosition == info.pos ? TouchPhase.Canceled : TouchPhase.Ended;
 
         return info;
@@ -58,9 +53,7 @@ public static class TouchSystem
 
             if (info.phase == TouchPhase.Began) TouchBeganPosition = info.pos;
 
-            RaycastHit2D hit = Physics2D.Raycast(info.pos, Vector2.zero, 1f, layerMask);
-
-            if (hit.collider != null) info.gameObject = hit.collider.gameObject;
+            info.hits = Physics2D.RaycastAll(info.pos, Vector2.zero, 1f, layerMask);
         }
 
         return info;
