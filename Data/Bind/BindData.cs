@@ -37,7 +37,7 @@ public class BindData<T>
 
             case SetCallbackType.Remove:
                 prevCallback -= callback;
-                break;
+                return;
 
             default:
                 return;
@@ -60,7 +60,7 @@ public class BindData<T>
 
             case SetCallbackType.Remove:
                 subCallback -= callback;
-                break;
+                return;
 
             default:
                 return;
