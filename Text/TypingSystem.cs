@@ -9,64 +9,44 @@ public class TypingSystem
 
     private readonly List<SpeechBubbleInfo> typingList = new();
 
-    public IEnumerator Typing(TypingData _action)
+    public IEnumerator Typing(TypingData action)
     {
-        if (typingList.Contains(_action.info))
+        if (typingList.Contains(action.info))
         {
             skip = true;
 
             yield break;
         }
-        else typingList.Add(_action.info);
+        else typingList.Add(action.info);
 
-        _action.startAction?.Invoke();
+        action.startAction?.Invoke();
 
-        if (!_action.text.Equals(""))
+        if (!action.text.Equals(""))
         {
-            WaitForSeconds sleepTime = new(_action.sleepTime);
+            WaitForSeconds sleepTime = new(action.sleepTime);
 
-            _action.info.SetActive(true);
-            _action.info.textMesh.text = null;
+            action.info.SetActive(true);
+            action.info.textMesh.text = null;
 
-            for (int i = 0; i < _action.text.Length; i++)
+            for (int i = 0; i < action.text.Length; i++)
             {
                 if (skip) break;
                 else yield return sleepTime;
 
-                _action.charAction?.Invoke(i, ref _action.text, ref sleepTime);
+                action.charAction?.Invoke(i, ref action.text, ref sleepTime);
 
-                _action.info.textMesh.text += _action.text[i];
+                action.info.textMesh.text += action.text[i];
             }
 
             if (skip)
             {
-                _action.info.textMesh.text = _action.text;
+                action.info.textMesh.text = action.text;
                 skip = false;
             }
         }
 
-        typingList.Remove(_action.info);
+        typingList.Remove(action.info);
 
-        _action.endAction?.Invoke();
+        action.endAction?.Invoke();
     }
-}
-
-public struct TypingData
-{
-    public SpeechBubbleInfo info;
-
-    public string text;
-    public float sleepTime;
-
-    public Action startAction;
-    public Action endAction;
-    public CharAction charAction;
-
-    public delegate void CharAction(int _index, ref string _text, ref WaitForSeconds _sleepTime);
-}
-
-public enum TypingActionType
-{
-    ChangeSleepTime,
-    TypingEmoji
 }

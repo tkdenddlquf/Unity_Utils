@@ -1,7 +1,7 @@
 using TMPro;
 using UnityEngine;
 
-public class TextStyleEdit : MonoBehaviour
+public class StyleTextManager : MonoBehaviour
 {
     public float size = 5;
     public TMP_Text text;
@@ -23,7 +23,7 @@ public class TextStyleEdit : MonoBehaviour
         IncreaseText(type);
     }
 
-    public void IncreaseText(StyleTextType _type)
+    public void IncreaseText(StyleTextType type)
     {
         text.ForceMeshUpdate();
 
@@ -45,7 +45,7 @@ public class TextStyleEdit : MonoBehaviour
 
             varts = textInfo.meshInfo[charInfo.materialReferenceIndex].vertices;
 
-            switch (_type)
+            switch (type)
             {
                 case StyleTextType.Up:
                     varts[charInfo.vertexIndex + 1] += nowValue * Vector3.up;
@@ -89,11 +89,4 @@ public class TextStyleEdit : MonoBehaviour
             text.UpdateGeometry(meshInfo.mesh, i);
         }
     }
-}
-
-public enum StyleTextType
-{
-    Up,
-    Both,
-    Down
 }
