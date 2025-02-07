@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public struct TouchInfo
+public struct TouchInfo2D
 {
     public int count;
     public Vector2 pos;

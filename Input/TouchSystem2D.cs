@@ -1,17 +1,17 @@
 using UnityEngine;
 
-public static class TouchSystem
+public static class TouchSystem2D
 {
     public static Vector2 TouchBeganPosition { get; private set; }
 
     private static Camera mainCamera;
 
 #if UNITY_EDITOR
-    public static TouchInfo GetTouch(int index, int layerMask = -1)
+    public static TouchInfo2D GetTouch(int index, int layerMask = -1)
     {
         if (mainCamera == null) mainCamera = Camera.main;
 
-        TouchInfo info = new();
+        TouchInfo2D info = new();
         Vector2 pos = Input.mousePosition;
 
         if (pos.x > mainCamera.scaledPixelWidth || pos.y > mainCamera.scaledPixelHeight) return info;
@@ -37,11 +37,11 @@ public static class TouchSystem
         return info;
     }
 #else
-    public static TouchInfo GetTouch(int index, int layerMask = -1)
+    public static TouchInfo2D GetTouch(int index, int layerMask = -1)
     {
         if (mainCamera == null) mainCamera = Camera.main;
 
-        TouchInfo info = new() { count = Input.touchCount };
+        TouchInfo2D info = new() { count = Input.touchCount };
 
         if (info.count > index)
         {
