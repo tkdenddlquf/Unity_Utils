@@ -71,7 +71,6 @@ public static class TouchSystem3D
             
             infos[layerMask].length = Physics.RaycastNonAlloc(ray, infos[layerMask].hits, Mathf.Infinity, layerMask);
         }
-        else infos[layerMask].phase = infos[layerMask].phase == TouchPhase.Stationary && beganPosition == pos ? TouchPhase.Canceled : TouchPhase.Ended;
 
         return infos[layerMask];
     }
