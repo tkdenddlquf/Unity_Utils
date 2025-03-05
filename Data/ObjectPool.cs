@@ -18,7 +18,7 @@ public class ObjectPool<T> where T : MonoBehaviour
 
     public T Dequeue(Transform parent = null)
     {
-        T @object = poolObjects.Count == 0 ? Object.Instantiate(poolObject) : poolObjects.Dequeue();
+        T @object = poolObjects.Count == 0 ? Object.Instantiate(poolObject, parent) : poolObjects.Dequeue();
 
         @object.transform.SetParent(parent);
 
