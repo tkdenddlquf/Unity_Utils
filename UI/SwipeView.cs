@@ -7,8 +7,8 @@ using UnityEngine.UI;
 [RequireComponent(typeof(ScrollRect))]
 public class SwipeView : MonoBehaviour, IBeginDragHandler, IEndDragHandler
 {
-    [SerializeField] private UnityEvent beginCallback;
-    [SerializeField] private UnityEvent<int> endCallback;
+    [SerializeField] private UnityEvent onBeginDrag;
+    [SerializeField] private UnityEvent<int> onEndDrag;
 
     private ScrollRect scrollRect;
 
@@ -16,6 +16,8 @@ public class SwipeView : MonoBehaviour, IBeginDragHandler, IEndDragHandler
 
     private int childCount;
     private float step;
+
+    public int CurrentIndex => PositionToIndex(scrollRect.vertical ? scrollRect.normalizedPosition.y : scrollRect.normalizedPosition.x);
 
     public int SelectIndex { get; private set; } = 0;
 
@@ -42,7 +44,7 @@ public class SwipeView : MonoBehaviour, IBeginDragHandler, IEndDragHandler
 
         swipeCoroutine = null;
 
-        beginCallback?.Invoke();
+        onBeginDrag?.Invoke();
     }
 
     private void EndSwipe()
@@ -52,29 +54,14 @@ public class SwipeView : MonoBehaviour, IBeginDragHandler, IEndDragHandler
         swipeCoroutine = StartCoroutine(Swipe(scrollRect.vertical));
     }
 
-    private IEnumerator Swipe(bool vert)
+    private IEnumerator Swipe(bool vertSwipe)
     {
         yield return new WaitUntil(() => Vector2.Distance(Vector2.zero, scrollRect.velocity) < 200);
 
         scrollRect.velocity = Vector2.zero;
 
         Vector2 currentPos = scrollRect.normalizedPosition;
-        Vector2 targetPos;
-
-        if (vert)
-        {
-            (float, int) value = Round(currentPos.y);
-
-            targetPos = Vector2.up * value.Item1;
-            SelectIndex = value.Item2;
-        }
-        else
-        {
-            (float, int) value = Round(currentPos.x);
-
-            targetPos = Vector2.right * value.Item1;
-            SelectIndex = value.Item2;
-        }
+        Vector2 targetPos = PositionToIndex(vertSwipe ? currentPos.y : currentPos.x) * step * Vector2.up;
 
         while (true)
         {
@@ -87,13 +74,10 @@ public class SwipeView : MonoBehaviour, IBeginDragHandler, IEndDragHandler
             yield return null;
         }
 
-        endCallback?.Invoke(SelectIndex);
+        SelectIndex = PositionToIndex(vertSwipe ? currentPos.y : currentPos.x);
+
+        onEndDrag?.Invoke(SelectIndex);
     }
 
-    private (float, int) Round(float value)
-    {
-        int round = Mathf.RoundToInt(value / step);
-
-        return (round * step, round);
-    }
+    private int PositionToIndex(float value) => childCount == 0 ? -1 : Mathf.RoundToInt(value / step);
 }
