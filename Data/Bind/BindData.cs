@@ -11,6 +11,7 @@ public class BindData<T>
 
     public T Value
     {
+        get => value;
         set
         {
             prevCallback?.Invoke(ref this.value, value);
@@ -70,8 +71,4 @@ public class BindData<T>
 
     public delegate void PrevCallback(ref T currentValue, T newValue);
     public delegate void SubCallback(T newValue);
-
-    public static implicit operator T(BindData<T> bindData) => bindData.value;
-
-    public static implicit operator BindData<T>(T value) => value;
 }
