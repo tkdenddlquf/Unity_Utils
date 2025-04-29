@@ -7,8 +7,15 @@ using UnityEngine.UI;
 [RequireComponent(typeof(ScrollRect))]
 public class SwipeView : MonoBehaviour, IBeginDragHandler, IEndDragHandler
 {
-    [SerializeField] private UnityEvent onBeginDrag;
-    [SerializeField] private UnityEvent<int> onEndDrag;
+    [Header("Settings")]
+    [SerializeField] private float waitVelocity = 200f;
+
+    [SerializeField, Tooltip("스크롤 속도")] private float scrollPower = 5f;
+    [SerializeField, Tooltip("스크롤 정지 거리")] private float setDistance = 0.01f;
+
+    [Header("Events")]
+    [SerializeField, Space(5f)] private UnityEvent onBeginDrag;
+    [SerializeField, Space(5f)] private UnityEvent<int> onEndDrag;
 
     private ScrollRect scrollRect;
 
@@ -56,7 +63,7 @@ public class SwipeView : MonoBehaviour, IBeginDragHandler, IEndDragHandler
 
     private IEnumerator Swipe(bool vertSwipe)
     {
-        yield return new WaitUntil(() => Vector2.Distance(Vector2.zero, scrollRect.velocity) < 200);
+        yield return new WaitUntil(() => Vector2.Distance(Vector2.zero, scrollRect.velocity) < waitVelocity);
 
         scrollRect.velocity = Vector2.zero;
 
@@ -67,9 +74,9 @@ public class SwipeView : MonoBehaviour, IBeginDragHandler, IEndDragHandler
         {
             currentPos = scrollRect.normalizedPosition;
 
-            scrollRect.normalizedPosition = Vector2.Lerp(currentPos, targetPos, Time.unscaledDeltaTime * 5);
+            scrollRect.normalizedPosition = Vector2.Lerp(currentPos, targetPos, Time.unscaledDeltaTime * scrollPower);
 
-            if (Vector2.Distance(currentPos, targetPos) < 0.001f) break;
+            if (Vector2.Distance(currentPos, targetPos) < setDistance) break;
 
             yield return null;
         }
