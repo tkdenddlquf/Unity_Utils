@@ -23,10 +23,7 @@ public class HorizontalChildGroup : MonoBehaviour, IDragHandler, IBeginDragHandl
 
     private void Start()
     {
-        foreach (RectTransform rect in GetComponentsInChildren<RectTransform>())
-        {
-            if (rect.parent == transform) childs.Add(rect);
-        }
+        for (int i = 0; i < transform.childCount; i++) childs.Add(transform.GetChild(i).transform as RectTransform);
 
         Move(false);
     }
@@ -38,10 +35,7 @@ public class HorizontalChildGroup : MonoBehaviour, IDragHandler, IBeginDragHandl
         {
             List<RectTransform> childs = new();
 
-            foreach (RectTransform rect in GetComponentsInChildren<RectTransform>())
-            {
-                if (rect.parent == transform) childs.Add(rect);
-            }
+            for (int i = 0; i < transform.childCount; i++) childs.Add(transform.GetChild(i).transform as RectTransform);
 
             SetChildPos(childs, false);
         }
