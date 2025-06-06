@@ -23,7 +23,7 @@ namespace Yang.Network.Relay
 
         public int ConnectCount => connectGUIDs.Count;
 
-        private List<string> connectGUIDs = new();
+        private readonly List<string> connectGUIDs = new();
         #endregion
 
         #region Client
@@ -34,7 +34,7 @@ namespace Yang.Network.Relay
         /// </summary>
         public event Action ChangeConnect;
 
-        public bool IsJoined => client.IsConnect;
+        public bool IsClient => client.IsConnect;
         #endregion
 
         public string MyGUID { get; private set; }
@@ -62,7 +62,7 @@ namespace Yang.Network.Relay
         /// 방 생성
         /// </summary>
         /// <param name="maxConnection">최대 인원 수 (호스트 포함)</param>
-        public async Task<string> Create(int maxConnection)
+        public async Task<bool> Create(int maxConnection)
         {
             MaxConnection = maxConnection;
 
@@ -70,16 +70,16 @@ namespace Yang.Network.Relay
 
             host.BindHost();
 
-            return JoinCode;
+            return JoinCode != string.Empty;
         }
 
         /// <summary>
         /// 참여중인 방에서 퇴장
         /// </summary>
-        public void Dispose()
+        public void Exit()
         {
             if (IsHost) host.DisconnectAll();
-            else if (IsJoined)
+            else if (IsClient)
             {
                 client.Disconnect();
 
@@ -126,7 +126,7 @@ namespace Yang.Network.Relay
         public void TossMessage(byte type, string message)
         {
             if (IsHost) host.TossMessage(new(type, message));
-            else if (IsJoined) client.TossMessage(type, message);
+            else if (IsClient) client.TossMessage(type, message);
         }
 
         public void AddGUID(string guid)
