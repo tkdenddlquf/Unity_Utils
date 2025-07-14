@@ -1,8 +1,8 @@
 using UnityEditor;
 using UnityEngine;
 
-[CustomPropertyDrawer(typeof(LocalizeKey))]
-public class LocalizeKeyDrawer : PropertyDrawer
+[CustomPropertyDrawer(typeof(LocalizeStringKey))]
+public class LocalizeStringKeyDrawer : PropertyDrawer
 {
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
     {

@@ -21,6 +21,11 @@ public static class LocalizeDataManager
         stringEvent.StringReference.Add(name, variable);
     }
 
+    public static void SetTable(this LocalizeSpriteEvent spriteEvent, string table, string entry)
+    {
+        spriteEvent.AssetReference.SetReference(table, entry);
+    }
+
     public static void SetText(this TMPro.TMP_Text text, string table, string entry) => text.text = LocalizationSettings.StringDatabase.GetLocalizedString(table, entry);
 
     public static string GetText(string table, string entry) => LocalizationSettings.StringDatabase.GetLocalizedString(table, entry);
