@@ -1,4 +1,3 @@
-using UnityEngine;
 using UnityEngine.Localization.Components;
 using UnityEngine.Localization.Settings;
 using UnityEngine.Localization.SmartFormat.PersistentVariables;
@@ -11,19 +10,33 @@ public static class LocalizeDataManager
         stringEvent.RefreshString();
     }
 
-    public static void SetObjectVariable(this LocalizeStringEvent stringEvent, string name, ObjectVariable variable, Object value)
-    {
-        stringEvent.StringReference.Clear();
-        stringEvent.SetTable("", "");
-
-        variable.Value = value;
-
-        stringEvent.StringReference.Add(name, variable);
-    }
-
     public static void SetTable(this LocalizeSpriteEvent spriteEvent, string table, string entry)
     {
         spriteEvent.AssetReference.SetReference(table, entry);
+    }
+
+    public static void Clear(this LocalizeStringEvent stringEvent)
+    {
+        stringEvent.StringReference.Clear();
+        stringEvent.SetTable("", "");
+    }
+
+    public static void Clear(this LocalizeSpriteEvent spriteEvent)
+    {
+        spriteEvent.SetTable("", "");
+    }
+
+    public static void SetObjectVariable(this LocalizeStringEvent stringEvent, LocalizeVariableData data)
+    {
+        stringEvent.Clear();
+
+        stringEvent.StringReference.Add(data.key, data.value);
+        stringEvent.SetTable(data.table, data.entry);
+    }
+
+    public static void SetObjectVariable(this LocalizeStringEvent stringEvent, string key, IVariable value)
+    {
+        stringEvent.StringReference.Add(key, value);
     }
 
     public static void SetText(this TMPro.TMP_Text text, string table, string entry) => text.text = LocalizationSettings.StringDatabase.GetLocalizedString(table, entry);

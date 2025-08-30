@@ -34,8 +34,6 @@ namespace Yang.Localize
 
             int selectedIndex = collections.FindIndex(c => property.objectReferenceValue == c);
 
-            if (selectedIndex < 0) selectedIndex = 0;
-
             EditorGUI.BeginProperty(position, label, property);
 
             Rect labelRect = new(position.x, position.y, EditorGUIUtility.labelWidth, EditorGUIUtility.singleLineHeight);
