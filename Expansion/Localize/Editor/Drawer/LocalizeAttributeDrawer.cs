@@ -35,7 +35,20 @@ namespace Yang.Localize
             List<string> values = new();
 
             string tableName = dataField.FindPropertyRelative("tableName").stringValue;
-            StringTableCollection tableCollection = LocalizationEditorSettings.GetStringTableCollection(tableName);
+            SerializedProperty typeProp = dataField.FindPropertyRelative("type");
+
+            LocalizationTableCollection tableCollection = null;
+
+            switch ((LocalizeTableType)typeProp.enumValueIndex)
+            {
+                case LocalizeTableType.Asset:
+                    tableCollection = LocalizationEditorSettings.GetAssetTableCollection(tableName);
+                    break;
+
+                case LocalizeTableType.String:
+                    tableCollection = LocalizationEditorSettings.GetStringTableCollection(tableName);
+                    break;
+            }
 
             if (tableCollection == null) return;
 
@@ -53,22 +66,25 @@ namespace Yang.Localize
             }
         }
 
-        private void SetContents(List<GUIContent> contents, List<string> values, StringTableCollection tableCollection)
+        private void SetContents(List<GUIContent> contents, List<string> values, LocalizationTableCollection tableCollection)
         {
             foreach (SharedTableData.SharedTableEntry key in tableCollection.SharedData.Entries)
             {
-                foreach (StringTable table in tableCollection.StringTables)
+                LocalizationTable table = tableCollection.GetTable(SystemLanguage.Korean);
+
+                string tooltip = "";
+
+                if (table is StringTable stringTable)
                 {
-                    if (table.LocaleIdentifier != SystemLanguage.Korean) continue;
+                    StringTableEntry entry = stringTable.GetEntry(key.Key);
 
-                    StringTableEntry tableEntry = table.GetEntry(key.Key);
-                    GUIContent content = new(key.Key, tableEntry == null ? "" : tableEntry.Value);
-
-                    contents.Add(content);
-                    values.Add(key.Key);
-
-                    break;
+                    if (entry != null) tooltip = entry.Value;
                 }
+
+                GUIContent content = new(key.Key, tooltip);
+
+                contents.Add(content);
+                values.Add(key.Key);
 
             }
         }

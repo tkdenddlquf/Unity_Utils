@@ -1,3 +1,4 @@
+using DG.DemiEditor;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Localization;
@@ -25,29 +26,36 @@ namespace Yang.Localize
 
             EditorGUI.PropertyField(typeRect, typeProp, new GUIContent(typeProp.displayName));
 
-            List<string> collections = new();
-            List<string> groups = new();
+            List<LocalizationTableCollection> collections = new();
 
             switch ((LocalizeTableType)typeProp.enumValueIndex)
             {
                 case LocalizeTableType.Asset:
                     foreach (LocalizationTableCollection collection in LocalizationEditorSettings.GetAssetTableCollections())
                     {
-                        collections.Add(collection.TableCollectionName);
-                        groups.Add(collection.Group);
+                        collections.Add(collection);
                     }
                     break;
 
                 case LocalizeTableType.String:
                     foreach (LocalizationTableCollection collection in LocalizationEditorSettings.GetStringTableCollections())
                     {
-                        collections.Add(collection.TableCollectionName);
-                        groups.Add(collection.Group);
+                        collections.Add(collection);
                     }
                     break;
             }
 
-            int selectedIndex = collections.IndexOf(tableProp.stringValue);
+            int selectedIndex = -1;
+
+            for (int i = 0; i < collections.Count; i++)
+            {
+                if (collections[i].TableCollectionName == tableProp.stringValue)
+                {
+                    selectedIndex = i;
+
+                    break;
+                }
+            }
 
             EditorGUI.BeginProperty(tableRect, new GUIContent(tableProp.displayName), tableProp);
 
@@ -62,19 +70,25 @@ namespace Yang.Localize
 
             string[] options = new string[collections.Count];
 
-            for (int i = 0; i < collections.Count; i++) options[i] = string.IsNullOrEmpty(groups[i]) ? collections[i] : $"{groups[i]}/{collections[i]}";
+            for (int i = 0; i < collections.Count; i++)
+            {
+                string tableName = collections[i].TableCollectionName;
+                string group = collections[i].Group;
+
+                options[i] = string.IsNullOrEmpty(group) ? tableName : $"{group}/{tableName}";
+            }
 
             int newIndex = EditorGUI.Popup(dropdownRect, selectedIndex, options);
 
             if (newIndex != selectedIndex)
             {
-                tableProp.stringValue = collections[newIndex];
+                tableProp.stringValue = collections[newIndex].TableCollectionName;
                 tableProp.serializedObject.ApplyModifiedProperties();
 
                 selectedIndex = newIndex;
             }
 
-            if (GUI.Button(openButtonRect, EditorGUIUtility.IconContent("Folder Icon"))) LocalizationTablesWindow.ShowWindow(collections[selectedIndex], "");
+            if (GUI.Button(openButtonRect, EditorGUIUtility.IconContent("Folder Icon"))) LocalizationTablesWindow.ShowWindow(collections[selectedIndex]);
 
             EditorGUI.EndProperty();
         }
