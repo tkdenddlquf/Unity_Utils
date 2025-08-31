@@ -9,8 +9,6 @@ namespace Yang.Localize
     [CustomPropertyDrawer(typeof(LocalizeAttribute))]
     public class LocalizeAttributeDrawer : PropertyDrawer
     {
-        private LocalizationTableCollection table;
-
         private LocalizeAttribute TargetAttribute => (LocalizeAttribute)attribute;
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -24,16 +22,11 @@ namespace Yang.Localize
 
             SerializedProperty dataField = FindBaseOrSiblingProperty(property, TargetAttribute.DataField);
 
-            if (dataField != null)
+            if (dataField == null)
             {
-                table = dataField.objectReferenceValue as LocalizationTableCollection;
+                EditorGUI.LabelField(position, "ERROR", "None table");
 
-                if (dataField.objectReferenceValue == null || table == null)
-                {
-                    EditorGUI.LabelField(position, "ERROR", "None table");
-
-                    return;
-                }
+                return;
             }
 
             position = EditorGUI.PrefixLabel(position, label);
@@ -41,7 +34,12 @@ namespace Yang.Localize
             List<GUIContent> contents = new();
             List<string> values = new();
 
-            SetContents(contents, values, table.SharedData);
+            string tableName = dataField.FindPropertyRelative("tableName").stringValue;
+            StringTableCollection tableCollection = LocalizationEditorSettings.GetStringTableCollection(tableName);
+
+            if (tableCollection == null) return;
+
+            SetContents(contents, values, tableCollection);
 
             int currentIndex = values.IndexOf(property.stringValue);
             int previousIndex = currentIndex;
@@ -55,12 +53,10 @@ namespace Yang.Localize
             }
         }
 
-        private void SetContents(List<GUIContent> contents, List<string> values, SharedTableData data)
+        private void SetContents(List<GUIContent> contents, List<string> values, StringTableCollection tableCollection)
         {
-            foreach (SharedTableData.SharedTableEntry key in data.Entries)
+            foreach (SharedTableData.SharedTableEntry key in tableCollection.SharedData.Entries)
             {
-                StringTableCollection tableCollection = LocalizationEditorSettings.GetStringTableCollection(data.TableCollectionName);
-
                 foreach (StringTable table in tableCollection.StringTables)
                 {
                     if (table.LocaleIdentifier != SystemLanguage.Korean) continue;
@@ -128,7 +124,7 @@ namespace Yang.Localize
 
                         if (dotIndex < 0) break;
 
-                        newPropertyPath = propertyPath.Remove(dotIndex + 1) + propertyName;
+                        newPropertyPath = propertyPath[..(dotIndex + 1)] + propertyName;
                         relativeProperty = property.serializedObject.FindProperty(newPropertyPath);
                     }
                 }
