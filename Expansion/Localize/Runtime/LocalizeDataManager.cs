@@ -1,31 +1,34 @@
 using UnityEngine.Localization.Components;
 using UnityEngine.Localization.Settings;
 using UnityEngine.Localization.SmartFormat.PersistentVariables;
+using static UnityEngine.EventSystems.EventTrigger;
+using static UnityEngine.Rendering.DebugUI;
 
 namespace Yang.Localize
 {
     public static class LocalizeDataManager
     {
-        public static void SetTable(this LocalizeStringEvent stringEvent, string table, string entry)
+        public static void SetTable(this LocalizeStringEvent stringEvent, LocalizeReference reference)
         {
-            stringEvent.StringReference.SetReference(table, entry);
+            stringEvent.StringReference.SetReference(reference.tableName, reference.entryName);
             stringEvent.RefreshString();
         }
 
-        public static void SetTable(this LocalizeSpriteEvent spriteEvent, string table, string entry)
+        public static void SetTable(this LocalizeSpriteEvent spriteEvent, LocalizeReference reference)
         {
-            spriteEvent.AssetReference.SetReference(table, entry);
+            spriteEvent.AssetReference.SetReference(reference.tableName, reference.entryName);
         }
 
         public static void Clear(this LocalizeStringEvent stringEvent)
         {
             stringEvent.StringReference.Clear();
-            stringEvent.SetTable("", "");
+            stringEvent.StringReference.SetReference("", "");
+            stringEvent.RefreshString();
         }
 
         public static void Clear(this LocalizeSpriteEvent spriteEvent)
         {
-            spriteEvent.SetTable("", "");
+            spriteEvent.AssetReference.SetReference("", "");
         }
 
         public static void SetObjectVariable(this LocalizeStringEvent stringEvent, LocalizeVariableData data)
@@ -33,7 +36,7 @@ namespace Yang.Localize
             stringEvent.Clear();
 
             stringEvent.StringReference.Add(data.key, data.value);
-            stringEvent.SetTable(data.table, data.entry);
+            stringEvent.SetTable(data.reference);
         }
 
         public static void SetObjectVariable(this LocalizeStringEvent stringEvent, string key, IVariable value)
