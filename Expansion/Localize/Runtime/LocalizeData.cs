@@ -1,14 +1,19 @@
 using System;
+using UnityEngine;
 
 namespace Yang.Localize
 {
     [Serializable]
     public class LocalizeData
     {
-        public LocalizeTableType type;
+        [SerializeField] private LocalizeTableType type;
 
-        public string tableName;
-        public string[] entryNames;
+        [SerializeField] private string tableName;
+        [SerializeField] private string[] entryNames;
+
+        public string Name => tableName;
+
+        public int Length => entryNames.Length;
 
         public LocalizeReference this[int index] => new(tableName, entryNames[index]);
     }

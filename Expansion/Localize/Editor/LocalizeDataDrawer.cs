@@ -70,30 +70,27 @@ namespace Yang.Localize
 
             if (foldout)
             {
-                if (entriesList == null || entriesList.serializedProperty != entryProp)
+                entriesList ??= new(property.serializedObject, entryProp, true, false, true, true)
                 {
-                    entriesList = new(property.serializedObject, entryProp, true, false, true, true)
+                    elementHeight = lineHeight,
+
+                    drawElementCallback = (rect, index, isActive, isFocused) =>
                     {
-                        elementHeight = lineHeight,
+                        SerializedProperty prop = entryProp.GetArrayElementAtIndex(index);
 
-                        drawElementCallback = (rect, index, isActive, isFocused) =>
+                        int selectedEntryIndex = values.IndexOf(prop.stringValue);
+
+                        Rect popupRect = new(rect.x, rect.y, rect.width, lineHeight);
+
+                        selectedEntryIndex = EditorGUI.Popup(popupRect, new($"Element {index}"), selectedEntryIndex, contents.ToArray());
+
+                        if (selectedEntryIndex >= 0 && selectedEntryIndex < values.Count)
                         {
-                            SerializedProperty prop = entryProp.GetArrayElementAtIndex(index);
-
-                            int selectedEntryIndex = values.IndexOf(prop.stringValue);
-
-                            Rect popupRect = new(rect.x, rect.y + 2, rect.width, lineHeight);
-
-                            selectedEntryIndex = EditorGUI.Popup(popupRect, selectedEntryIndex, contents.ToArray());
-
-                            if (selectedEntryIndex >= 0 && selectedEntryIndex < values.Count)
-                            {
-                                prop.stringValue = values[selectedEntryIndex];
-                                prop.serializedObject.ApplyModifiedProperties();
-                            }
+                            prop.stringValue = values[selectedEntryIndex];
+                            prop.serializedObject.ApplyModifiedProperties();
                         }
-                    };
-                }
+                    },
+                };
 
                 entriesList.DoList(entryRect);
             }
