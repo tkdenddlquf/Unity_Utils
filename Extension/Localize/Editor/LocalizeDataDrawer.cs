@@ -14,6 +14,9 @@ namespace Yang.Localize
         private ReorderableList entriesList;
         private bool foldout = true;
 
+        private List<GUIContent> contents;
+        private List<string> values;
+
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
@@ -60,8 +63,7 @@ namespace Yang.Localize
 
             if (GUI.Button(openButtonRect, EditorGUIUtility.IconContent("Folder Icon"))) LocalizationTablesWindow.ShowWindow(collections[selectedTableIndex]);
 
-            LocalizationTableCollection collection = selectedTableIndex == -1 ? null : collections[selectedTableIndex];
-            List<GUIContent> contents = GetEntryOptions(collection, out List<string> values);
+            contents = GetEntryOptions(selectedTableIndex == -1 ? null : collections[selectedTableIndex], out values);
 
             Rect foldoutRect = new(position.x, tableRect.y + lineHeight + spacing, position.width, lineHeight);
             Rect entryRect = new(position.x, foldoutRect.y + lineHeight + spacing, position.width, lineHeight);
