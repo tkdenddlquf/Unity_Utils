@@ -52,7 +52,8 @@ namespace Yang.Network.Steam
 
             void Complete(LobbyCreated_t result, bool failure)
             {
-                if (result.m_eResult == EResult.k_EResultOK)
+                if (failure || result.m_eResult != EResult.k_EResultOK) tcs.SetResult(false);
+                else
                 {
                     LobbyID = (CSteamID)result.m_ulSteamIDLobby;
 
@@ -61,11 +62,12 @@ namespace Yang.Network.Steam
                     ReceiveUpdate();
                     NetworkPing();
 
+                    UpdateLobbyData();
+
                     NetworkReader.Connect((ulong)userID);
 
                     tcs.SetResult(true);
                 }
-                else tcs.SetResult(false);
             }
 
             lobbyCreated.Set(SteamMatchmaking.CreateLobby(ConvertLobbyType(info.type), info.maxMembers), Complete);
@@ -83,18 +85,20 @@ namespace Yang.Network.Steam
             {
                 EChatRoomEnterResponse response = (EChatRoomEnterResponse)result.m_EChatRoomEnterResponse;
 
-                if (response == EChatRoomEnterResponse.k_EChatRoomEnterResponseSuccess)
+                if (failure || result.m_EChatRoomEnterResponse != (uint)EChatRoomEnterResponse.k_EChatRoomEnterResponseSuccess) tcs.SetResult(false);
+                else
                 {
                     LobbyID = (CSteamID)result.m_ulSteamIDLobby;
 
                     ReceiveUpdate();
                     NetworkPing();
 
+                    UpdateLobbyData();
+
                     NetworkReader.Connect((ulong)userID);
 
                     tcs.SetResult(true);
                 }
-                else tcs.SetResult(false);
             }
 
             lobbyEnter.Set(SteamMatchmaking.JoinLobby((CSteamID)lobbyID), Complete);
@@ -102,17 +106,59 @@ namespace Yang.Network.Steam
             return await tcs.Task;
         }
 
-        public void Leave()
+        public async Task<bool> Leave()
         {
-            if (LobbyID == CSteamID.Nil) return;
+            if (LobbyID == CSteamID.Nil) return false;
 
-            CSteamID lobbyID = LobbyID;
+            SteamMatchmaking.LeaveLobby(LobbyID);
 
             LobbyID = CSteamID.Nil;
 
-            SteamMatchmaking.LeaveLobby(lobbyID);
-
             lobbyDatas.Clear();
+
+            await Task.Delay(1000);
+
+            return true;
+        }
+
+        private bool UpdateLobbyData()
+        {
+            int dataLength = SteamMatchmaking.GetLobbyDataCount(LobbyID);
+
+            bool isChanged = false;
+
+            for (int i = 0; i < dataLength; i++)
+            {
+                if (SteamMatchmaking.GetLobbyDataByIndex(LobbyID, i, out string key, 256, out string value, 256))
+                {
+                    if (lobbyDatas.TryGetValue(key, out string oldValue))
+                    {
+                        if (oldValue != value)
+                        {
+                            if (value == "") lobbyDatas.Remove(key);
+                            else lobbyDatas[key] = value;
+
+                            isChanged = true;
+                        }
+                    }
+                    else
+                    {
+                        lobbyDatas.Add(key, value);
+                        isChanged = true;
+                    }
+                }
+            }
+
+            int limit = GetLobbyMemberLimit((ulong)LobbyID);
+
+            if (currentLobbyMemerLimit != limit)
+            {
+                currentLobbyMemerLimit = limit;
+
+                isChanged = true;
+            }
+
+            return isChanged;
         }
         #endregion
 
@@ -220,11 +266,63 @@ namespace Yang.Network.Steam
             }
         }
 
-        public async Task<int> GetLobbyList(List<ulong> lobbyIDs, int start, int count)
+        public async Task<int> GetLobbyList(List<ulong> lobbyIDs, int start, int count, params LobbyFilter[] filters)
         {
             TaskCompletionSource<int> tcs = new();
 
             void Complete(LobbyMatchList_t result, bool failure) => tcs.SetResult((int)result.m_nLobbiesMatching);
+
+            List<LobbyFilter> containFilters = new();
+
+            if (filters.Length != 0)
+            {
+                foreach (LobbyFilter filter in filters)
+                {
+                    ELobbyComparison comparison;
+
+                    switch (filter.filterType)
+                    {
+                        case LobbyFilterType.EqualToOrLessThan:
+                            comparison = ELobbyComparison.k_ELobbyComparisonEqualToOrLessThan;
+                            break;
+
+                        case LobbyFilterType.LessThan:
+                            comparison = ELobbyComparison.k_ELobbyComparisonLessThan;
+                            break;
+
+                        case LobbyFilterType.Equal:
+                            comparison = ELobbyComparison.k_ELobbyComparisonEqual;
+                            break;
+
+                        case LobbyFilterType.GreaterThan:
+                            comparison = ELobbyComparison.k_ELobbyComparisonGreaterThan;
+                            break;
+
+                        case LobbyFilterType.EqualToOrGreaterThan:
+                            comparison = ELobbyComparison.k_ELobbyComparisonEqualToOrGreaterThan;
+                            break;
+
+                        case LobbyFilterType.NotEqual:
+                            comparison = ELobbyComparison.k_ELobbyComparisonNotEqual;
+                            break;
+
+                        default:
+                            containFilters.Add(filter);
+                            continue;
+                    }
+
+                    switch (filter.valueType)
+                    {
+                        case LobbyValueType.String:
+                            SteamMatchmaking.AddRequestLobbyListStringFilter(filter.key, filter.value, comparison);
+                            break;
+
+                        case LobbyValueType.Int:
+                            SteamMatchmaking.AddRequestLobbyListNumericalFilter(filter.key, int.Parse(filter.value), comparison);
+                            break;
+                    }
+                }
+            }
 
             lobbyMatchList.Set(SteamMatchmaking.RequestLobbyList(), Complete);
 
@@ -235,7 +333,27 @@ namespace Yang.Network.Steam
             for (int i = start; i < start + count; i++)
             {
                 if (lobbyCount < i) lobbyIDs.Add((ulong)CSteamID.Nil);
-                else lobbyIDs.Add((ulong)SteamMatchmaking.GetLobbyByIndex(i));
+                else
+                {
+                    ulong lobbyID = (ulong)SteamMatchmaking.GetLobbyByIndex(i);
+
+                    bool addLobbyID = true;
+
+                    foreach (LobbyFilter filter in containFilters)
+                    {
+                        string value = GetLobbyData(lobbyID, filter.key);
+
+                        if (!value.Contains(filter.value))
+                        {
+                            addLobbyID = false;
+
+                            break;
+                        }
+                    }
+
+                    if (addLobbyID) lobbyIDs.Add(lobbyID);
+                    else count++;
+                }
             }
 
             return lobbyCount;
@@ -260,7 +378,12 @@ namespace Yang.Network.Steam
 
         public int GetLobbyMemberLimit(ulong lobbyID) => SteamMatchmaking.GetLobbyMemberLimit((CSteamID)lobbyID);
 
-        public void SetLobbyMemberLimit(int maxMembers) => SteamMatchmaking.SetLobbyMemberLimit(LobbyID, maxMembers);
+        public void SetLobbyMemberLimit(int maxMembers)
+        {
+            if (maxMembers < GetLobbyMemberCount((ulong)LobbyID)) return;
+
+            SteamMatchmaking.SetLobbyMemberLimit(LobbyID, maxMembers);
+        }
         #endregion
 
         #region Datas
@@ -303,42 +426,7 @@ namespace Yang.Network.Steam
 
             if (callback.m_ulSteamIDLobby == callback.m_ulSteamIDMember) // 로비 데이터 변경
             {
-                int dataLength = SteamMatchmaking.GetLobbyDataCount(LobbyID);
-
-                bool isChanged = false;
-
-                for (int i = 0; i < dataLength; i++)
-                {
-                    if (SteamMatchmaking.GetLobbyDataByIndex(LobbyID, i, out string key, 256, out string value, 256))
-                    {
-                        if (lobbyDatas.TryGetValue(key, out string oldValue))
-                        {
-                            if (oldValue != value)
-                            {
-                                if (value == "") lobbyDatas.Remove(key);
-                                else lobbyDatas[key] = value;
-
-                                isChanged = true;
-                            }
-                        }
-                        else
-                        {
-                            lobbyDatas.Add(key, value);
-                            isChanged = true;
-                        }
-                    }
-                }
-
-                int limit = GetLobbyMemberLimit((ulong)LobbyID);
-
-                if (currentLobbyMemerLimit != limit)
-                {
-                    currentLobbyMemerLimit = limit;
-
-                    isChanged = true;
-                }
-
-                if (isChanged) NetworkReader.ChangeLobbyData();
+                if (UpdateLobbyData()) NetworkReader.ChangeLobbyData();
             }
             else // 유저 데이터 변경
             {
@@ -359,8 +447,6 @@ namespace Yang.Network.Steam
                     break;
 
                 default:
-                    if (this.userID == (CSteamID)userID) Dispose();
-
                     NetworkReader.Disconnect(userID);
                     break;
             }

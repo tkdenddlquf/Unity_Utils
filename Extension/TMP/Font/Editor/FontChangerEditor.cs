@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using UnityEngine;
 using TMPro;
 using UnityEditor;
@@ -54,4 +53,3 @@ public class FontChangerEditor : Editor
         count++;
     }
 }
-#endif

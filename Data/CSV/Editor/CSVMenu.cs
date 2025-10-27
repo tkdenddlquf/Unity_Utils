@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System.Collections.Generic;
 using UnityEditor;
 
@@ -25,4 +24,3 @@ public class CSVMenu
         crypt.Save(new DialogDatas { data = dialogDatas.ToArray() }, "Dialog/DialogData.json", CryptType.Resources);
     }
 }
-#endif

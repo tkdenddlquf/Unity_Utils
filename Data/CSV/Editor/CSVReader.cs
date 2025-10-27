@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.IO;
@@ -49,4 +48,3 @@ public class CSVReader
         return _list;
     }
 }
-#endif

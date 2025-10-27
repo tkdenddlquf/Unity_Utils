@@ -56,7 +56,6 @@ namespace Yang.Localize
             if (newTableIndex != selectedTableIndex)
             {
                 tableProp.stringValue = collections[newTableIndex].TableCollectionName;
-                tableProp.serializedObject.ApplyModifiedProperties();
 
                 selectedTableIndex = newTableIndex;
             }
@@ -67,6 +66,14 @@ namespace Yang.Localize
 
             Rect foldoutRect = new(position.x, tableRect.y + lineHeight + spacing, position.width, lineHeight);
             Rect entryRect = new(position.x, foldoutRect.y + lineHeight + spacing, position.width, lineHeight);
+
+            if (property.serializedObject.isEditingMultipleObjects)
+            {
+                EditorGUI.LabelField(foldoutRect, "Multi-object editing is not supported.", EditorStyles.helpBox);
+                EditorGUI.EndProperty();
+
+                return;
+            }
 
             foldout = EditorGUI.Foldout(foldoutRect, foldout, entryProp.displayName, true);
 
@@ -86,11 +93,7 @@ namespace Yang.Localize
 
                         selectedEntryIndex = EditorGUI.Popup(popupRect, new($"Element {index}"), selectedEntryIndex, contents.ToArray());
 
-                        if (selectedEntryIndex >= 0 && selectedEntryIndex < values.Count)
-                        {
-                            prop.stringValue = values[selectedEntryIndex];
-                            prop.serializedObject.ApplyModifiedProperties();
-                        }
+                        if (selectedEntryIndex >= 0 && selectedEntryIndex < values.Count) prop.stringValue = values[selectedEntryIndex];
                     },
                 };
 

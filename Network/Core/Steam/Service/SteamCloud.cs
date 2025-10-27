@@ -9,11 +9,13 @@ namespace Yang.Network.Steam
     {
         private readonly CallResult<RemoteStorageFileReadAsyncComplete_t> readAsyncComplete = new();
         private readonly CallResult<RemoteStorageFileWriteAsyncComplete_t> writeAsyncComplete = new();
+        private readonly CallResult<RemoteStorageFileShareResult_t> shareComplete = new();
 
         public void Dispose()
         {
             readAsyncComplete.Dispose();
             writeAsyncComplete.Dispose();
+            shareComplete.Dispose();
         }
 
         public async Task<T> JsonRead<T>(string fileName)
@@ -49,14 +51,14 @@ namespace Yang.Network.Steam
 
             void Complete(RemoteStorageFileReadAsyncComplete_t result, bool failure)
             {
-                if (result.m_eResult == EResult.k_EResultOK)
+                if (failure || result.m_eResult != EResult.k_EResultOK) tcs.SetResult(null);
+                else
                 {
                     byte[] buffer = new byte[result.m_cubRead];
                     bool complete = SteamRemoteStorage.FileReadAsyncComplete(result.m_hFileReadAsync, buffer, result.m_cubRead);
-                    
+
                     tcs.SetResult(complete ? buffer : null);
                 }
-                else tcs.SetResult(null);
             }
 
             readAsyncComplete.Set(call, Complete);
@@ -70,11 +72,34 @@ namespace Yang.Network.Steam
 
             SteamAPICall_t call = SteamRemoteStorage.FileWriteAsync(fileName, data, (uint)data.Length);
 
-            void Complete(RemoteStorageFileWriteAsyncComplete_t result, bool failure) => tcs.SetResult(result.m_eResult == EResult.k_EResultOK);
+            void Complete(RemoteStorageFileWriteAsyncComplete_t result, bool failure)
+            {
+                if (failure || result.m_eResult != EResult.k_EResultOK) tcs.SetResult(false);
+                else tcs.SetResult(true);
+            }
 
             writeAsyncComplete.Set(call, Complete);
 
-            return await tcs.Task;
+            if (await tcs.Task)
+            {
+                tcs = new();
+
+                call = SteamRemoteStorage.FileShare(fileName);
+
+                void Share(RemoteStorageFileShareResult_t result, bool failure)
+                {
+                    if (failure || result.m_eResult != EResult.k_EResultOK) tcs.SetResult(false);
+                    else tcs.SetResult(true);
+                }
+
+                shareComplete.Set(call, Share);
+
+                return await tcs.Task;
+            }
+
+            return false;
         }
+
+        public bool FileDelete(string fileName) => SteamRemoteStorage.FileDelete(fileName);
     }
 }

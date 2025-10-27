@@ -33,9 +33,9 @@ namespace Yang.Network.Steam
             return true;
         }
 
-        public override void OnDestroy()
+        public override async void OnDestroy()
         {
-            Leave();
+            await Leave();
 
             steamLobby.Dispose();
             steamUser.Dispose();
@@ -47,6 +47,8 @@ namespace Yang.Network.Steam
         public override bool IsNoneID(ulong id) => id == GetNoneID();
 
         public override ulong GetNoneID() => (ulong)CSteamID.Nil;
+
+        public override int GetVersion() => SteamApps.GetAppBuildId();
         #endregion
 
         #region User
@@ -90,10 +92,10 @@ namespace Yang.Network.Steam
             return success;
         }
 
-        public override void Leave() => steamLobby.Leave();
+        public override async Task<bool> Leave() => await steamLobby.Leave();
 
         #region Info
-        public override async Task<int> GetLobbyList(List<ulong> lobbyIDs, int start, int count) => await steamLobby.GetLobbyList(lobbyIDs, start, count);
+        public override async Task<int> GetLobbyList(List<ulong> lobbyIDs, int start, int count, params LobbyFilter[] filters) => await steamLobby.GetLobbyList(lobbyIDs, start, count, filters);
 
         public override string GetLobbyData(ulong lobbyID, string key) => steamLobby.GetLobbyData(lobbyID, key);
 
