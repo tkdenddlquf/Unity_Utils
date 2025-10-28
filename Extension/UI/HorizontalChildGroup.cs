@@ -4,137 +4,285 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 
+[ExecuteAlways, DisallowMultipleComponent]
 public class HorizontalChildGroup : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler
 {
     [Header("Events")]
-    [SerializeField, Space(5f)] private UnityEvent<RectTransform> beginDragEvent;
+    [SerializeField, Space(5f)] private UnityEvent<int> beginDragEvent;
     [SerializeField, Space(5f)] private UnityEvent<float> dragEvent;
-    [SerializeField, Space(5f)] private UnityEvent<List<RectTransform>> endDragEvent;
+    [SerializeField, Space(5f)] private UnityEvent<int, int> endDragEvent;
 
     [Header("Child Settings")]
     [SerializeField] private float spacing = 10f;
     [SerializeField] private TextAnchor childAlignment = TextAnchor.MiddleCenter;
 
-    private bool isMove;
+    private bool isMove = false;
 
-    private RectTransform selectItem;
+    private int childCount = 0;
+
+    private int selectIndex = -1;
+    private RectTransform selectChild;
+
+    private RectTransform rect;
 
     private readonly List<RectTransform> childs = new();
 
-    private void Start()
+    private void Awake()
     {
-        for (int i = 0; i < transform.childCount; i++) childs.Add(transform.GetChild(i).transform as RectTransform);
-
-        Move(false);
+        rect = GetComponent<RectTransform>();
+        CacheChildren();
     }
 
-    private void OnValidate()
+    private void OnEnable()
     {
-        if (Application.isPlaying) Move();
-        else
+        CacheChildren();
+        RebuildLayout(false);
+    }
+
+#if UNITY_EDITOR
+    private Vector2 lastSize;
+
+    private struct ChildState
+    {
+        public Vector2 anchoredPos;
+        public Vector2 sizeDelta;
+    }
+
+    private readonly Dictionary<RectTransform, ChildState> childStates = new();
+
+    private void OnTransformChildrenChanged()
+    {
+        if (isMove) return;
+
+        CacheChildren();
+        RebuildLayout(false);
+    }
+
+    private void OnRectTransformDimensionsChange()
+    {
+        if (isMove || !rect) return;
+
+        if (rect.rect.size != lastSize)
         {
-            List<RectTransform> childs = new();
+            lastSize = rect.rect.size;
 
-            for (int i = 0; i < transform.childCount; i++) childs.Add(transform.GetChild(i).transform as RectTransform);
-
-            SetChildPos(childs, false);
+            RebuildLayout(false);
         }
     }
 
+    private void LateUpdate()
+    {
+        if (isMove) return;
+
+        int inactiveCount = 0;
+        bool changed = false;
+
+        foreach (Transform childTrans in transform)
+        {
+            if (childTrans.gameObject.activeSelf)
+            {
+                if (childTrans is RectTransform childRect)
+                {
+                    if (childStates.TryGetValue(childRect, out ChildState state))
+                    {
+                        if (childRect.anchoredPosition != state.anchoredPos || childRect.sizeDelta != state.sizeDelta)
+                        {
+                            changed = true;
+
+                            childStates[childRect] = new ChildState
+                            {
+                                anchoredPos = childRect.anchoredPosition,
+                                sizeDelta = childRect.sizeDelta
+                            };
+                        }
+                    }
+                }
+            }
+            else inactiveCount++;
+        }
+
+        if (transform.childCount - inactiveCount != childCount)
+        {
+            childCount = transform.childCount - inactiveCount;
+
+            CacheChildren();
+
+            changed = true;
+        }
+
+        if (changed) RebuildLayout(false);
+    }
+
+    private void CacheChildren()
+    {
+        childs.Clear();
+        childStates.Clear();
+
+        int inactiveCount = 0;
+
+        foreach (Transform childTrans in transform)
+        {
+            if (childTrans.gameObject.activeSelf)
+            {
+                if (childTrans is RectTransform childRect)
+                {
+                    childStates[childRect] = new ChildState
+                    {
+                        anchoredPos = childRect.anchoredPosition,
+                        sizeDelta = childRect.sizeDelta
+                    };
+
+                    childs.Add(childRect);
+                }
+                else inactiveCount++;
+            }
+            else inactiveCount++;
+        }
+
+        childCount = transform.childCount - inactiveCount;
+
+        if (rect) lastSize = rect.rect.size;
+    }
+#else
+    private void CacheChildren()
+    {
+        childs.Clear();
+
+        foreach (Transform childTrans in transform)
+        {
+            if (childTrans.gameObject.activeSelf)
+            {
+                if (childTrans is RectTransform childRect) childs.Add(childRect);
+                else inactiveCount++;
+            }
+            else inactiveCount++;
+        }
+
+        childCount = transform.childCount - inactiveCount;
+    }
+#endif
+
     public void OnBeginDrag(PointerEventData eventData)
     {
-        foreach (RectTransform child in childs)
+        for (int i = 0; i < childs.Count; i++)
         {
-            if (RectTransformUtility.RectangleContainsScreenPoint(child, eventData.pressPosition))
+            if (RectTransformUtility.RectangleContainsScreenPoint(childs[i], eventData.pressPosition))
             {
-                selectItem = child;
+                selectIndex = i;
+                selectChild = childs[i];
 
-                Move();
+                DragChild();
 
-                beginDragEvent?.Invoke(selectItem);
+                beginDragEvent?.Invoke(selectIndex);
 
                 return;
             }
         }
 
-        selectItem = null;
+        selectIndex = -1;
+        selectChild = null;
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (selectItem == null) return;
+        if (selectIndex == -1) return;
 
         Vector2 pos = eventData.position;
 
-        pos.y = selectItem.transform.position.y;
+        pos.y = selectChild.position.y;
 
-        selectItem.transform.position = pos;
+        selectChild.position = pos;
 
-        Vector2 fixedPos = selectItem.anchoredPosition;
+        Vector2 fixedPos = selectChild.anchoredPosition;
 
-        float checkPosX = selectItem.rect.width * 0.5f;
+        float checkPosX = selectChild.rect.width * 0.5f;
 
-        if (selectItem.anchoredPosition.x < checkPosX) fixedPos.x = checkPosX;
+        if (selectChild.anchoredPosition.x < checkPosX) fixedPos.x = checkPosX;
         else
         {
-            checkPosX = (transform as RectTransform).rect.width - selectItem.rect.width * 0.5f;
+            checkPosX = rect.rect.width - selectChild.rect.width * 0.5f;
 
-            if (selectItem.anchoredPosition.x > checkPosX) fixedPos.x = checkPosX;
+            if (selectChild.anchoredPosition.x > checkPosX) fixedPos.x = checkPosX;
         }
 
-        selectItem.anchoredPosition = fixedPos;
+        selectChild.anchoredPosition = fixedPos;
 
-        childs.Sort((a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
+        childs.Sort((a, b) => a.position.x.CompareTo(b.position.x));
 
         dragEvent?.Invoke(fixedPos.x);
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
-        selectItem = null;
+        if (selectIndex == -1) return;
 
-        endDragEvent?.Invoke(childs);
+        int currentIndex = childs.IndexOf(selectChild);
+
+        if (currentIndex < childCount - 1)
+        {
+            if (currentIndex == 0) selectChild.SetAsFirstSibling();
+            else
+            {
+                if (selectIndex < currentIndex)
+                {
+                    int nextIndex = childs[currentIndex - 1].GetSiblingIndex();
+
+                    selectChild.SetSiblingIndex(nextIndex);
+                }
+                else
+                {
+                    int nextIndex = childs[currentIndex + 1].GetSiblingIndex();
+
+                    selectChild.SetSiblingIndex(nextIndex);
+                }
+            }
+        }
+        else selectChild.SetAsLastSibling();
+
+        endDragEvent?.Invoke(selectIndex, currentIndex);
+
+        selectIndex = -1;
+        selectChild = null;
     }
 
-    private void Move(bool lerp = true)
+    private void DragChild()
     {
         if (isMove) return;
 
         isMove = true;
 
-        StartCoroutine(MoveChilds(lerp));
+        IEnumerator MoveWait()
+        {
+            while (!RebuildLayout(true) || selectChild != null) yield return null;
+        }
+
+        StartCoroutine(MoveWait());
     }
 
-    private IEnumerator MoveChilds(bool lerp)
+    private bool RebuildLayout(bool lerp)
     {
-        while (!SetChildPos(childs, lerp) || selectItem != null) yield return null;
-    }
-
-    private bool SetChildPos(List<RectTransform> childs, bool lerp)
-    {
-        Rect rect = (transform as RectTransform).rect;
-
+        int childCount = this.childCount - 1;
         float totalWidth = 0f;
 
         if (spacing < 0) spacing = 0;
 
         for (int i = 0; i < childs.Count; i++) totalWidth += childs[i].rect.width;
 
-        totalWidth += spacing * (childs.Count - 1);
+        totalWidth += spacing * childCount;
 
-        if (totalWidth > rect.width)
+        if (totalWidth > rect.rect.width)
         {
-            float overSpacing = (totalWidth - rect.width) / (childs.Count - 1);
+            float overSpacing = (totalWidth - rect.rect.width) / childCount;
 
             spacing -= overSpacing;
-            totalWidth -= overSpacing * (childs.Count - 1);
+            totalWidth -= overSpacing * childCount;
         }
 
         float currentY;
         float currentX = childAlignment switch
         {
-            TextAnchor.UpperCenter or TextAnchor.MiddleCenter or TextAnchor.LowerCenter => (rect.width - totalWidth) * 0.5f,
-            TextAnchor.UpperRight or TextAnchor.MiddleRight or TextAnchor.LowerRight => rect.width - totalWidth,
+            TextAnchor.UpperCenter or TextAnchor.MiddleCenter or TextAnchor.LowerCenter => (rect.rect.width - totalWidth) * 0.5f,
+            TextAnchor.UpperRight or TextAnchor.MiddleRight or TextAnchor.LowerRight => rect.rect.width - totalWidth,
             _ => 0f,
         };
 
@@ -143,28 +291,30 @@ public class HorizontalChildGroup : MonoBehaviour, IDragHandler, IBeginDragHandl
 
         for (int i = 0; i < childs.Count; i++)
         {
-            childRect = childs[i].rect;
+            RectTransform childTrans = childs[i];
+
+            childRect = childTrans.rect;
 
             currentX += childRect.width * 0.5f;
             currentY = childAlignment switch
             {
                 TextAnchor.UpperLeft or TextAnchor.UpperCenter or TextAnchor.UpperRight => childRect.height * 0.5f,
-                TextAnchor.LowerLeft or TextAnchor.LowerCenter or TextAnchor.LowerRight => rect.height - childRect.height * 0.5f,
-                _ => rect.height * 0.5f,
+                TextAnchor.LowerLeft or TextAnchor.LowerCenter or TextAnchor.LowerRight => rect.rect.height - childRect.height * 0.5f,
+                _ => rect.rect.height * 0.5f,
             };
 
             Vector2 movePos = new(currentX, -currentY);
 
-            if (selectItem != childs[i])
+            if (childs[i] != selectChild)
             {
-                if (lerp) childs[i].anchoredPosition = Vector2.Lerp(childs[i].anchoredPosition, movePos, Time.deltaTime * 10);
-                else childs[i].anchoredPosition = movePos;
+                if (lerp) childTrans.anchoredPosition = Vector2.Lerp(childTrans.anchoredPosition, movePos, Time.deltaTime * 10);
+                else childTrans.anchoredPosition = movePos;
             }
 
             currentX += childRect.width * 0.5f + spacing;
 
-            if (Vector2.Distance(childs[i].anchoredPosition, movePos) > 0.01f) endMove = false;
-            else childs[i].anchoredPosition = movePos;
+            if (Vector2.Distance(childTrans.anchoredPosition, movePos) > 0.01f) endMove = false;
+            else childTrans.anchoredPosition = movePos;
         }
 
         isMove = !endMove;
