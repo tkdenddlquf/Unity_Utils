@@ -264,7 +264,9 @@ public class HorizontalChildGroup : MonoBehaviour, IDragHandler, IBeginDragHandl
         int childCount = this.childCount - 1;
         float totalWidth = 0f;
 
-        if (spacing < 0) spacing = 0;
+        if (this.spacing < 0) this.spacing = 0;
+
+        float spacing = this.spacing;
 
         for (int i = 0; i < childs.Count; i++) totalWidth += childs[i].rect.width;
 
