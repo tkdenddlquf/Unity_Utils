@@ -24,15 +24,19 @@ namespace Yang.Localize
         Asset,
     }
 
-    public struct LocalizeReference
+    public readonly struct LocalizeReference : IEquatable<LocalizeReference>
     {
-        public string tableName;
-        public string entryName;
+        public readonly string tableName;
+        public readonly string entryName;
 
         public LocalizeReference(string tableName, string entryName)
         {
             this.tableName = tableName;
             this.entryName = entryName;
         }
+
+        public bool Equals(LocalizeReference other) => tableName == other.tableName && entryName == other.entryName;
+
+        public override int GetHashCode() => HashCode.Combine(tableName, entryName);
     }
 }
