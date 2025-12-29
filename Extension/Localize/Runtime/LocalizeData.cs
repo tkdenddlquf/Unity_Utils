@@ -16,6 +16,11 @@ namespace Yang.Localize
         public int Length => entryNames.Length;
 
         public LocalizeReference this[int index] => new(tableName, entryNames[index]);
+
+#if UNITY_EDITOR
+        [SerializeField] private string tableGuid;
+        [SerializeField] private long[] entryIDs;
+#endif
     }
 
     public enum LocalizeTableType

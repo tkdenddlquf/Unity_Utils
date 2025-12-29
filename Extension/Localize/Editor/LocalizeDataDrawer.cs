@@ -14,8 +14,11 @@ namespace Yang.Localize
         private ReorderableList entriesList;
         private bool foldout = true;
 
-        private List<GUIContent> contents;
-        private List<string> values;
+        private readonly List<GUIContent> contents = new();
+        private readonly List<LocalizationTableCollection> collections = new();
+
+        private readonly List<long> ids = new();
+        private readonly List<string> values = new();
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
@@ -24,7 +27,10 @@ namespace Yang.Localize
             SerializedProperty typeProp = property.FindPropertyRelative("type");
 
             SerializedProperty tableProp = property.FindPropertyRelative("tableName");
-            SerializedProperty entryProp = property.FindPropertyRelative("entryNames");
+            SerializedProperty entriesProp = property.FindPropertyRelative("entryNames");
+
+            SerializedProperty guidProp = property.FindPropertyRelative("tableGuid");
+            SerializedProperty idsProp = property.FindPropertyRelative("entryIDs");
 
             float lineHeight = EditorGUIUtility.singleLineHeight;
             float spacing = EditorGUIUtility.standardVerticalSpacing;
@@ -34,9 +40,11 @@ namespace Yang.Localize
 
             EditorGUI.PropertyField(typeRect, typeProp, new GUIContent(typeProp.displayName));
 
-            List<LocalizationTableCollection> collections = GetCollections((LocalizeTableType)typeProp.enumValueIndex);
+            SetCollections((LocalizeTableType)typeProp.enumValueIndex);
 
-            int selectedTableIndex = GetTableIndex(collections, tableProp.stringValue);
+            int selectedTableIndex = GetTableIndex(tableProp.stringValue);
+
+            if (selectedTableIndex == -1 && guidProp.stringValue != "") selectedTableIndex = GetTableIndex(System.Guid.Parse(guidProp.stringValue));
 
             EditorGUI.BeginProperty(tableRect, new GUIContent(tableProp.displayName), tableProp);
 
@@ -49,20 +57,25 @@ namespace Yang.Localize
             Rect dropdownRect = new(tableRect.x + EditorGUIUtility.labelWidth, tableRect.y, dropdownWidth, EditorGUIUtility.singleLineHeight);
             Rect openButtonRect = new(dropdownRect.xMax + 5f, tableRect.y, 20f, EditorGUIUtility.singleLineHeight);
 
-            string[] tableOptions = GetTableOptios(collections);
+            string[] tableOptions = GetTableOptios();
 
             int newTableIndex = EditorGUI.Popup(dropdownRect, selectedTableIndex, tableOptions);
 
             if (newTableIndex != selectedTableIndex)
             {
-                tableProp.stringValue = collections[newTableIndex].TableCollectionName;
+                LocalizationTableCollection collection = collections[newTableIndex];
+
+                tableProp.stringValue = collection.TableCollectionName;
+                guidProp.stringValue = collection.TableCollectionNameReference.TableCollectionNameGuid.ToString();
 
                 selectedTableIndex = newTableIndex;
             }
 
+            if (guidProp.stringValue == "" && tableProp.stringValue != "") guidProp.stringValue = collections[newTableIndex].TableCollectionNameReference.TableCollectionNameGuid.ToString();
+
             if (GUI.Button(openButtonRect, EditorGUIUtility.IconContent("Folder Icon"))) LocalizationTablesWindow.ShowWindow(collections[selectedTableIndex]);
 
-            contents = GetEntryOptions(selectedTableIndex == -1 ? null : collections[selectedTableIndex], out values);
+            SetEntryOptions(selectedTableIndex == -1 ? null : collections[selectedTableIndex]);
 
             Rect foldoutRect = new(position.x, tableRect.y + lineHeight + spacing, position.width, lineHeight);
             Rect entryRect = new(position.x, foldoutRect.y + lineHeight + spacing, position.width, lineHeight);
@@ -75,25 +88,35 @@ namespace Yang.Localize
                 return;
             }
 
-            foldout = EditorGUI.Foldout(foldoutRect, foldout, entryProp.displayName, true);
+            foldout = EditorGUI.Foldout(foldoutRect, foldout, entriesProp.displayName, true);
 
             if (foldout)
             {
-                entriesList ??= new(property.serializedObject, entryProp, true, false, true, true)
+                entriesList ??= new(property.serializedObject, entriesProp, true, false, true, true)
                 {
                     elementHeight = lineHeight,
 
                     drawElementCallback = (rect, index, isActive, isFocused) =>
                     {
-                        SerializedProperty prop = entryProp.GetArrayElementAtIndex(index);
+                        SerializedProperty entryprop = entriesProp.GetArrayElementAtIndex(index);
 
-                        int selectedEntryIndex = values.IndexOf(prop.stringValue);
+                        if (idsProp.arraySize != entriesProp.arraySize) idsProp.arraySize = entriesProp.arraySize;
+
+                        SerializedProperty idprop = idsProp.GetArrayElementAtIndex(index);
+
+                        int selectedIndex = values.IndexOf(entryprop.stringValue);
+
+                        if (selectedIndex == -1) selectedIndex = ids.IndexOf(idprop.longValue);
 
                         Rect popupRect = new(rect.x, rect.y, rect.width, lineHeight);
 
-                        selectedEntryIndex = EditorGUI.Popup(popupRect, new($"Element {index}"), selectedEntryIndex, contents.ToArray());
+                        selectedIndex = EditorGUI.Popup(popupRect, new($"Element {index}"), selectedIndex, contents.ToArray());
 
-                        if (selectedEntryIndex >= 0 && selectedEntryIndex < values.Count) prop.stringValue = values[selectedEntryIndex];
+                        if (selectedIndex >= 0 && selectedIndex < values.Count)
+                        {
+                            entryprop.stringValue = values[selectedIndex];
+                            idprop.longValue = ids[selectedIndex];
+                        }
                     },
                 };
 
@@ -103,10 +126,8 @@ namespace Yang.Localize
             EditorGUI.EndProperty();
         }
 
-        private List<LocalizationTableCollection> GetCollections(LocalizeTableType type)
+        private void SetCollections(LocalizeTableType type)
         {
-            List<LocalizationTableCollection> collections = new();
-
             switch (type)
             {
                 case LocalizeTableType.Asset:
@@ -123,11 +144,9 @@ namespace Yang.Localize
                     }
                     break;
             }
-
-            return collections;
         }
 
-        private int GetTableIndex(List<LocalizationTableCollection> collections, string value)
+        private int GetTableIndex(string value)
         {
             for (int i = 0; i < collections.Count; i++)
             {
@@ -137,7 +156,17 @@ namespace Yang.Localize
             return -1;
         }
 
-        private string[] GetTableOptios(List<LocalizationTableCollection> collections)
+        private int GetTableIndex(System.Guid value)
+        {
+            for (int i = 0; i < collections.Count; i++)
+            {
+                if (collections[i].TableCollectionNameReference.TableCollectionNameGuid == value) return i;
+            }
+
+            return -1;
+        }
+
+        private string[] GetTableOptios()
         {
             string[] options = new string[collections.Count];
 
@@ -152,33 +181,37 @@ namespace Yang.Localize
             return options;
         }
 
-        private List<GUIContent> GetEntryOptions(LocalizationTableCollection collection, out List<string> values)
+        private void SetEntryOptions(LocalizationTableCollection collection)
         {
-            List<GUIContent> contents = new();
+            contents.Clear();
 
-            values = new();
+            ids.Clear();
+            values.Clear();
 
             if (collection != null)
             {
-                foreach (SharedTableData.SharedTableEntry key in collection.SharedData.Entries)
+                List<SharedTableData.SharedTableEntry> entries = collection.SharedData.Entries;
+
+                for (int i = 0; i < entries.Count; i++)
                 {
                     string tooltip = "";
+                    SharedTableData.SharedTableEntry current = entries[i];
 
                     if (collection.GetTable(SystemLanguage.Korean) is StringTable stringTable)
                     {
-                        StringTableEntry entry = stringTable.GetEntry(key.Key);
+                        StringTableEntry entry = stringTable.GetEntry(current.Key);
 
                         if (entry != null) tooltip = entry.Value;
                     }
 
-                    GUIContent content = new(key.Key, tooltip);
+                    GUIContent content = new(current.Key, tooltip);
 
                     contents.Add(content);
-                    values.Add(key.Key);
+
+                    ids.Add(current.Id);
+                    values.Add(current.Key);
                 }
             }
-
-            return contents;
         }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
