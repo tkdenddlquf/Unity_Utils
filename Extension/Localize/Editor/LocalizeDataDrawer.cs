@@ -61,24 +61,12 @@ namespace Yang.Localize
 
             int newTableIndex = EditorGUI.Popup(dropdownRect, selectedTableIndex, tableOptions);
 
-            if (newTableIndex != selectedTableIndex)
-            {
-                LocalizationTableCollection collection = collections[newTableIndex];
+            LocalizationTableCollection collection = collections[newTableIndex];
 
-                tableProp.stringValue = collection.TableCollectionName;
-                guidProp.stringValue = collection.TableCollectionNameReference.TableCollectionNameGuid.ToString();
+            tableProp.stringValue = collection.TableCollectionName;
+            guidProp.stringValue = collection.TableCollectionNameReference.TableCollectionNameGuid.ToString();
 
-                selectedTableIndex = newTableIndex;
-            }
-
-            if (tableProp.stringValue == "")
-            {
-                if (guidProp.stringValue != "") tableProp.stringValue = collections[newTableIndex].TableCollectionName;
-            }
-            else
-            {
-                if (guidProp.stringValue == "") guidProp.stringValue = collections[newTableIndex].TableCollectionNameReference.TableCollectionNameGuid.ToString();
-            }
+            selectedTableIndex = newTableIndex;
 
             if (GUI.Button(openButtonRect, EditorGUIUtility.IconContent("Folder Icon"))) LocalizationTablesWindow.ShowWindow(collections[selectedTableIndex]);
 
