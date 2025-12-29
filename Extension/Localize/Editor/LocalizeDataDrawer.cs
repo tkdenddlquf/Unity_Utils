@@ -71,7 +71,14 @@ namespace Yang.Localize
                 selectedTableIndex = newTableIndex;
             }
 
-            if (guidProp.stringValue == "" && tableProp.stringValue != "") guidProp.stringValue = collections[newTableIndex].TableCollectionNameReference.TableCollectionNameGuid.ToString();
+            if (tableProp.stringValue == "")
+            {
+                if (guidProp.stringValue != "") tableProp.stringValue = collections[newTableIndex].TableCollectionName;
+            }
+            else
+            {
+                if (guidProp.stringValue == "") guidProp.stringValue = collections[newTableIndex].TableCollectionNameReference.TableCollectionNameGuid.ToString();
+            }
 
             if (GUI.Button(openButtonRect, EditorGUIUtility.IconContent("Folder Icon"))) LocalizationTablesWindow.ShowWindow(collections[selectedTableIndex]);
 
