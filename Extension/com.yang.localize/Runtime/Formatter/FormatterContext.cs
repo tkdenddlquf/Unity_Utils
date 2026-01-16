@@ -6,7 +6,6 @@ using UnityEngine.Localization.Settings;
 using UnityEngine.Localization.SmartFormat;
 using UnityEngine.Localization.SmartFormat.Core.Extensions;
 using UnityEngine.ResourceManagement.AsyncOperations;
-using static UnityEngine.Rendering.DebugUI;
 
 namespace Yang.Localize.Formatter
 {
@@ -15,20 +14,28 @@ namespace Yang.Localize.Formatter
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void RuntimeInit()
         {
-            RegisterAll();
+            var op = LocalizationSettings.InitializationOperation;
 
-            LocalizationSettings.InitializationOperation.Completed -= RegisterAll;
-            LocalizationSettings.InitializationOperation.Completed += RegisterAll;
+            if (op.IsDone) RegisterAll();
+            else
+            {
+                op.Completed -= RegisterAll;
+                op.Completed += RegisterAll;
+            }
         }
 
 #if UNITY_EDITOR
         [UnityEditor.InitializeOnLoadMethod]
         private static void EditorInit()
         {
-            RegisterAll();
+            var op = LocalizationSettings.InitializationOperation;
 
-            LocalizationSettings.InitializationOperation.Completed -= RegisterAll;
-            LocalizationSettings.InitializationOperation.Completed += RegisterAll;
+            if (op.IsDone) RegisterAll();
+            else
+            {
+                op.Completed -= RegisterAll;
+                op.Completed += RegisterAll;
+            }
         }
 #endif
 

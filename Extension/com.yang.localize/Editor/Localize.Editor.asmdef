@@ -1,0 +1,9 @@
+{
+  "name": "Localize.Editor",
+  "references": [
+    "Localize.Runtime",
+    "Unity.Localization",
+    "Unity.Localization.Editor"
+  ],
+  "includePlatforms": ["Editor"]
+}

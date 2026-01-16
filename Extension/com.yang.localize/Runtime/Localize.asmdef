@@ -1,0 +1,7 @@
+{
+  "name": "Localize.Runtime",
+  "references": [
+    "Unity.Localization",
+    "Unity.ResourceManager"
+  ]
+}
