@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using UnityEditor.Experimental.GraphView;
 
 namespace Yang.Dialogue
 {
@@ -8,7 +7,7 @@ namespace Yang.Dialogue
     {
         public string CurrentNode { get; private set; }
 
-        private readonly List<RunnerData> runnerDatas = new();
+        private readonly List<RunnerText> runnerDatas = new();
 
         private readonly DialogueRunner runner;
         private readonly RunnerEvent runnerEvent;
@@ -82,22 +81,12 @@ namespace Yang.Dialogue
 
                         OptionData message = nodeData.GetOption(messageIndex);
 
-                        RunnerData data = new()
-                        {
-                            speakerTable = speakerTable.datas[1],
-                            speakerEntry = speakerEntry.datas[1],
+                        RunnerText speaker = new(speakerTable.datas[1], speakerEntry.datas[1]);
+                        RunnerText text = new(nodeData.GetPort(0), textTable.datas[1], textEntry.datas[1]);
 
-                            textTable = textTable.datas[1],
-                            textEntry = textEntry.datas[1],
+                        foreach (IDialogueView view in runner.Views) await view.OnDialogue(speaker, text, message.datas[0], token);
 
-                            message = message.datas[0],
-
-                            portName = nodeData.GetPort(0),
-                        };
-
-                        foreach (DialogueViewBase view in runner.Views) await view.OnDialogue(data, token);
-
-                        RunnerPort port = new(currentNode, data.portName);
+                        RunnerPort port = new(currentNode, text.portName);
 
                         if (links.TryGetValue(port, out RunnerPort target))
                         {
@@ -219,27 +208,18 @@ namespace Yang.Dialogue
 
                         OptionData message = nodeData.GetOption(messageIndex);
 
+                        RunnerText speaker = new(speakerTable.datas[1], speakerEntry.datas[1]);
+
                         foreach (OptionData textEntry in nodeData.GetOptions(DialogueType.CHOICE_TYPE_003, _ => _.Count != 0))
                         {
-                            RunnerData data = new()
-                            {
-                                speakerTable = speakerTable.datas[1],
-                                speakerEntry = speakerEntry.datas[1],
-
-                                textTable = textTable.datas[1],
-                                textEntry = textEntry.datas[2],
-
-                                message = message.datas[0],
-
-                                portName = textEntry.datas[0],
-                            };
+                            RunnerText data = new(textEntry.datas[0], textEntry.datas[2], textTable.datas[1]);
 
                             runnerDatas.Add(data);
                         }
 
-                        foreach (DialogueViewBase view in runner.Views)
+                        foreach (IDialogueView view in runner.Views)
                         {
-                            int result = await view.OnChoice(runnerDatas, token);
+                            int result = await view.OnChoice(speaker, runnerDatas, message.datas[0], token);
 
                             if (result != -1)
                             {
