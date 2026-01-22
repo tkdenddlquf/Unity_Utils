@@ -1,0 +1,13 @@
+{
+    "name": "com.yang.uicontroller",
+    "version": "1.0.0",
+    "displayName": "UIController",
+    "description": "Unity UI 제작 편의 및 관리 기능",
+    "unity": "2021.3",
+    "dependencies": {
+        "com.unity.inputsystem": "1.5.1"
+    },
+    "author": {
+        "name": "Yang Jaewan"
+    }
+}
