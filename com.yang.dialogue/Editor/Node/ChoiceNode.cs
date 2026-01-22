@@ -271,8 +271,8 @@ namespace Yang.Dialogue.Editor
 
                     OptionData option = data.GetOption(optionIndex);
 
-                    option.datas[0] = speakerEntries[index].id.ToString();
-                    option.datas[1] = speakerEntries[index].key;
+                    option.datas[0] = speakerEntries[index].key;
+                    option.datas[1] = speakerEntries[index].id.ToString();
 
                     data.SetOption(optionIndex, option);
                     so.SetNode(GUID, data);
@@ -288,14 +288,14 @@ namespace Yang.Dialogue.Editor
 
         private void AddSpeakerEntry(List<string> datas)
         {
-            int index = speakerEntries.IndexOf(new EntryData(datas[0], datas[1]));
+            int index = speakerEntries.IndexOf(new EntryData(datas[1], datas[0]));
 
             VisualElement container = AddSpeakerEntryContainer(index);
 
             if (index != -1)
             {
-                datas[0] = speakerEntries[index].id.ToString();
-                datas[1] = speakerEntries[index].key;
+                datas[0] = speakerEntries[index].key;
+                datas[1] = speakerEntries[index].id.ToString();
             }
 
             extensionContainer.Add(container);
@@ -373,8 +373,8 @@ namespace Yang.Dialogue.Editor
 
                     OptionData option = data.GetOption(optionIndex);
 
-                    option.datas[1] = textEntries[index].id.ToString();
-                    option.datas[2] = textEntries[index].key;
+                    option.datas[1] = textEntries[index].key;
+                    option.datas[2] = textEntries[index].id.ToString();
 
                     data.SetOption(optionIndex, option);
                     so.SetNode(GUID, data);
@@ -390,14 +390,14 @@ namespace Yang.Dialogue.Editor
 
         private void AddChoiceEntry(List<string> datas)
         {
-            int index = textEntries.IndexOf(new EntryData(datas[1], datas[2]));
+            int index = textEntries.IndexOf(new EntryData(datas[2], datas[1]));
 
             AddChoiceEntryContainer(datas[0], index);
 
             if (index != -1)
             {
-                datas[1] = textEntries[index].id.ToString();
-                datas[2] = textEntries[index].key;
+                datas[1] = textEntries[index].key;
+                datas[2] = textEntries[index].id.ToString();
             }
         }
 

@@ -81,8 +81,8 @@ namespace Yang.Dialogue
 
                         OptionData message = nodeData.GetOption(messageIndex);
 
-                        RunnerText speaker = new(speakerTable.datas[1], speakerEntry.datas[1]);
-                        RunnerText text = new(nodeData.GetPort(0), textTable.datas[1], textEntry.datas[1]);
+                        RunnerText speaker = new(speakerTable.datas[0], speakerEntry.datas[0]);
+                        RunnerText text = new(nodeData.GetPort(0), textTable.datas[0], textEntry.datas[0]);
 
                         foreach (IDialogueView view in runner.Views) await view.OnDialogue(speaker, text, message.datas[0], token);
 
@@ -208,11 +208,11 @@ namespace Yang.Dialogue
 
                         OptionData message = nodeData.GetOption(messageIndex);
 
-                        RunnerText speaker = new(speakerTable.datas[1], speakerEntry.datas[1]);
+                        RunnerText speaker = new(speakerTable.datas[0], speakerEntry.datas[0]);
 
                         foreach (OptionData textEntry in nodeData.GetOptions(DialogueType.CHOICE_TYPE_003, _ => _.Count != 0))
                         {
-                            RunnerText data = new(textEntry.datas[0], textEntry.datas[2], textTable.datas[1]);
+                            RunnerText data = new(textEntry.datas[0], textEntry.datas[1], textTable.datas[0]);
 
                             runnerDatas.Add(data);
                         }

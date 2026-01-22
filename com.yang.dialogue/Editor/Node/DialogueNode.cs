@@ -227,8 +227,8 @@ namespace Yang.Dialogue.Editor
 
                     OptionData option = data.GetOption(optionIndex);
 
-                    option.datas[0] = entries[index].id.ToString();
-                    option.datas[1] = entries[index].key;
+                    option.datas[0] = entries[index].key;
+                    option.datas[1] = entries[index].id.ToString();
 
                     data.SetOption(optionIndex, option);
                     so.SetNode(GUID, data);
@@ -244,14 +244,14 @@ namespace Yang.Dialogue.Editor
 
         private void AddEntry(List<string> datas, string type, List<EntryData> entries)
         {
-            int index = entries.IndexOf(new EntryData(datas[0], datas[1]));
+            int index = entries.IndexOf(new EntryData(datas[1], datas[0]));
 
             VisualElement container = AddEntryContainer(index, type, entries);
 
             if (index != -1)
             {
-                datas[0] = entries[index].id.ToString();
-                datas[1] = entries[index].key;
+                datas[0] = entries[index].key;
+                datas[1] = entries[index].id.ToString();
             }
 
             extensionContainer.Add(container);

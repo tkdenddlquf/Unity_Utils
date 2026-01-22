@@ -218,8 +218,6 @@ namespace Yang.Dialogue.Editor
 
             if (Selection.activeObject is DialogueSO so)
             {
-                if (SO == so) return;
-
                 SO = so;
 
                 RefreshView();
