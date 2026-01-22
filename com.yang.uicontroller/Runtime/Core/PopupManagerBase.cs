@@ -32,7 +32,7 @@ namespace Yang.UIController
 
         protected readonly List<UIBase<T>> activeUIs = new();
 
-        protected virtual void Start() => Init();
+        protected virtual void Awake() => Init();
 
         protected void Init()
         {

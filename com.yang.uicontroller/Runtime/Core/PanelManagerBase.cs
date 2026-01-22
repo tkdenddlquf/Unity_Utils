@@ -30,7 +30,7 @@ namespace Yang.UIController
 
         public T CurrentPanel { get; private set; }
 
-        protected virtual void Start() => Init(default);
+        protected virtual void Awake() => Init(default);
 
         protected void Init(T type)
         {
