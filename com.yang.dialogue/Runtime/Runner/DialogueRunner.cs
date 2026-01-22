@@ -7,8 +7,10 @@ namespace Yang.Dialogue
     {
         [SerializeField] private DialogueSO so;
 
-        [SerializeField] private List<DialogueViewBase> views = new();
-        public List<DialogueViewBase> Views => views;
+        [SerializeField] private List<DialogueViewBase> viewBases = new();
+
+        private readonly List<IDialogueView> views = new();
+        public List<IDialogueView> Views => views;
 
         private RunnerNode runnerNode;
         private RunnerEvent runnerEvent;
@@ -24,9 +26,11 @@ namespace Yang.Dialogue
 
         private void Init()
         {
-            runnerEvent ??= new();
-            runnerTrigger ??= new();
-            runnerNode ??= new(this, runnerEvent);
+            runnerEvent = new();
+            runnerTrigger = new();
+            runnerNode = new(this, runnerEvent);
+
+            views.InsertRange(0, viewBases);
 
             SetDialogue(so);
         }
