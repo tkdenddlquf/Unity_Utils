@@ -1,0 +1,20 @@
+{
+    "name": "Dialogue.Editor",
+    "rootNamespace": "",
+    "references": [
+        "Unity.Localization",
+        "Unity.Localization.Editor",
+        "Dialogue.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
