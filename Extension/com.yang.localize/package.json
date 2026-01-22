@@ -1,6 +1,6 @@
 {
   "name": "com.yang.localize",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "Localize",
   "description": "Unity Localization 패키지를 확장하는 기능 모음",
   "unity": "2021.3",
@@ -8,6 +8,6 @@
     "com.unity.localization": "1.5.3"
   },
   "author": {
-    "name": "Your Name"
+    "name": "Yang Jaewan"
   }
 }
