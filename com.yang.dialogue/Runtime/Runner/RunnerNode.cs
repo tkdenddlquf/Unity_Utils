@@ -212,7 +212,7 @@ namespace Yang.Dialogue
 
                         foreach (OptionData textEntry in nodeData.GetOptions(DialogueType.CHOICE_TYPE_003, _ => _.Count != 0))
                         {
-                            RunnerText data = new(textEntry.datas[0], textEntry.datas[1], textTable.datas[0]);
+                            RunnerText data = new(textEntry.datas[0], textTable.datas[0], textEntry.datas[1]);
 
                             runnerDatas.Add(data);
                         }
