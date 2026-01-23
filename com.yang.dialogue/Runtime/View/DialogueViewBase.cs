@@ -9,11 +9,16 @@ namespace Yang.Dialogue
         public virtual Task OnDialogue(RunnerText speaker, RunnerText text, string message, RunnerToken token) => Task.CompletedTask;
 
         public virtual Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, RunnerToken token) => Task.FromResult(-1);
+
+        public virtual void EndDialogue() { }
     }
 
     public interface IDialogueView
     {
         public Task OnDialogue(RunnerText speaker, RunnerText text, string message, RunnerToken token);
+
         public Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, RunnerToken token);
+
+        public void EndDialogue();
     }
 }

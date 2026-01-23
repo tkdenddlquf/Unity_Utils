@@ -64,6 +64,8 @@ namespace Yang.Dialogue
             token.Dispose();
             token = null;
 
+            foreach (IDialogueView view in views) await view.EndDialogue();
+
             IsStarted = false;
         }
 
