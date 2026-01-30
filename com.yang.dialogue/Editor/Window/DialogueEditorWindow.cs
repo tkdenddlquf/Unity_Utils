@@ -220,7 +220,7 @@ namespace Yang.Dialogue.Editor
             {
                 SO = so;
 
-                RefreshView();
+                if (so != null) RefreshView();
             }
         }
 
