@@ -220,12 +220,14 @@ namespace Yang.Dialogue.Editor
             {
                 SO = so;
 
-                if (so != null) RefreshView();
+                RefreshView();
             }
         }
 
         private void RefreshView()
         {
+            if (SO == null) return;
+
             foreach (Node node in graph.nodes) graph.RemoveElement(node);
             foreach (Edge edge in graph.edges) graph.RemoveElement(edge);
 
