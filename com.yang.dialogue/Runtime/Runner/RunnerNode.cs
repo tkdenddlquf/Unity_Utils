@@ -249,20 +249,20 @@ namespace Yang.Dialogue
 
                         List<string> datas = option.datas;
 
-                        WaitType type = (WaitType)Enum.Parse(typeof(WaitType), datas[1]);
+                        WaitType type = (WaitType)Enum.Parse(typeof(WaitType), datas[0]);
 
                         switch (type)
                         {
                             case WaitType.Notify:
-                                foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait, datas[2]);
+                                foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait, datas[1]);
 
-                                runnerEvent.OnEvent(datas[2]);
+                                runnerEvent.OnEvent(datas[1]);
                                 break;
 
                             case WaitType.Seconds:
-                                TimeSpan delay = TimeSpan.FromSeconds(float.Parse(datas[2]));
+                                TimeSpan delay = TimeSpan.FromSeconds(float.Parse(datas[1]));
 
-                                await Task.Delay(delay.Milliseconds, token.Token);
+                                await Task.Delay(delay, token.Token);
                                 break;
                         }
 

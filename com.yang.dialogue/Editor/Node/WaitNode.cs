@@ -32,11 +32,9 @@ namespace Yang.Dialogue.Editor
 
             if (data.OptionCount == 0)
             {
-                string id = CreateID(DialogueType.WAIT_TYPE_000);
                 OptionData optionData = new(DialogueType.WAIT_TYPE_000);
 
-                optionData.datas.Add(id);
-                optionData.datas.Add(EMPTY_OPTION);
+                optionData.datas.Add(WaitType.Notify.ToString());
                 optionData.datas.Add(EMPTY_OPTION);
 
                 data.AddOption(optionData);
@@ -54,11 +52,11 @@ namespace Yang.Dialogue.Editor
 
             List<string> datas = option.datas;
 
-            Enum.TryParse(datas[1], out WaitType waitType);
+            Enum.TryParse(datas[0], out WaitType waitType);
 
             EnumField typeField = GetTypeField(waitType, option.type);
-            FloatField secondsField = GetSecondsField(datas[2], option.type);
-            PopupField<string> eventField = GetEventField(so.Events, datas[2], option.type);
+            FloatField secondsField = GetSecondsField(datas[1], option.type);
+            PopupField<string> eventField = GetEventField(so.Events, datas[1], option.type);
 
             extensionContainer.Add(typeField);
             extensionContainer.Add(secondsField);
@@ -146,7 +144,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[1] = evt.newValue.ToString();
+                optionData.datas[0] = evt.newValue.ToString();
 
                 SetDisplaySeconds((WaitType)evt.newValue);
 
@@ -172,7 +170,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[2] = evt.newValue.ToString();
+                optionData.datas[1] = evt.newValue.ToString();
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);
@@ -196,7 +194,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[2] = evt.newValue;
+                optionData.datas[1] = evt.newValue;
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);
