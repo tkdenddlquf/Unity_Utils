@@ -1,5 +1,3 @@
-using UnityEngine;
-
 namespace Yang.Dialogue
 {
     public class DialogueType
@@ -7,6 +5,8 @@ namespace Yang.Dialogue
         public const string TRIGGER_TYPE_000 = "Trigger";
 
         public const string EVENT_TYPE_000 = "Event";
+
+        public const string WAIT_TYPE_000 = "Wait";
 
         public const string CHOICE_TYPE_000 = "Speaker Table";
         public const string CHOICE_TYPE_001 = "Speaker Entry";
@@ -23,15 +23,5 @@ namespace Yang.Dialogue
         public const string DIALOGUE_TYPE_002 = "Text Table";
         public const string DIALOGUE_TYPE_003 = "Text Entry";
         public const string DIALOGUE_TYPE_004 = "Message";
-
-        public enum Node
-        {
-            Start,
-            Dialogue,
-            Condition,
-            Trigger,
-            Event,
-            Choice,
-        }
     }
 }

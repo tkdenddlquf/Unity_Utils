@@ -235,12 +235,12 @@ namespace Yang.Dialogue.Editor
 
             if (string.IsNullOrEmpty(startNode.guid))
             {
-                SO.startNode = new NodeData(DialogueType.Node.Start);
+                SO.startNode = new NodeData(NodeType.Start);
 
                 startNode = SO.startNode;
             }
 
-            CreateNode(DialogueType.Node.Start, startNode.guid, startNode.position);
+            CreateNode(NodeType.Start, startNode.guid, startNode.position);
 
             IReadOnlyList<NodeData> nodes = SO.GetNodes();
 
@@ -312,7 +312,7 @@ namespace Yang.Dialogue.Editor
             graph.MarkDirtyRepaint();
         }
 
-        private void CreateNode(DialogueType.Node type, string guid, Vector2 position)
+        private void CreateNode(NodeType type, string guid, Vector2 position)
         {
             BaseNode node = graph.CreateNode(type, guid, position);
 

@@ -41,7 +41,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        protected string CreateIDName(string baseID)
+        protected string CreateID(string baseID)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);

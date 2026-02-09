@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -6,6 +7,8 @@ namespace Yang.Dialogue
     public class RunnerNode
     {
         public string CurrentNode { get; private set; }
+
+        public bool IsWait { get; private set; }
 
         private readonly List<RunnerText> runnerDatas = new();
 
@@ -51,7 +54,7 @@ namespace Yang.Dialogue
 
             switch (nodeData.type)
             {
-                case DialogueType.Node.Start:
+                case NodeType.Start:
                     {
                         string portName = nodeData.GetPort(0);
 
@@ -61,7 +64,7 @@ namespace Yang.Dialogue
                     }
                     break;
 
-                case DialogueType.Node.Dialogue:
+                case NodeType.Dialogue:
                     {
                         CurrentNode = currentNode;
 
@@ -97,7 +100,7 @@ namespace Yang.Dialogue
                     }
                     break;
 
-                case DialogueType.Node.Condition:
+                case NodeType.Condition:
                     {
                         IReadOnlyList<OptionData> options = nodeData.GetOptions();
 
@@ -142,7 +145,7 @@ namespace Yang.Dialogue
                     }
                     break;
 
-                case DialogueType.Node.Trigger:
+                case NodeType.Trigger:
                     {
                         IReadOnlyList<OptionData> options = nodeData.GetOptions();
 
@@ -167,7 +170,7 @@ namespace Yang.Dialogue
                     }
                     break;
 
-                case DialogueType.Node.Event:
+                case NodeType.Event:
                     {
                         IReadOnlyList<OptionData> options = nodeData.GetOptions();
 
@@ -188,7 +191,7 @@ namespace Yang.Dialogue
                     }
                     break;
 
-                case DialogueType.Node.Choice:
+                case NodeType.Choice:
                     {
                         CurrentNode = currentNode;
 
@@ -236,6 +239,43 @@ namespace Yang.Dialogue
                         }
                     }
                     break;
+
+                case NodeType.Wait:
+                    {
+                        IsWait = true;
+                        CurrentNode = currentNode;
+
+                        OptionData option = nodeData.GetOption(0);
+
+                        List<string> datas = option.datas;
+
+                        WaitType type = (WaitType)Enum.Parse(typeof(WaitType), datas[1]);
+
+                        switch (type)
+                        {
+                            case WaitType.Notify:
+                                foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait);
+                                break;
+
+                            case WaitType.Seconds:
+                                TimeSpan delay = TimeSpan.FromSeconds(float.Parse(datas[2]));
+
+                                await Task.Delay(delay.Milliseconds, token.Token);
+                                break;
+                        }
+
+                        string portName = nodeData.GetPort(0);
+
+                        RunnerPort port = new(currentNode, portName);
+
+                        if (links.TryGetValue(port, out RunnerPort target))
+                        {
+                            CurrentNode = target.guid;
+
+                            return CurrentNode;
+                        }
+                    }
+                    break;
             }
 
             return "";
@@ -247,5 +287,7 @@ namespace Yang.Dialogue
 
             CurrentNode = nodeName;
         }
+
+        public void Continue() => IsWait = false;
     }
 }

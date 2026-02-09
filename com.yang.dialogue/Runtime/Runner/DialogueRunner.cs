@@ -64,12 +64,14 @@ namespace Yang.Dialogue
             token.Dispose();
             token = null;
 
-            foreach (IDialogueView view in views) view.EndDialogue();
+            foreach (IDialogueView view in views) view.OnNotify(NotifyType.End);
 
             IsStarted = false;
         }
 
         public void StopDialogue() => token?.Cancel();
+
+        public void ContinueDialogue() => runnerNode.Continue();
 
         public DialogueWrapper Save()
         {

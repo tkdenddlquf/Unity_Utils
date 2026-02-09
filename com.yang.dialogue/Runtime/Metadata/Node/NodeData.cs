@@ -8,7 +8,7 @@ namespace Yang.Dialogue
     public struct NodeData : IEquatable<NodeData>
     {
         public string guid;
-        public DialogueType.Node type;
+        public NodeType type;
 
         [SerializeField] private List<string> ports;
         [SerializeField] private List<OptionData> options;
@@ -17,7 +17,7 @@ namespace Yang.Dialogue
         public Vector2 position;
 #endif
 
-        public NodeData(DialogueType.Node type)
+        public NodeData(NodeType type)
         {
             guid = Guid.NewGuid().ToString();
 

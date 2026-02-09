@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEditor.Localization;
@@ -184,7 +185,18 @@ namespace Yang.Dialogue.Editor
         {
             int index = GetTableIndex(datas[0], datas[1]);
 
-            VisualElement container = AddTableContainer(index, type, entries);
+            PopupField<string> dropdown = new(type, tables, index);
+
+            dropdown.labelElement.style.minWidth = StyleKeyword.Auto;
+            dropdown.labelElement.style.width = StyleKeyword.Auto;
+            
+            VisualElement box = dropdown[1];
+
+            box.style.minWidth = ITEM_MIN_WIDTH;
+
+            dropdown.RegisterValueChangedCallback(evt => TableChangedCallback(evt, type, entries));
+
+            extensionContainer.Add(dropdown);
 
             if (index != -1)
             {
@@ -193,30 +205,6 @@ namespace Yang.Dialogue.Editor
                 datas[0] = collections[index].TableCollectionName;
                 datas[1] = collections[index].TableCollectionNameReference.TableCollectionNameGuid.ToString();
             }
-
-            extensionContainer.Add(container);
-        }
-
-        private VisualElement AddTableContainer(int index, string type, List<EntryData> entries)
-        {
-            VisualElement container = new();
-
-            container.style.flexDirection = FlexDirection.Row;
-
-            Label label = new(type);
-
-            label.style.alignSelf = Align.Center;
-
-            PopupField<string> dropdown = new(tables, index);
-
-            dropdown.style.flexGrow = 1;
-            dropdown.style.minWidth = ITEM_MIN_WIDTH;
-            dropdown.RegisterValueChangedCallback(evt => TableChangedCallback(evt, type, entries));
-
-            container.Add(label);
-            container.Add(dropdown);
-
-            return container;
         }
 
         private void SetTables()
@@ -290,39 +278,26 @@ namespace Yang.Dialogue.Editor
         {
             int index = speakerEntries.IndexOf(new EntryData(datas[1], datas[0]));
 
-            VisualElement container = AddSpeakerEntryContainer(index);
+            PopupField<EntryData> dropdown = new(DialogueType.CHOICE_TYPE_001, speakerEntries, index);
+
+            dropdown.labelElement.style.minWidth = StyleKeyword.Auto;
+            dropdown.labelElement.style.width = StyleKeyword.Auto;
+
+            VisualElement box = dropdown[1];
+
+            box.style.minWidth = ITEM_MIN_WIDTH;
+
+            dropdown.RegisterValueChangedCallback(evt => SpeakerEntryChangedCallback(evt));
+
+            extensionContainer.Add(dropdown);
 
             if (index != -1)
             {
+                dropdown.tooltip = speakerEntries[index].tooltip;
+
                 datas[0] = speakerEntries[index].key;
                 datas[1] = speakerEntries[index].id.ToString();
             }
-
-            extensionContainer.Add(container);
-        }
-
-        private VisualElement AddSpeakerEntryContainer(int index)
-        {
-            VisualElement container = new();
-
-            container.style.flexDirection = FlexDirection.Row;
-
-            Label label = new(DialogueType.CHOICE_TYPE_001);
-
-            label.style.alignSelf = Align.Center;
-
-            PopupField<EntryData> dropdown = new(speakerEntries, index);
-
-            dropdown.style.minWidth = ITEM_MIN_WIDTH;
-            dropdown.style.flexGrow = 1;
-            dropdown.RegisterValueChangedCallback(evt => SpeakerEntryChangedCallback(evt));
-
-            container.Add(label);
-            container.Add(dropdown);
-
-            if (index != -1) dropdown.tooltip = speakerEntries[index].tooltip;
-
-            return container;
         }
         #endregion
 
@@ -488,10 +463,8 @@ namespace Yang.Dialogue.Editor
 
             text.labelElement.style.minWidth = StyleKeyword.Auto;
             text.labelElement.style.width = StyleKeyword.Auto;
-            text.labelElement.style.flexShrink = 0;
 
             text.style.minWidth = ITEM_MIN_WIDTH;
-            text.style.flexGrow = 1;
             text.RegisterValueChangedCallback(evt => MessageChangedCallback(evt, type));
 
             extensionContainer.Add(text);

@@ -32,11 +32,12 @@ namespace Yang.Dialogue.Editor
 
             DropdownMenu menu = evt.menu;
 
-            menu.AppendAction("Add Dialogue", _ => AddNode(DialogueType.Node.Dialogue, nodePos));
-            menu.AppendAction("Add Condition", _ => AddNode(DialogueType.Node.Condition, nodePos));
-            menu.AppendAction("Add Trigger", _ => AddNode(DialogueType.Node.Trigger, nodePos));
-            menu.AppendAction("Add Event", _ => AddNode(DialogueType.Node.Event, nodePos));
-            menu.AppendAction("Add Choice", _ => AddNode(DialogueType.Node.Choice, nodePos));
+            menu.AppendAction("Add Dialogue", _ => AddNode(NodeType.Dialogue, nodePos));
+            menu.AppendAction("Add Condition", _ => AddNode(NodeType.Condition, nodePos));
+            menu.AppendAction("Add Trigger", _ => AddNode(NodeType.Trigger, nodePos));
+            menu.AppendAction("Add Event", _ => AddNode(NodeType.Event, nodePos));
+            menu.AppendAction("Add Choice", _ => AddNode(NodeType.Choice, nodePos));
+            menu.AppendAction("Add Wait", _ => AddNode(NodeType.Wait, nodePos));
         }
 
         public override List<Port> GetCompatiblePorts(Port startPort, NodeAdapter nodeAdapter)
@@ -56,7 +57,7 @@ namespace Yang.Dialogue.Editor
         }
 
         #region Node
-        private void AddNode(DialogueType.Node type, Vector2 position)
+        private void AddNode(NodeType type, Vector2 position)
         {
             DialogueSO so = window.SO;
 
@@ -75,7 +76,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        public BaseNode CreateNode(DialogueType.Node type, string guid, Vector2 position) => CreateNode(ConvertData(type, guid), position);
+        public BaseNode CreateNode(NodeType type, string guid, Vector2 position) => CreateNode(ConvertData(type, guid), position);
 
         public BaseNode CreateNode(BaseNode node, Vector2 position)
         {
@@ -91,16 +92,17 @@ namespace Yang.Dialogue.Editor
             return node;
         }
 
-        private BaseNode ConvertData(DialogueType.Node type, string guid)
+        private BaseNode ConvertData(NodeType type, string guid)
         {
             BaseNode node = type switch
             {
-                DialogueType.Node.Start => new StartNode(window, guid),
-                DialogueType.Node.Dialogue => new DialogueNode(window, guid),
-                DialogueType.Node.Condition => new ConditionNode(window, guid),
-                DialogueType.Node.Trigger => new TriggerNode(window, guid),
-                DialogueType.Node.Event => new EventNode(window, guid),
-                DialogueType.Node.Choice => new ChoiceNode(window, guid),
+                NodeType.Start => new StartNode(window, guid),
+                NodeType.Dialogue => new DialogueNode(window, guid),
+                NodeType.Condition => new ConditionNode(window, guid),
+                NodeType.Trigger => new TriggerNode(window, guid),
+                NodeType.Event => new EventNode(window, guid),
+                NodeType.Choice => new ChoiceNode(window, guid),
+                NodeType.Wait => new WaitNode(window, guid),
                 _ => null,
             };
 

@@ -7,6 +7,8 @@ namespace Yang.Dialogue.Editor
 {
     public class EventNode : BaseNode
     {
+        private readonly List<string> events = new();
+
         public EventNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
@@ -36,10 +38,10 @@ namespace Yang.Dialogue.Editor
 
             if (data.OptionCount == 0)
             {
-                string triggerName = CreateIDName(DialogueType.EVENT_TYPE_000);
+                string id = CreateID(DialogueType.EVENT_TYPE_000);
                 OptionData optionData = new(DialogueType.EVENT_TYPE_000);
 
-                optionData.datas.Add(triggerName);
+                optionData.datas.Add(id);
                 optionData.datas.Add(EMPTY_OPTION);
 
                 data.AddOption(optionData);
@@ -53,7 +55,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            List<EventKeySO> events = so.events;
+            KeyConverter.GetKeys(so.Events, events);
 
             foreach (OptionData option in data.GetOptions())
             {
@@ -62,7 +64,7 @@ namespace Yang.Dialogue.Editor
                 switch (option.type)
                 {
                     case DialogueType.EVENT_TYPE_000:
-                        int index = EventKeySO.FindIndex(events, datas[1]);
+                        int index = events.IndexOf(datas[1]);
 
                         AddEvent(datas[0], index);
                         break;
@@ -75,7 +77,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            string id = CreateIDName(type);
+            string id = CreateID(type);
 
             Undo.RecordObject(so, $"Create {type}");
 
@@ -109,7 +111,9 @@ namespace Yang.Dialogue.Editor
             container.style.flexDirection = FlexDirection.Row;
             container.style.alignItems = Align.Center;
 
-            PopupField<EventKeySO> dropdown = new(so.events, index);
+            KeyConverter.GetKeys(so.Events, events);
+
+            PopupField<string> dropdown = new(events, index);
 
             dropdown.style.minWidth = ITEM_MIN_WIDTH;
             dropdown.style.flexGrow = 1;
@@ -146,7 +150,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<EventKeySO> evt, string id, string type)
+        private void ChangedCallback(ChangeEvent<string> evt, string id, string type)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
@@ -167,7 +171,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[index] = evt.newValue.key;
+                optionData.datas[index] = evt.newValue;
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);

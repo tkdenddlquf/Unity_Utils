@@ -7,6 +7,8 @@ namespace Yang.Dialogue.Editor
 {
     public class TriggerNode : BaseNode
     {
+        private readonly List<string> conditions = new();
+
         public TriggerNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
@@ -36,10 +38,10 @@ namespace Yang.Dialogue.Editor
 
             if (data.OptionCount == 0)
             {
-                string triggerName = CreateIDName(DialogueType.TRIGGER_TYPE_000);
+                string id = CreateID(DialogueType.TRIGGER_TYPE_000);
                 OptionData optionData = new(DialogueType.TRIGGER_TYPE_000);
 
-                optionData.datas.Add(triggerName);
+                optionData.datas.Add(id);
                 optionData.datas.Add(EMPTY_OPTION);
                 optionData.datas.Add(true.ToString());
 
@@ -54,7 +56,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            List<ConditionKeySO> conditions = so.conditions;
+            KeyConverter.GetKeys(so.Conditions, conditions);
 
             foreach (OptionData option in data.GetOptions())
             {
@@ -63,7 +65,7 @@ namespace Yang.Dialogue.Editor
                 switch (option.type)
                 {
                     case DialogueType.TRIGGER_TYPE_000:
-                        int index = ConditionKeySO.FindIndex(conditions, datas[1]);
+                        int index = conditions.IndexOf(datas[1]);
 
                         AddTrigger(datas[0], index, bool.Parse(datas[2]));
                         break;
@@ -76,7 +78,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            string id = CreateIDName(type);
+            string id = CreateID(type);
 
             Undo.RecordObject(so, $"Create {type}");
 
@@ -115,7 +117,9 @@ namespace Yang.Dialogue.Editor
 
             toggle.RegisterValueChangedCallback(evt => ToggleCallback(evt, id, DialogueType.TRIGGER_TYPE_000));
 
-            PopupField<ConditionKeySO> dropdown = new(so.conditions, index);
+            KeyConverter.GetKeys(so.Conditions, conditions);
+
+            PopupField<string> dropdown = new(conditions, index);
 
             dropdown.style.minWidth = ITEM_MIN_WIDTH;
             dropdown.style.flexGrow = 1;
@@ -153,7 +157,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<ConditionKeySO> evt, string id, string type)
+        private void ChangedCallback(ChangeEvent<string> evt, string id, string type)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
@@ -174,7 +178,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[index] = evt.newValue.key;
+                optionData.datas[index] = evt.newValue;
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);

@@ -7,6 +7,8 @@ namespace Yang.Dialogue.Editor
 {
     public class ConditionNode : BaseNode
     {
+        private readonly List<string> conditions = new();
+
         public ConditionNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
@@ -52,7 +54,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            List<ConditionKeySO> conditions = so.conditions;
+            KeyConverter.GetKeys(so.Conditions, conditions);
 
             foreach (OptionData option in data.GetOptions())
             {
@@ -66,7 +68,7 @@ namespace Yang.Dialogue.Editor
 
                     case DialogueType.CONDITION_TYPE_002:
                         {
-                            int index = ConditionKeySO.FindIndex(conditions, datas[1]);
+                            int index = conditions.IndexOf(datas[1]);
 
                             AddSinglePort(datas[0], index);
                         }
@@ -78,7 +80,7 @@ namespace Yang.Dialogue.Editor
 
                         for (int i = 0; i < datas.Count; i++)
                         {
-                            int index = ConditionKeySO.FindIndex(conditions, datas[i]);
+                            int index = conditions.IndexOf(datas[i]);
 
                             AddDropdown(portName, option.type, itemContainer, index);
                         }
@@ -163,7 +165,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void ChangedCallback(ChangeEvent<ConditionKeySO> evt, string portName, string type)
+        private void ChangedCallback(ChangeEvent<string> evt, string portName, string type)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
@@ -194,7 +196,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[index] = evt.newValue.key;
+                optionData.datas[index] = evt.newValue;
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);
@@ -240,7 +242,9 @@ namespace Yang.Dialogue.Editor
             container.style.flexDirection = FlexDirection.Row;
             container.style.alignItems = Align.Center;
 
-            PopupField<ConditionKeySO> dropdown = new(so.conditions, index);
+            KeyConverter.GetKeys(so.Conditions, conditions);
+
+            PopupField<string> dropdown = new(conditions, index);
 
             dropdown.style.flexGrow = 1;
             dropdown.style.minWidth = ITEM_MIN_WIDTH;
@@ -350,7 +354,9 @@ namespace Yang.Dialogue.Editor
             dropdownContainer.style.flexDirection = FlexDirection.Row;
             dropdownContainer.style.alignItems = Align.Center;
 
-            PopupField<ConditionKeySO> dropdown = new(so.conditions, index);
+            KeyConverter.GetKeys(so.Conditions, conditions);
+
+            PopupField<string> dropdown = new(conditions, index);
 
             dropdown.style.minWidth = ITEM_MIN_WIDTH;
             dropdown.style.flexGrow = 1;

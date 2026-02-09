@@ -10,8 +10,11 @@ namespace Yang.Dialogue
 
         public NodeData startNode;
 
-        public List<EventKeySO> events;
-        public List<ConditionKeySO> conditions;
+        [SerializeReference] private IEventMarker events;
+        public IEventMarker Events => events;
+
+        [SerializeReference] private IConditionMarker conditions;
+        public IConditionMarker Conditions => conditions;
 
         [SerializeField] private List<NodeData> nodes = new();
         [SerializeField] private List<LinkData> links = new();
