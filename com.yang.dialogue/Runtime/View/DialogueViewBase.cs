@@ -10,7 +10,7 @@ namespace Yang.Dialogue
 
         public virtual Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, RunnerToken token) => Task.FromResult(-1);
 
-        public virtual void OnNotify(NotifyType type) { }
+        public virtual void OnNotify(NotifyType type, string key) { }
     }
 
     public interface IDialogueView
@@ -19,6 +19,6 @@ namespace Yang.Dialogue
 
         public Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, RunnerToken token);
 
-        public void OnNotify(NotifyType type);
+        public void OnNotify(NotifyType type, string key);
     }
 }

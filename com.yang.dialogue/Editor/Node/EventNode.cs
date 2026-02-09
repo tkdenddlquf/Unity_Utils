@@ -66,7 +66,7 @@ namespace Yang.Dialogue.Editor
                     case DialogueType.EVENT_TYPE_000:
                         int index = events.IndexOf(datas[1]);
 
-                        AddEvent(datas[0], index);
+                        AddEventField(datas[0], index);
                         break;
                 }
             }
@@ -88,7 +88,7 @@ namespace Yang.Dialogue.Editor
             switch (type)
             {
                 case DialogueType.EVENT_TYPE_000:
-                    AddEvent(id, -1);
+                    AddEventField(id, -1);
 
                     newOption.datas.Add(EMPTY_OPTION);
                     break;
@@ -103,7 +103,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void AddEvent(string id, int index)
+        private void AddEventField(string id, int index)
         {
             DialogueSO so = window.SO;
             VisualElement container = new();
@@ -113,21 +113,21 @@ namespace Yang.Dialogue.Editor
 
             KeyConverter.GetKeys(so.Events, events);
 
-            PopupField<string> dropdown = new(events, index);
+            PopupField<string> field = new(events, index);
 
-            dropdown.style.minWidth = ITEM_MIN_WIDTH;
-            dropdown.style.flexGrow = 1;
-            dropdown.RegisterValueChangedCallback(evt => ChangedCallback(evt, id, DialogueType.EVENT_TYPE_000));
+            field.style.minWidth = ITEM_MIN_WIDTH;
+            field.style.flexGrow = 1;
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, id, DialogueType.EVENT_TYPE_000));
 
-            Button removeButton = new(() => RemoveEvent(container, id, DialogueType.EVENT_TYPE_000)) { text = "X" };
+            Button removeButton = new(() => RemoveEventContainer(container, id, DialogueType.EVENT_TYPE_000)) { text = "X" };
 
-            container.Add(dropdown);
+            container.Add(field);
             container.Add(removeButton);
 
             extensionContainer.Add(container);
         }
 
-        private void RemoveEvent(VisualElement container, string id, string type)
+        private void RemoveEventContainer(VisualElement container, string id, string type)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
@@ -155,15 +155,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int index = 1;
-            int optionIndex = -1;
-
-            switch (type)
-            {
-                case DialogueType.EVENT_TYPE_000:
-                    optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == id);
-                    break;
-            }
+            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == id);
 
             if (optionIndex != -1)
             {
@@ -171,7 +163,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[index] = evt.newValue;
+                optionData.datas[1] = evt.newValue;
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);

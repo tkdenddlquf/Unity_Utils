@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.ComponentModel;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEditor.Localization;
@@ -83,30 +82,30 @@ namespace Yang.Dialogue.Editor
                 switch (option.type)
                 {
                     case DialogueType.DIALOGUE_TYPE_000:
-                        AddTable(option.datas, option.type, speakerEntries);
+                        AddTableField(option.datas, option.type, speakerEntries);
                         break;
 
                     case DialogueType.DIALOGUE_TYPE_001:
-                        AddEntry(option.datas, option.type, speakerEntries);
+                        AddEntryField(option.datas, option.type, speakerEntries);
                         break;
 
                     case DialogueType.DIALOGUE_TYPE_002:
-                        AddTable(option.datas, option.type, textEntries);
+                        AddTableField(option.datas, option.type, textEntries);
                         break;
 
                     case DialogueType.DIALOGUE_TYPE_003:
-                        AddEntry(option.datas, option.type, textEntries);
+                        AddEntryField(option.datas, option.type, textEntries);
                         break;
 
                     case DialogueType.DIALOGUE_TYPE_004:
-                        AddMessage(option.datas, option.type);
+                        AddMessageField(option.datas, option.type);
                         break;
                 }
             }
         }
 
         #region Table
-        private void TableChangedCallback(ChangeEvent<string> evt, string type, List<EntryData> entries)
+        private void ChangedCallback(ChangeEvent<string> evt, string type, List<EntryData> entries)
         {
             int index = tables.IndexOf(evt.newValue);
 
@@ -138,22 +137,20 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void AddTable(List<string> datas, string type, List<EntryData> entries)
+        private void AddTableField(List<string> datas, string type, List<EntryData> entries)
         {
             int index = GetTableIndex(datas[0], datas[1]);
 
-            PopupField<string> dropdown = new(type, tables, index);
+            PopupField<string> field = new(type, tables, index);
 
-            dropdown.labelElement.style.minWidth = StyleKeyword.Auto;
-            dropdown.labelElement.style.width = StyleKeyword.Auto;
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
 
-            VisualElement box = dropdown[1];
+            field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            box.style.minWidth = ITEM_MIN_WIDTH;
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type, entries));
 
-            dropdown.RegisterValueChangedCallback(evt => TableChangedCallback(evt, type, entries));
-
-            extensionContainer.Add(dropdown);
+            extensionContainer.Add(field);
 
             if (index != -1)
             {
@@ -198,7 +195,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Entry
-        private void EntryChangedCallback(ChangeEvent<EntryData> evt, string type, List<EntryData> entries)
+        private void ChangedCallback(ChangeEvent<EntryData> evt, string type, List<EntryData> entries)
         {
             int index = entries.IndexOf(evt.newValue);
 
@@ -221,7 +218,7 @@ namespace Yang.Dialogue.Editor
                     data.SetOption(optionIndex, option);
                     so.SetNode(GUID, data);
 
-                    if (index != -1 && evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = entries[index].tooltip;
+                    if (evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = entries[index].tooltip;
 
                     EditorUtility.SetDirty(so);
 
@@ -230,26 +227,24 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void AddEntry(List<string> datas, string type, List<EntryData> entries)
+        private void AddEntryField(List<string> datas, string type, List<EntryData> entries)
         {
             int index = entries.IndexOf(new EntryData(datas[1], datas[0]));
 
-            PopupField<EntryData> dropdown = new(type, entries, index);
+            PopupField<EntryData> field = new(type, entries, index);
 
-            dropdown.labelElement.style.minWidth = StyleKeyword.Auto;
-            dropdown.labelElement.style.width = StyleKeyword.Auto;
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
 
-            VisualElement box = dropdown[1];
+            field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            box.style.minWidth = ITEM_MIN_WIDTH;
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type, entries));
 
-            dropdown.RegisterValueChangedCallback(evt => EntryChangedCallback(evt, type, entries));
-
-            extensionContainer.Add(dropdown);
+            extensionContainer.Add(field);
 
             if (index != -1)
             {
-                dropdown.tooltip = entries[index].tooltip;
+                field.tooltip = entries[index].tooltip;
 
                 datas[0] = entries[index].key;
                 datas[1] = entries[index].id.ToString();
@@ -282,7 +277,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Message
-        private void MessageChangedCallback(ChangeEvent<string> evt, string type)
+        private void ChangedCallback(ChangeEvent<string> evt, string type)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
@@ -306,17 +301,18 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void AddMessage(List<string> datas, string type)
+        private void AddMessageField(List<string> datas, string type)
         {
-            TextField text = new(type) { value = datas[0] };
+            TextField field = new(type) { value = datas[0] };
 
-            text.labelElement.style.minWidth = StyleKeyword.Auto;
-            text.labelElement.style.width = StyleKeyword.Auto;
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
 
-            text.style.minWidth = ITEM_MIN_WIDTH;
-            text.RegisterValueChangedCallback(evt => MessageChangedCallback(evt, type));
+            field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            extensionContainer.Add(text);
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type));
+
+            extensionContainer.Add(field);
         }
         #endregion
     }

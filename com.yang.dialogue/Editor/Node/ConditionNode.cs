@@ -82,7 +82,7 @@ namespace Yang.Dialogue.Editor
                         {
                             int index = conditions.IndexOf(datas[i]);
 
-                            AddDropdown(portName, option.type, itemContainer, index);
+                            AddConditionField(portName, option.type, itemContainer, index);
                         }
                         break;
                 }
@@ -115,7 +115,7 @@ namespace Yang.Dialogue.Editor
 
                     option.datas.Add(EMPTY_OPTION);
 
-                    AddDropdown(portName, type, itemContainer, -1);
+                    AddConditionField(portName, type, itemContainer, -1);
                     break;
             }
 
@@ -244,17 +244,17 @@ namespace Yang.Dialogue.Editor
 
             KeyConverter.GetKeys(so.Conditions, conditions);
 
-            PopupField<string> dropdown = new(conditions, index);
+            PopupField<string> field = new(conditions, index);
 
-            dropdown.style.flexGrow = 1;
-            dropdown.style.minWidth = ITEM_MIN_WIDTH;
-            dropdown.RegisterValueChangedCallback(evt => ChangedCallback(evt, portName, DialogueType.CONDITION_TYPE_002));
+            field.style.minWidth = ITEM_MIN_WIDTH;
+            field.style.flexGrow = 1;
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, portName, DialogueType.CONDITION_TYPE_002));
 
             Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
             Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
             Button removeButton = new(() => RemovePort(port)) { text = "X" };
 
-            container.Add(dropdown);
+            container.Add(field);
             container.Add(upButton);
             container.Add(downButton);
             container.Add(removeButton);
@@ -299,7 +299,7 @@ namespace Yang.Dialogue.Editor
             buttonContainer.style.alignItems = Align.FlexEnd;
             buttonContainer.style.alignSelf = Align.FlexEnd;
 
-            Button createButton = new(() => CreateDropdown(portName, DialogueType.CONDITION_TYPE_003, itemContainer)) { text = "+" };
+            Button createButton = new(() => CreateCondition(portName, DialogueType.CONDITION_TYPE_003, itemContainer)) { text = "+" };
             Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
             Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
             Button removeButton = new(() => RemovePort(port)) { text = "X" };
@@ -322,7 +322,7 @@ namespace Yang.Dialogue.Editor
             return itemContainer;
         }
 
-        private void CreateDropdown(string portName, string type, VisualElement itemContainer)
+        private void CreateCondition(string portName, string type, VisualElement itemContainer)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
@@ -335,7 +335,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                AddDropdown(portName, type,itemContainer, -1);
+                AddConditionField(portName, type,itemContainer, -1);
 
                 optionData.datas.Add(EMPTY_OPTION);
 
@@ -345,39 +345,39 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void AddDropdown(string portName, string type, VisualElement itemContainer, int index)
+        private void AddConditionField(string portName, string type, VisualElement itemContainer, int index)
         {
             DialogueSO so = window.SO;
 
-            VisualElement dropdownContainer = new();
+            VisualElement container = new();
 
-            dropdownContainer.style.flexDirection = FlexDirection.Row;
-            dropdownContainer.style.alignItems = Align.Center;
+            container.style.flexDirection = FlexDirection.Row;
+            container.style.alignItems = Align.Center;
 
             KeyConverter.GetKeys(so.Conditions, conditions);
 
-            PopupField<string> dropdown = new(conditions, index);
+            PopupField<string> field = new(conditions, index);
 
-            dropdown.style.minWidth = ITEM_MIN_WIDTH;
-            dropdown.style.flexGrow = 1;
-            dropdown.RegisterValueChangedCallback(evt => ChangedCallback(evt, portName, type));
+            field.style.minWidth = ITEM_MIN_WIDTH;
+            field.style.flexGrow = 1;
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, portName, type));
 
-            Button remove = new(() => RemoveDropdown(portName, type, dropdownContainer)) { text = "-" };
+            Button remove = new(() => RemoveConditionField(portName, type, container)) { text = "-" };
 
-            dropdownContainer.Add(dropdown);
-            dropdownContainer.Add(remove);
+            container.Add(field);
+            container.Add(remove);
 
-            itemContainer.Add(dropdownContainer);
+            itemContainer.Add(container);
         }
 
-        private void RemoveDropdown(string portName, string type, VisualElement dropdownContainer)
+        private void RemoveConditionField(string portName, string type, VisualElement container)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
             int index = data.GetOptionIndex(type, _ => _.Count > 1 && _[0] == portName);
 
-            VisualElement itemContainer = dropdownContainer.parent;
+            VisualElement itemContainer = container.parent;
 
             if (index != -1 && itemContainer.childCount > 1)
             {
@@ -385,7 +385,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(index);
 
-                int containerIndex = itemContainer.IndexOf(dropdownContainer);
+                int containerIndex = itemContainer.IndexOf(container);
 
                 itemContainer.RemoveAt(containerIndex);
                 optionData.datas.RemoveAt(containerIndex + 1);

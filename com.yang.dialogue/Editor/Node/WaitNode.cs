@@ -8,6 +8,8 @@ namespace Yang.Dialogue.Editor
 {
     public class WaitNode : BaseNode
     {
+        private readonly List<string> events = new();
+
         public WaitNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
@@ -52,91 +54,157 @@ namespace Yang.Dialogue.Editor
 
             List<string> datas = option.datas;
 
-            Enum.TryParse(datas[1], out WaitType type);
+            Enum.TryParse(datas[1], out WaitType waitType);
 
-            EnumField dropdown = new("Type", type);
+            EnumField typeField = GetTypeField(waitType, option.type);
+            FloatField secondsField = GetSecondsField(datas[2], option.type);
+            PopupField<string> eventField = GetEventField(so.Events, datas[2], option.type);
 
-            dropdown.labelElement.style.minWidth = StyleKeyword.Auto;
-            dropdown.labelElement.style.width = StyleKeyword.Auto;
+            extensionContainer.Add(typeField);
+            extensionContainer.Add(secondsField);
+            extensionContainer.Add(eventField);
 
-            VisualElement box = dropdown[1];
-
-            box.style.minWidth = ITEM_MIN_WIDTH;
-
-            dropdown.RegisterValueChangedCallback(evt => ChangedCallback(evt, 0, 1));
-
-            FloatField seconds = new("Seconds");
-
-            float.TryParse(datas[2], out float value);
-
-            seconds.value = value;
-
-            seconds.labelElement.style.minWidth = StyleKeyword.Auto;
-            seconds.labelElement.style.width = StyleKeyword.Auto;
-
-            seconds.style.minWidth = ITEM_MIN_WIDTH;
-            seconds.RegisterValueChangedCallback(evt => ChangedCallback(evt, 0, 2));
-
-            SetDisplaySeconds(seconds, type);
-
-            extensionContainer.Add(dropdown);
-            extensionContainer.Add(seconds);
+            SetDisplaySeconds(waitType);
         }
 
-        private void SetDisplaySeconds(VisualElement seconds, WaitType type)
+        private void SetDisplaySeconds(WaitType waitType)
         {
-            switch (type)
+            switch (waitType)
             {
                 case WaitType.Notify:
-                    seconds.style.display = DisplayStyle.None;
+                    extensionContainer[1].style.display = DisplayStyle.None;
+                    extensionContainer[2].style.display = DisplayStyle.Flex;
                     break;
 
                 case WaitType.Seconds:
-                    seconds.style.display = DisplayStyle.Flex;
+                    extensionContainer[1].style.display = DisplayStyle.Flex;
+                    extensionContainer[2].style.display = DisplayStyle.None;
                     break;
             }
         }
 
-        private void ChangedCallback(ChangeEvent<Enum> evt, int optionIndex, int dataIndex)
+        private EnumField GetTypeField(WaitType waitType, string type)
         {
-            DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            EnumField field = new("Type", waitType);
 
-            Undo.RecordObject(so, "Change Wait Option");
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
 
-            OptionData optionData = data.GetOption(optionIndex);
+            field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            optionData.datas[dataIndex] = evt.newValue.ToString();
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type));
 
-            VisualElement seconds = extensionContainer[extensionContainer.childCount - 1];
-
-            SetDisplaySeconds(seconds, (WaitType)evt.newValue);
-
-            data.SetOption(optionIndex, optionData);
-            so.SetNode(GUID, data);
-
-            EditorUtility.SetDirty(so);
-
-            window.SetUnsaved();
+            return field;
         }
 
-        private void ChangedCallback(ChangeEvent<float> evt, int optionIndex, int dataIndex)
+        private FloatField GetSecondsField(string data, string type)
+        {
+            FloatField field = new("Seconds");
+
+            float.TryParse(data, out float value);
+
+            field.value = value;
+
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
+
+            field[1].style.minWidth = ITEM_MIN_WIDTH;
+
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type));
+
+            return field;
+        }
+
+        private PopupField<string> GetEventField(IEventMarker marker, string data, string type)
+        {
+            KeyConverter.GetKeys(marker, events);
+
+            int index = events.IndexOf(data);
+
+            PopupField<string> field = new("Event", events, index);
+
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
+
+            field[1].style.minWidth = ITEM_MIN_WIDTH;
+
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type));
+
+            return field;
+        }
+
+        private void ChangedCallback(ChangeEvent<Enum> evt, string type)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            Undo.RecordObject(so, "Change Wait Second");
+            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0);
 
-            OptionData optionData = data.GetOption(optionIndex);
+            if (optionIndex != -1)
+            {
+                Undo.RecordObject(so, "Change Wait Option");
 
-            optionData.datas[dataIndex] = evt.newValue.ToString();
+                OptionData optionData = data.GetOption(optionIndex);
 
-            data.SetOption(optionIndex, optionData);
-            so.SetNode(GUID, data);
+                optionData.datas[1] = evt.newValue.ToString();
 
-            EditorUtility.SetDirty(so);
+                SetDisplaySeconds((WaitType)evt.newValue);
 
-            window.SetUnsaved();
+                data.SetOption(optionIndex, optionData);
+                so.SetNode(GUID, data);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedCallback(ChangeEvent<float> evt, string type)
+        {
+            DialogueSO so = window.SO;
+            NodeData data = so.GetNode(GUID);
+
+            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0);
+
+            if (optionIndex != -1)
+            {
+                Undo.RecordObject(so, "Change Wait Second");
+
+                OptionData optionData = data.GetOption(optionIndex);
+
+                optionData.datas[2] = evt.newValue.ToString();
+
+                data.SetOption(optionIndex, optionData);
+                so.SetNode(GUID, data);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedCallback(ChangeEvent<string> evt, string type)
+        {
+            DialogueSO so = window.SO;
+            NodeData data = so.GetNode(GUID);
+
+            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0);
+
+            if (optionIndex != -1)
+            {
+                Undo.RecordObject(so, "Change Wait Event");
+
+                OptionData optionData = data.GetOption(optionIndex);
+
+                optionData.datas[2] = evt.newValue;
+
+                data.SetOption(optionIndex, optionData);
+                so.SetNode(GUID, data);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
         }
     }
 }

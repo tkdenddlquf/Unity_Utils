@@ -254,7 +254,9 @@ namespace Yang.Dialogue
                         switch (type)
                         {
                             case WaitType.Notify:
-                                foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait);
+                                foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait, datas[2]);
+
+                                runnerEvent.OnEvent(datas[2]);
                                 break;
 
                             case WaitType.Seconds:

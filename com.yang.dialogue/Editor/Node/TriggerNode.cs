@@ -67,7 +67,7 @@ namespace Yang.Dialogue.Editor
                     case DialogueType.TRIGGER_TYPE_000:
                         int index = conditions.IndexOf(datas[1]);
 
-                        AddTrigger(datas[0], index, bool.Parse(datas[2]));
+                        AddTriggerField(datas[0], index, bool.Parse(datas[2]));
                         break;
                 }
             }
@@ -92,7 +92,7 @@ namespace Yang.Dialogue.Editor
                     newOption.datas.Add(EMPTY_OPTION);
                     newOption.datas.Add(true.ToString());
 
-                    AddTrigger(id, -1);
+                    AddTriggerField(id, -1);
                     break;
             }
 
@@ -105,7 +105,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void AddTrigger(string id, int index, bool check = true)
+        private void AddTriggerField(string id, int index, bool check = true)
         {
             DialogueSO so = window.SO;
             VisualElement container = new();
@@ -115,26 +115,26 @@ namespace Yang.Dialogue.Editor
 
             Toggle toggle = new() { value = check };
 
-            toggle.RegisterValueChangedCallback(evt => ToggleCallback(evt, id, DialogueType.TRIGGER_TYPE_000));
+            toggle.RegisterValueChangedCallback(evt => ChangedCallback(evt, id, DialogueType.TRIGGER_TYPE_000));
 
             KeyConverter.GetKeys(so.Conditions, conditions);
 
-            PopupField<string> dropdown = new(conditions, index);
+            PopupField<string> field = new(conditions, index);
 
-            dropdown.style.minWidth = ITEM_MIN_WIDTH;
-            dropdown.style.flexGrow = 1;
-            dropdown.RegisterValueChangedCallback(evt => ChangedCallback(evt, id, DialogueType.TRIGGER_TYPE_000));
+            field.style.minWidth = ITEM_MIN_WIDTH;
+            field.style.flexGrow = 1;
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, id, DialogueType.TRIGGER_TYPE_000));
 
-            Button removeButton = new(() => RemoveTrigger(container, id, DialogueType.TRIGGER_TYPE_000)) { text = "X" };
+            Button removeButton = new(() => RemoveTriggerField(container, id, DialogueType.TRIGGER_TYPE_000)) { text = "X" };
 
             container.Add(toggle);
-            container.Add(dropdown);
+            container.Add(field);
             container.Add(removeButton);
 
             extensionContainer.Add(container);
         }
 
-        private void RemoveTrigger(VisualElement container, string id, string type)
+        private void RemoveTriggerField(VisualElement container, string id, string type)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
@@ -162,15 +162,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int index = 1;
-            int optionIndex = -1;
-
-            switch (type)
-            {
-                case DialogueType.TRIGGER_TYPE_000:
-                    optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == id);
-                    break;
-            }
+            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == id);
 
             if (optionIndex != -1)
             {
@@ -178,7 +170,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[index] = evt.newValue;
+                optionData.datas[1] = evt.newValue;
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);
@@ -189,20 +181,12 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ToggleCallback(ChangeEvent<bool> evt, string id, string type)
+        private void ChangedCallback(ChangeEvent<bool> evt, string id, string type)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int index = 2;
-            int optionIndex = -1;
-
-            switch (type)
-            {
-                case DialogueType.TRIGGER_TYPE_000:
-                    optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == id);
-                    break;
-            }
+            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == id);
 
             if (optionIndex != -1)
             {
@@ -210,7 +194,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[index] = evt.newValue.ToString();
+                optionData.datas[2] = evt.newValue.ToString();
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);
