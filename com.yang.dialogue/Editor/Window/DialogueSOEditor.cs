@@ -62,8 +62,6 @@ namespace Yang.Dialogue.Editor
                 }
             }
 
-            if (currentIndex < 0) currentIndex = 0;
-
             PopupField<string> typePopup = new(containerProp.displayName, typeNames, currentIndex);
 
             typePopup.RegisterValueChangedCallback(evt =>
