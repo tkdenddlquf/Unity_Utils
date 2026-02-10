@@ -257,6 +257,8 @@ namespace Yang.Dialogue
                                 foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait, datas[1]);
 
                                 runnerEvent.OnEvent(datas[1]);
+
+                                while (IsWait && !token.IsCancellationRequested) await Task.Yield();
                                 break;
 
                             case WaitType.Seconds:
