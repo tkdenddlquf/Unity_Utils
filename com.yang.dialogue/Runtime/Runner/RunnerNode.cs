@@ -245,27 +245,32 @@ namespace Yang.Dialogue
                         IsWait = true;
                         CurrentNode = currentNode;
 
-                        OptionData option = nodeData.GetOption(0);
+                        int optionIndex = nodeData.GetOptionIndex(DialogueType.WAIT_TYPE_000, _ => _.Count != 0);
 
-                        List<string> datas = option.datas;
-
-                        WaitType type = (WaitType)Enum.Parse(typeof(WaitType), datas[0]);
-
-                        switch (type)
+                        if (optionIndex != -1)
                         {
-                            case WaitType.Notify:
-                                foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait, datas[1]);
+                            OptionData option = nodeData.GetOption(optionIndex);
 
-                                runnerEvent.OnEvent(datas[1]);
+                            List<string> datas = option.datas;
 
-                                while (IsWait && !token.IsCancellationRequested) await Task.Yield();
-                                break;
+                            WaitType type = (WaitType)Enum.Parse(typeof(WaitType), datas[0]);
 
-                            case WaitType.Seconds:
-                                TimeSpan delay = TimeSpan.FromSeconds(float.Parse(datas[1]));
+                            switch (type)
+                            {
+                                case WaitType.Notify:
+                                    foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait, datas[1]);
 
-                                await Task.Delay(delay, token.Token);
-                                break;
+                                    runnerEvent.OnEvent(datas[1]);
+
+                                    while (IsWait && !token.IsCancellationRequested) await Task.Yield();
+                                    break;
+
+                                case WaitType.Seconds:
+                                    TimeSpan delay = TimeSpan.FromSeconds(float.Parse(datas[1]));
+
+                                    await Task.Delay(delay, token.Token);
+                                    break;
+                            }
                         }
 
                         string portName = nodeData.GetPort(0);

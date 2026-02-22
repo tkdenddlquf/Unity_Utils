@@ -17,12 +17,22 @@ namespace Yang.Dialogue.Editor
             PopupField<string> eventPopup = GetPopup<IEventMarker>(root, "events");
             PopupField<string> conditionPopup = GetPopup<IConditionMarker>(root, "conditions");
 
+            Button button = new(Open) { text = "Edit" };
+
             root.Add(eventPopup);
             root.Add(conditionPopup);
+            root.Add(button);
 
             serializedObject.ApplyModifiedProperties();
 
             return root;
+        }
+
+        private void Open()
+        {
+            DialogueEditorWindow window = DialogueEditorWindow.Open();
+
+            window.SO = target as DialogueSO;
         }
 
         private PopupField<string> GetPopup<T>(VisualElement root, string propName)

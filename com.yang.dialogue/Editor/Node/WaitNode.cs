@@ -48,21 +48,26 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            OptionData option = data.GetOption(0);
+            int optionIndex = data.GetOptionIndex(DialogueType.WAIT_TYPE_000, _ => _.Count != 0);
 
-            List<string> datas = option.datas;
+            if (optionIndex != -1)
+            {
+                OptionData option = data.GetOption(optionIndex);
 
-            Enum.TryParse(datas[0], out WaitType waitType);
+                List<string> datas = option.datas;
 
-            EnumField typeField = GetTypeField(waitType, option.type);
-            FloatField secondsField = GetSecondsField(datas[1], option.type);
-            PopupField<string> eventField = GetEventField(so.Events, datas[1], option.type);
+                Enum.TryParse(datas[0], out WaitType waitType);
 
-            extensionContainer.Add(typeField);
-            extensionContainer.Add(secondsField);
-            extensionContainer.Add(eventField);
+                EnumField typeField = GetTypeField(waitType, option.type);
+                FloatField secondsField = GetSecondsField(datas[1], option.type);
+                PopupField<string> eventField = GetEventField(so.Events, datas[1], option.type);
 
-            SetDisplaySeconds(waitType);
+                extensionContainer.Add(typeField);
+                extensionContainer.Add(secondsField);
+                extensionContainer.Add(eventField);
+
+                SetDisplaySeconds(waitType);
+            }
         }
 
         private void SetDisplaySeconds(WaitType waitType)
@@ -71,12 +76,26 @@ namespace Yang.Dialogue.Editor
             {
                 case WaitType.Notify:
                     extensionContainer[1].style.display = DisplayStyle.None;
-                    extensionContainer[2].style.display = DisplayStyle.Flex;
+
+                    PopupField<string> eventField = extensionContainer[2] as PopupField<string>;
+
+                    string currentEvent = eventField.value;
+
+                    eventField.SetValueWithoutNotify("");
+                    eventField.value = currentEvent;
+                    eventField.style.display = DisplayStyle.Flex;
                     break;
 
                 case WaitType.Seconds:
-                    extensionContainer[1].style.display = DisplayStyle.Flex;
                     extensionContainer[2].style.display = DisplayStyle.None;
+
+                    FloatField secondsField = extensionContainer[1] as FloatField;
+
+                    float currentSeconds = secondsField.value;
+
+                    secondsField.SetValueWithoutNotify(currentSeconds - 1);
+                    secondsField.value = currentSeconds;
+                    secondsField.style.display = DisplayStyle.Flex;
                     break;
             }
         }

@@ -10,7 +10,17 @@ namespace Yang.Dialogue.Editor
     {
         private DialogueGraph graph;
 
-        public DialogueSO SO { get; private set; }
+        private DialogueSO so;
+        public DialogueSO SO
+        {
+            get => so;
+            set
+            {
+                so = value;
+
+                RefreshView();
+            }
+        }
 
         private void OnEnable()
         {
@@ -24,9 +34,6 @@ namespace Yang.Dialogue.Editor
 
             Undo.postprocessModifications -= OnPostprocessModifications;
             Undo.postprocessModifications += OnPostprocessModifications;
-
-            Selection.selectionChanged -= OnSelectionChanged;
-            Selection.selectionChanged += OnSelectionChanged;
 
             graph.graphViewChanged -= OnGraphViewChanged;
             graph.graphViewChanged += OnGraphViewChanged;
@@ -46,15 +53,13 @@ namespace Yang.Dialogue.Editor
 
             Undo.postprocessModifications -= OnPostprocessModifications;
 
-            Selection.selectionChanged -= OnSelectionChanged;
-
             graph.graphViewChanged -= OnGraphViewChanged;
 
             graph.UnregisterCallback<KeyDownEvent>(OnKeyDownEvent);
         }
 
         [MenuItem("Tools/Dialogue")]
-        public static void Open() => GetWindow<DialogueEditorWindow>("Dialogue");
+        public static DialogueEditorWindow Open() => GetWindow<DialogueEditorWindow>("Dialogue");
 
         private void OnKeyDownEvent(KeyDownEvent evt)
         {
@@ -210,18 +215,6 @@ namespace Yang.Dialogue.Editor
             }
 
             return default;
-        }
-
-        private void OnSelectionChanged()
-        {
-            if (graph == null) return;
-
-            if (Selection.activeObject is DialogueSO so)
-            {
-                SO = so;
-
-                RefreshView();
-            }
         }
 
         private void RefreshView()
