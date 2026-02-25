@@ -27,11 +27,11 @@ namespace Yang.Localize.Editor
 
             SerializedProperty typeProp = property.FindPropertyRelative("type");
 
-            SerializedProperty tableProp = property.FindPropertyRelative("tableName");
-            SerializedProperty entriesProp = property.FindPropertyRelative("entryNames");
+            SerializedProperty tableName = property.FindPropertyRelative("tableName");
+            SerializedProperty tableGuid = property.FindPropertyRelative("tableGuid");
 
-            SerializedProperty guidProp = property.FindPropertyRelative("tableGuid");
-            SerializedProperty idsProp = property.FindPropertyRelative("entryIDs");
+            SerializedProperty entryNames = property.FindPropertyRelative("entryNames");
+            SerializedProperty entryIDs = property.FindPropertyRelative("entryIDs");
 
             float lineHeight = EditorGUIUtility.singleLineHeight;
             float spacing = EditorGUIUtility.standardVerticalSpacing;
@@ -43,31 +43,33 @@ namespace Yang.Localize.Editor
 
             SetTables((LocalizeTableType)typeProp.enumValueIndex);
 
-            int selectedTableIndex = GetTableIndex(tableProp.stringValue, guidProp.stringValue);
-
-            EditorGUI.BeginProperty(tableRect, new GUIContent(tableProp.displayName), tableProp);
+            EditorGUI.BeginProperty(tableRect, new GUIContent(tableName.displayName), tableName);
 
             Rect labelRect = new(tableRect.x, tableRect.y, EditorGUIUtility.labelWidth, EditorGUIUtility.singleLineHeight);
 
-            EditorGUI.LabelField(labelRect, tableProp.displayName);
+            EditorGUI.LabelField(labelRect, tableName.displayName);
 
             float dropdownWidth = tableRect.width - EditorGUIUtility.labelWidth - 25f;
 
             Rect dropdownRect = new(tableRect.x + EditorGUIUtility.labelWidth, tableRect.y, dropdownWidth, EditorGUIUtility.singleLineHeight);
             Rect openButtonRect = new(dropdownRect.xMax + 5f, tableRect.y, 20f, EditorGUIUtility.singleLineHeight);
 
-            int newTableIndex = EditorGUI.Popup(dropdownRect, selectedTableIndex, tables);
+            int tableIndex = EditorGUI.Popup(dropdownRect, GetTableIndex(tableName.stringValue, tableGuid.stringValue), tables);
 
-            LocalizationTableCollection collection = collections[newTableIndex];
+            LocalizationTableCollection collection;
 
-            tableProp.stringValue = collection.TableCollectionName;
-            guidProp.stringValue = collection.TableCollectionNameReference.TableCollectionNameGuid.ToString();
+            if (tableIndex >= 0 && tableIndex < collections.Count)
+            {
+                collection = collections[tableIndex];
 
-            selectedTableIndex = newTableIndex;
+                tableName.stringValue = collection.TableCollectionName;
+                tableGuid.stringValue = collection.TableCollectionNameReference.TableCollectionNameGuid.ToString();
+            }
+            else collection = null;
 
-            if (GUI.Button(openButtonRect, EditorGUIUtility.IconContent("Folder Icon"))) LocalizationTablesWindow.ShowWindow(collections[selectedTableIndex]);
+            if (GUI.Button(openButtonRect, EditorGUIUtility.IconContent("Folder Icon")) && collection != null) LocalizationTablesWindow.ShowWindow(collection);
 
-            SetEntries(selectedTableIndex == -1 ? null : collections[selectedTableIndex]);
+            SetEntries(collection);
 
             Rect foldoutRect = new(position.x, tableRect.y + lineHeight + spacing, position.width, lineHeight);
             Rect entryRect = new(position.x, foldoutRect.y + lineHeight + spacing, position.width, lineHeight);
@@ -80,32 +82,32 @@ namespace Yang.Localize.Editor
                 return;
             }
 
-            foldout = EditorGUI.Foldout(foldoutRect, foldout, entriesProp.displayName, true);
+            foldout = EditorGUI.Foldout(foldoutRect, foldout, entryNames.displayName, true);
 
             if (foldout)
             {
-                entriesList ??= new(property.serializedObject, entriesProp, true, false, true, true)
+                entriesList ??= new(property.serializedObject, entryNames, true, false, true, true)
                 {
                     elementHeight = lineHeight,
 
                     drawElementCallback = (rect, index, isActive, isFocused) =>
                     {
-                        SerializedProperty entryprop = entriesProp.GetArrayElementAtIndex(index);
+                        SerializedProperty entryName = entryNames.GetArrayElementAtIndex(index);
 
-                        if (idsProp.arraySize != entriesProp.arraySize) idsProp.arraySize = entriesProp.arraySize;
+                        if (entryIDs.arraySize != entryNames.arraySize) entryIDs.arraySize = entryNames.arraySize;
 
-                        SerializedProperty idprop = idsProp.GetArrayElementAtIndex(index);
+                        SerializedProperty entryID = entryIDs.GetArrayElementAtIndex(index);
 
-                        int selectedIndex = System.Array.IndexOf(entries, new EntryData(idprop.longValue, entryprop.stringValue, ""));
+                        int entryIndex = System.Array.IndexOf(entries, new EntryData(entryID.longValue, entryName.stringValue, ""));
 
                         Rect popupRect = new(rect.x, rect.y, rect.width, lineHeight);
 
-                        selectedIndex = EditorGUI.Popup(popupRect, new($"Element {index}"), selectedIndex, contents);
+                        entryIndex = EditorGUI.Popup(popupRect, new($"Element {index}"), entryIndex, contents);
 
-                        if (selectedIndex >= 0 && selectedIndex < entries.Length)
+                        if (entryIndex >= 0 && entryIndex < entries.Length)
                         {
-                            idprop.longValue = entries[selectedIndex].id;
-                            entryprop.stringValue = entries[selectedIndex].key;
+                            entryID.longValue = entries[entryIndex].id;
+                            entryName.stringValue = entries[entryIndex].key;
                         }
                     },
                 };
