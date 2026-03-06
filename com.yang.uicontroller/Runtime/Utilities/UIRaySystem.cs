@@ -23,14 +23,29 @@ namespace Yang.UIController
 
         public static bool IsPointerOverUI()
         {
-            if (eventSystem == null) return false;
             if (eventSystem != EventSystem.current) Init();
+            if (eventSystem == null) return false;
 
             pointerData.position = Mouse.current.position.ReadValue();
 
             eventSystem.RaycastAll(pointerData, results);
 
             return results.Count > 0;
+        }
+
+        public static bool IsPointerOverUI(Transform target)
+        {
+            if (IsPointerOverUI())
+            {
+                foreach (RaycastResult result in results)
+                {
+                    bool isChild = result.gameObject.transform.IsChildOf(target);
+
+                    if (isChild) return true;
+                }
+            }
+
+            return false;
         }
 
         public static void SetFocus(GameObject target)
