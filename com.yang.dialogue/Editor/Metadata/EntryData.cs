@@ -17,9 +17,9 @@ namespace Yang.Dialogue.Editor
             this.tooltip = tooltip;
         }
 
-        public EntryData(string id, string key)
+        public EntryData(long id, string key)
         {
-            long.TryParse(id, out this.id);
+            this.id = id;
             this.key = key;
 
             tooltip = "";

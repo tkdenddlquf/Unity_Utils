@@ -41,8 +41,8 @@ namespace Yang.Dialogue.Editor
                 string id = CreateID(DialogueType.EVENT_TYPE_000);
                 OptionData optionData = new(DialogueType.EVENT_TYPE_000);
 
-                optionData.datas.Add(id);
-                optionData.datas.Add(EMPTY_OPTION);
+                optionData.datas.Add(new(id));
+                optionData.datas.Add(new(GenericData.Type.String));
 
                 data.AddOption(optionData);
 
@@ -59,14 +59,14 @@ namespace Yang.Dialogue.Editor
 
             foreach (OptionData option in data.GetOptions())
             {
-                List<string> datas = option.datas;
+                List<GenericData> datas = option.datas;
 
                 switch (option.type)
                 {
                     case DialogueType.EVENT_TYPE_000:
-                        int index = events.IndexOf(datas[1]);
+                        int index = events.IndexOf(datas[1].stringValue);
 
-                        AddEventField(datas[0], index);
+                        AddEventField(datas[0].stringValue, index);
                         break;
                 }
             }
@@ -83,14 +83,14 @@ namespace Yang.Dialogue.Editor
 
             OptionData newOption = new(type);
 
-            newOption.datas.Add(id);
+            newOption.datas.Add(new(id));
 
             switch (type)
             {
                 case DialogueType.EVENT_TYPE_000:
                     AddEventField(id, -1);
 
-                    newOption.datas.Add(EMPTY_OPTION);
+                    newOption.datas.Add(new(EMPTY_OPTION));
                     break;
             }
 
@@ -132,7 +132,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == id);
+            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0].stringValue == id);
 
             if (optionIndex != -1 && extensionContainer.childCount > 1)
             {
@@ -155,7 +155,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == id);
+            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0].stringValue == id);
 
             if (optionIndex != -1)
             {
@@ -163,7 +163,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[1] = evt.newValue;
+                optionData.datas[1] = new(evt.newValue);
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);

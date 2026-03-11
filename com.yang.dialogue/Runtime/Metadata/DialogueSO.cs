@@ -34,6 +34,18 @@ namespace Yang.Dialogue
 
         public IReadOnlyList<NodeData> GetNodes() => nodes;
 
+        public bool ContainsNode(string guid)
+        {
+            if (guid == startNode.guid) return true;
+
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                if (nodes[i].guid == guid) return true;
+            }
+
+            return false;
+        }
+
         public bool TryGetNode(string guid, out NodeData node)
         {
             if (guid == startNode.guid)

@@ -46,19 +46,19 @@ namespace Yang.Dialogue.Editor
 
                 OptionData message = new(DialogueType.DIALOGUE_TYPE_004);
 
-                speakerTable.datas.Add(EMPTY_OPTION);
-                speakerTable.datas.Add(EMPTY_OPTION);
+                speakerTable.datas.Add(new(GenericData.Type.String));
+                speakerTable.datas.Add(new(GenericData.Type.Guid));
 
-                speakerEntry.datas.Add(EMPTY_OPTION);
-                speakerEntry.datas.Add(EMPTY_OPTION);
+                speakerEntry.datas.Add(new(GenericData.Type.String));
+                speakerEntry.datas.Add(new(GenericData.Type.Long));
 
-                textTable.datas.Add(EMPTY_OPTION);
-                textTable.datas.Add(EMPTY_OPTION);
+                textTable.datas.Add(new(GenericData.Type.String));
+                textTable.datas.Add(new(GenericData.Type.Guid));
 
-                textEntry.datas.Add(EMPTY_OPTION);
-                textEntry.datas.Add(EMPTY_OPTION);
+                textEntry.datas.Add(new(GenericData.Type.String));
+                textEntry.datas.Add(new(GenericData.Type.Long));
 
-                message.datas.Add(EMPTY_OPTION);
+                message.datas.Add(new(GenericData.Type.String));
 
                 data.AddOption(speakerTable);
                 data.AddOption(speakerEntry);
@@ -124,8 +124,8 @@ namespace Yang.Dialogue.Editor
 
                     OptionData option = data.GetOption(optionIndex);
 
-                    option.datas[0] = collections[index].TableCollectionName;
-                    option.datas[1] = collections[index].TableCollectionNameReference.TableCollectionNameGuid.ToString();
+                    option.datas[0] = new(collections[index].TableCollectionName);
+                    option.datas[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
 
                     data.SetOption(optionIndex, option);
                     so.SetNode(GUID, data);
@@ -137,27 +137,30 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void AddTableField(List<string> datas, string type, List<EntryData> entries)
+        private void AddTableField(List<GenericData> datas, string type, List<EntryData> entries)
         {
-            int index = GetTableIndex(datas[0], datas[1]);
-
-            PopupField<string> field = new(type, tables, index);
-
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
-
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type, entries));
-
-            extensionContainer.Add(field);
-
-            if (index != -1)
+            if (datas[1].TryGetValue(out System.Guid guid))
             {
-                SetEntries(collections[index], entries);
+                int index = GetTableIndex(datas[0].stringValue, guid);
 
-                datas[0] = collections[index].TableCollectionName;
-                datas[1] = collections[index].TableCollectionNameReference.TableCollectionNameGuid.ToString();
+                PopupField<string> field = new(type, tables, index);
+
+                field.labelElement.style.minWidth = StyleKeyword.Auto;
+                field.labelElement.style.width = StyleKeyword.Auto;
+
+                field[1].style.minWidth = ITEM_MIN_WIDTH;
+
+                field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type, entries));
+
+                extensionContainer.Add(field);
+
+                if (index != -1)
+                {
+                    SetEntries(collections[index], entries);
+
+                    datas[0] = new(collections[index].TableCollectionName);
+                    datas[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
+                }
             }
         }
 
@@ -179,10 +182,8 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private int GetTableIndex(string value, string stringGuid)
+        private int GetTableIndex(string value, System.Guid guid)
         {
-            System.Guid.TryParse(stringGuid, out System.Guid guid);
-
             for (int i = 0; i < collections.Count; i++)
             {
                 LocalizationTableCollection collection = collections[i];
@@ -212,8 +213,8 @@ namespace Yang.Dialogue.Editor
 
                     OptionData option = data.GetOption(optionIndex);
 
-                    option.datas[0] = entries[index].key;
-                    option.datas[1] = entries[index].id.ToString();
+                    option.datas[0] = new(entries[index].key);
+                    option.datas[1] = new(entries[index].id);
 
                     data.SetOption(optionIndex, option);
                     so.SetNode(GUID, data);
@@ -227,9 +228,9 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void AddEntryField(List<string> datas, string type, List<EntryData> entries)
+        private void AddEntryField(List<GenericData> datas, string type, List<EntryData> entries)
         {
-            int index = entries.IndexOf(new EntryData(datas[1], datas[0]));
+            int index = entries.IndexOf(new EntryData(datas[1].longValue, datas[0].stringValue));
 
             PopupField<EntryData> field = new(type, entries, index);
 
@@ -246,8 +247,8 @@ namespace Yang.Dialogue.Editor
             {
                 field.tooltip = entries[index].tooltip;
 
-                datas[0] = entries[index].key;
-                datas[1] = entries[index].id.ToString();
+                datas[0] = new(entries[index].key);
+                datas[1] = new(entries[index].id);
             }
         }
 
@@ -290,7 +291,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData option = data.GetOption(optionIndex);
 
-                option.datas[0] = evt.newValue;
+                option.datas[0] = new(evt.newValue);
 
                 data.SetOption(optionIndex, option);
                 so.SetNode(GUID, data);
@@ -301,9 +302,9 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void AddMessageField(List<string> datas, string type)
+        private void AddMessageField(List<GenericData> datas, string type)
         {
-            TextField field = new(type) { value = datas[0] };
+            TextField field = new(type) { value = datas[0].stringValue };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;

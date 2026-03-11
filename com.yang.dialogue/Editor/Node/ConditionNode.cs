@@ -41,7 +41,7 @@ namespace Yang.Dialogue.Editor
                 string portName = CreatePortName();
                 OptionData optionData = new(DialogueType.CONDITION_TYPE_001);
 
-                optionData.datas.Add(portName);
+                optionData.datas.Add(new(portName));
 
                 data.AddOption(optionData);
 
@@ -58,29 +58,29 @@ namespace Yang.Dialogue.Editor
 
             foreach (OptionData option in data.GetOptions())
             {
-                List<string> datas = option.datas;
+                List<GenericData> datas = option.datas;
 
                 switch (option.type)
                 {
                     case DialogueType.CONDITION_TYPE_001:
-                        AddDefaultPort(datas[0]);
+                        AddDefaultPort(datas[0].stringValue);
                         break;
 
                     case DialogueType.CONDITION_TYPE_002:
                         {
-                            int index = conditions.IndexOf(datas[1]);
+                            int index = conditions.IndexOf(datas[1].stringValue);
 
-                            AddSinglePort(datas[0], index);
+                            AddSinglePort(datas[0].stringValue, index);
                         }
                         break;
 
                     case DialogueType.CONDITION_TYPE_003:
-                        string portName = datas[0];
+                        string portName = datas[0].stringValue;
                         VisualElement itemContainer = AddMultiPort(portName);
 
                         for (int i = 0; i < datas.Count; i++)
                         {
-                            int index = conditions.IndexOf(datas[i]);
+                            int index = conditions.IndexOf(datas[i].stringValue);
 
                             AddConditionField(portName, option.type, itemContainer, index);
                         }
@@ -100,20 +100,20 @@ namespace Yang.Dialogue.Editor
 
             OptionData option = new(type);
 
-            option.datas.Add(portName);
+            option.datas.Add(new(portName));
 
             switch (type)
             {
                 case DialogueType.CONDITION_TYPE_002:
                     AddSinglePort(portName, -1);
 
-                    option.datas.Add(EMPTY_OPTION);
+                    option.datas.Add(new(EMPTY_OPTION));
                     break;
 
                 case DialogueType.CONDITION_TYPE_003:
                     VisualElement itemContainer = AddMultiPort(portName);
 
-                    option.datas.Add(EMPTY_OPTION);
+                    option.datas.Add(new(EMPTY_OPTION));
 
                     AddConditionField(portName, type, itemContainer, -1);
                     break;
@@ -147,7 +147,7 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Move Port Index");
 
-            int optionIndex = data.GetOptionIndex(_ => _.Count != 0 && _[0] == port.portName);
+            int optionIndex = data.GetOptionIndex(_ => _.Count != 0 && _[0].stringValue == port.portName);
 
             OptionData option = data.GetOption(optionIndex);
 
@@ -176,7 +176,7 @@ namespace Yang.Dialogue.Editor
             switch (type)
             {
                 case DialogueType.CONDITION_TYPE_002:
-                    optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == portName);
+                    optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0].stringValue == portName);
                     break;
 
                 case DialogueType.CONDITION_TYPE_003:
@@ -185,7 +185,7 @@ namespace Yang.Dialogue.Editor
                         VisualElement container = dropdown.parent;
 
                         index = container.parent.IndexOf(container) + 1;
-                        optionIndex = data.GetOptionIndex(type, _ => _.Count > index && _[0] == portName);
+                        optionIndex = data.GetOptionIndex(type, _ => _.Count > index && _[0].stringValue == portName);
                     }
                     break;
             }
@@ -196,7 +196,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[index] = evt.newValue;
+                optionData.datas[index] = new(evt.newValue);
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);
@@ -327,7 +327,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0] == portName);
+            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0].stringValue == portName);
 
             if (optionIndex != -1)
             {
@@ -337,7 +337,7 @@ namespace Yang.Dialogue.Editor
 
                 AddConditionField(portName, type,itemContainer, -1);
 
-                optionData.datas.Add(EMPTY_OPTION);
+                optionData.datas.Add(new(EMPTY_OPTION));
 
                 EditorUtility.SetDirty(so);
 
@@ -375,7 +375,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int index = data.GetOptionIndex(type, _ => _.Count > 1 && _[0] == portName);
+            int index = data.GetOptionIndex(type, _ => _.Count > 1 && _[0].stringValue == portName);
 
             VisualElement itemContainer = container.parent;
 

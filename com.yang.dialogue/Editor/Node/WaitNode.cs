@@ -34,8 +34,8 @@ namespace Yang.Dialogue.Editor
             {
                 OptionData optionData = new(DialogueType.WAIT_TYPE_000);
 
-                optionData.datas.Add(WaitType.Notify.ToString());
-                optionData.datas.Add(EMPTY_OPTION);
+                optionData.datas.Add(new(WaitType.Notify));
+                optionData.datas.Add(new(GenericData.Type.String));
 
                 data.AddOption(optionData);
 
@@ -54,13 +54,13 @@ namespace Yang.Dialogue.Editor
             {
                 OptionData option = data.GetOption(optionIndex);
 
-                List<string> datas = option.datas;
+                List<GenericData> datas = option.datas;
 
-                Enum.TryParse(datas[0], out WaitType waitType);
+                datas[0].TryGetValue(out WaitType waitType);
 
                 EnumField typeField = GetTypeField(waitType, option.type);
-                FloatField secondsField = GetSecondsField(datas[1], option.type);
-                PopupField<string> eventField = GetEventField(so.Events, datas[1], option.type);
+                FloatField secondsField = GetSecondsField(datas[1].floatValue, option.type);
+                PopupField<string> eventField = GetEventField(so.Events, datas[1].stringValue, option.type);
 
                 extensionContainer.Add(typeField);
                 extensionContainer.Add(secondsField);
@@ -114,13 +114,9 @@ namespace Yang.Dialogue.Editor
             return field;
         }
 
-        private FloatField GetSecondsField(string data, string type)
+        private FloatField GetSecondsField(float data, string type)
         {
-            FloatField field = new("Seconds");
-
-            float.TryParse(data, out float value);
-
-            field.value = value;
+            FloatField field = new("Seconds") { value = data };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;
@@ -163,7 +159,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[0] = evt.newValue.ToString();
+                optionData.datas[0] = new(evt.newValue);
 
                 SetDisplaySeconds((WaitType)evt.newValue);
 
@@ -189,7 +185,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[1] = evt.newValue.ToString();
+                optionData.datas[1] = new(evt.newValue);
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);
@@ -213,7 +209,7 @@ namespace Yang.Dialogue.Editor
 
                 OptionData optionData = data.GetOption(optionIndex);
 
-                optionData.datas[1] = evt.newValue;
+                optionData.datas[1] = new(evt.newValue);
 
                 data.SetOption(optionIndex, optionData);
                 so.SetNode(GUID, data);

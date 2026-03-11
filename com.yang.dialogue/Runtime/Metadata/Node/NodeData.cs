@@ -49,7 +49,7 @@ namespace Yang.Dialogue
 
         public readonly OptionData GetOption(int index) => options[index];
 
-        public readonly IEnumerable<OptionData> GetOptions(string type, Func<List<string>, bool> comparer)
+        public readonly IEnumerable<OptionData> GetOptions(string type, Func<List<GenericData>, bool> comparer)
         {
             for (int i = 0; i < options.Count; i++)
             {
@@ -62,7 +62,7 @@ namespace Yang.Dialogue
 
         public readonly IReadOnlyList<OptionData> GetOptions() => options;
 
-        public readonly int GetOptionIndex(string type, Func<List<string>, bool> comparer)
+        public readonly int GetOptionIndex(string type, Func<List<GenericData>, bool> comparer)
         {
             for (int i = 0; i < options.Count; i++)
             {
@@ -75,7 +75,7 @@ namespace Yang.Dialogue
             return -1;
         }
 
-        public readonly int GetOptionIndex(Func<List<string>, bool> comparer)
+        public readonly int GetOptionIndex(Func<List<GenericData>, bool> comparer)
         {
             for (int i = 0; i < options.Count; i++)
             {
@@ -93,7 +93,7 @@ namespace Yang.Dialogue
 
         public readonly void RemoveAtOption(int index) => options.RemoveAt(index);
 
-        public readonly bool ContainsOption(string type, Func<List<string>, bool> comparer) => GetOptionIndex(type, comparer) != -1;
+        public readonly bool ContainsOption(string type, Func<List<GenericData>, bool> comparer) => GetOptionIndex(type, comparer) != -1;
         #endregion
 
         #region Equatable

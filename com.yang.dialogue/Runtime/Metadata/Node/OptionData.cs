@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace Yang.Dialogue
 {
@@ -7,7 +6,7 @@ namespace Yang.Dialogue
     public struct OptionData
     {
         public string type;
-        public List<string> datas;
+        public List<GenericData> datas;
 
         public OptionData(string type)
         {

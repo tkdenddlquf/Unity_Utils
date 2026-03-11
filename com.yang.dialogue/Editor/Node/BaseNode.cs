@@ -9,7 +9,9 @@ namespace Yang.Dialogue.Editor
         protected const string EMPTY_OPTION = "";
         protected const int ITEM_MIN_WIDTH = 150;
 
-        public string GUID { get; }
+        public string GUID { get; private set; }
+
+        private readonly TextField idField;
 
         protected DialogueEditorWindow window;
 
@@ -18,6 +20,10 @@ namespace Yang.Dialogue.Editor
             this.window = window;
 
             GUID = guid;
+
+            idField = GetGUIDField();
+
+            contentContainer[0].Insert(1, idField);
         }
 
         public abstract void SetPorts();
@@ -50,7 +56,7 @@ namespace Yang.Dialogue.Editor
 
             for (int i = 0; ; i++)
             {
-                if (!data.ContainsOption(baseID, _ => _.Count != 0 && _[0] == id)) return id;
+                if (!data.ContainsOption(baseID, _ => _.Count != 0 && _[0].stringValue == id)) return id;
 
                 id = $"{baseID} {i + 1}";
             }
@@ -98,7 +104,7 @@ namespace Yang.Dialogue.Editor
 
                 window.RemoveEdge(port);
 
-                int optionIndex = data.GetOptionIndex(_ => _.Count != 0 && _[0] == port.portName);
+                int optionIndex = data.GetOptionIndex(_ => _.Count != 0 && _[0].stringValue == port.portName);
 
                 data.RemoveAtOption(optionIndex);
                 data.RemovePort(portName);
@@ -115,6 +121,43 @@ namespace Yang.Dialogue.Editor
 
                 window.SetUnsaved();
             }
+        }
+
+        private void ChangedCallback(ChangeEvent<string> evt)
+        {
+            DialogueSO so = window.SO;
+
+            if (so.ContainsNode(evt.newValue)) idField.SetValueWithoutNotify(GUID);
+            else
+            {
+                NodeData data = so.GetNode(GUID);
+
+                Undo.RecordObject(so, $"Change GUID");
+
+                data.guid = evt.newValue;
+
+                so.SetNode(GUID, data);
+
+                GUID = data.guid;
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private TextField GetGUIDField()
+        {
+            TextField field = new("ID") { value = GUID };
+
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
+
+            field[1].style.minWidth = ITEM_MIN_WIDTH;
+
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt));
+
+            return field;
         }
     }
 }
