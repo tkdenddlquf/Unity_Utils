@@ -48,7 +48,12 @@ namespace Yang.UIController
             }
         }
 
-        public bool CheckActive(T type) => popupDict[type].IsActive;
+        public bool CheckActive(T type)
+        {
+            if (popupDict.TryGetValue(type, out UIBase<T> popup)) return popup.IsActive;
+
+            return false;
+        }
 
         public void CloseAllPopup()
         {
@@ -84,7 +89,10 @@ namespace Yang.UIController
             if (popupDict.TryGetValue(type, out UIBase<T> popup)) popup.SetData(dataMarker);
         }
 
-        public void SetData<U>(U dataMarker) where U : struct, IDataMarker => activeUIs[^1].SetData(dataMarker);
+        public void SetData<U>(U dataMarker) where U : struct, IDataMarker
+        {
+            if (activeUIs.Count != 0) activeUIs[^1].SetData(dataMarker);
+        }
 
         public bool GetData<U>(T type, string markerID, out U result)
         {
@@ -95,6 +103,13 @@ namespace Yang.UIController
             return false;
         }
 
-        public bool GetData<U>(string markerID, out U result) => activeUIs[^1].GetData(markerID, out result);
+        public bool GetData<U>(string markerID, out U result)
+        {
+            if (activeUIs.Count != 0) return activeUIs[^1].GetData(markerID, out result);
+
+            result = default;
+
+            return false;
+        }
     }
 }

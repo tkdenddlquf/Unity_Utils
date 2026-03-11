@@ -69,7 +69,7 @@ namespace Yang.UIController
             if (panelDict.TryGetValue(type, out UIBase<T> panel)) panel.SetData(dataMarker);
         }
 
-        public void SetData<U>(U dataMarker) where U : struct, IDataMarker => panelDict[CurrentPanel].SetData(dataMarker);
+        public void SetData<U>(U dataMarker) where U : struct, IDataMarker => SetData(CurrentPanel, dataMarker);
 
         public bool GetData<U>(T type, string markerID, out U result)
         {
@@ -80,6 +80,6 @@ namespace Yang.UIController
             return false;
         }
 
-        public bool GetData<U>(string markerID, out U result) => panelDict[CurrentPanel].GetData(markerID, out result);
+        public bool GetData<U>(string markerID, out U result) => GetData(CurrentPanel, markerID, out result);
     }
 }
