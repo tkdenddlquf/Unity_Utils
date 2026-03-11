@@ -31,6 +31,20 @@ namespace Yang.Dialogue
 #endif
         }
 
+        public NodeData(NodeData data)
+        {
+            guid = Guid.NewGuid().ToString();
+
+            type = data.type;
+
+            ports = new(data.ports);
+            options = new(data.options);
+
+#if UNITY_EDITOR
+            position = data.position;
+#endif
+        }
+
         #region Port
         public readonly string GetPort(int index) => ports[index];
 

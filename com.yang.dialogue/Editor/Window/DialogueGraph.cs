@@ -21,6 +21,12 @@ namespace Yang.Dialogue.Editor
             this.AddManipulator(new ContentDragger());
             this.AddManipulator(new SelectionDragger());
             this.AddManipulator(new RectangleSelector());
+
+            serializeGraphElements = SerializeNodes;
+
+            unserializeAndPaste = UnserializeNode;
+
+            canPasteSerializedData = CheckSerialize;
         }
 
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
@@ -109,6 +115,66 @@ namespace Yang.Dialogue.Editor
             if (node != null) node.title = type.ToString();
 
             return node;
+        }
+        #endregion
+
+        #region Copy Paste
+        private string SerializeNodes(IEnumerable<GraphElement> elements)
+        {
+            List<BaseNode> nodes = new();
+
+            foreach (GraphElement element in elements)
+            {
+                if (element is BaseNode node) nodes.Add(node);
+            }
+
+            CopyData data = new();
+
+            DialogueSO so = window.SO;
+
+            foreach (BaseNode node in nodes)
+            {
+                NodeData nodeData = so.GetNode(node.GUID);
+
+                if (nodeData.Equals(so.startNode)) continue;
+
+                data.nodes.Add(nodeData);
+            }
+
+            return JsonUtility.ToJson(data);
+        }
+
+        private void UnserializeNode(string operationName, string data)
+        {
+            CopyData copyData = JsonUtility.FromJson<CopyData>(data);
+
+            ClearSelection();
+
+            DialogueSO so = window.SO;
+
+            Undo.RecordObject(so, "Paste Node");
+
+            foreach (NodeData nodeData in copyData.nodes)
+            {
+                NodeData newNodeData = new(nodeData);
+
+                so.AddNode(newNodeData);
+
+                BaseNode node = CreateNode(newNodeData.type, newNodeData.guid, newNodeData.position);
+
+                AddElement(node);
+                AddToSelection(node);
+            }
+
+            EditorUtility.SetDirty(so);
+        }
+
+        private bool CheckSerialize(string data) => !string.IsNullOrEmpty(data);
+
+        [System.Serializable]
+        private class CopyData
+        {
+            public List<NodeData> nodes = new();
         }
         #endregion
     }

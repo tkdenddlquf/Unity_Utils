@@ -20,6 +20,8 @@ namespace Yang.Dialogue
 
         private readonly DialogueWrapper wrapper = new();
 
+        public string CurrentNode => runnerNode.CurrentNode;
+
         public bool IsStarted { get; private set; }
 
         private void Awake() => Init();
@@ -72,6 +74,8 @@ namespace Yang.Dialogue
         public void StopDialogue() => token?.Cancel();
 
         public void ContinueDialogue() => runnerNode.Continue();
+
+        public void JumpNode(string nodeID) => runnerNode.JumpNode(nodeID);
 
         public DialogueWrapper Save()
         {
