@@ -54,26 +54,29 @@ namespace Yang.Dialogue
 
             string nextNode = runnerNode.CurrentNode;
 
-            token = new();
-
-            while (!token.IsCancellationRequested)
+            if (nextNode != "")
             {
-                nextNode = await runnerNode.NextNode(nextNode, token);
+                token = new();
 
-                if (nextNode == "") break;
+                while (!token.IsCancellationRequested)
+                {
+                    nextNode = await runnerNode.NextNode(nextNode, token);
+
+                    if (nextNode == "") break;
+                }
+
+                token.Dispose();
+                token = null;
+
+                foreach (IDialogueView view in views) view.OnNotify(NotifyType.End, "");
             }
-
-            token.Dispose();
-            token = null;
-
-            foreach (IDialogueView view in views) view.OnNotify(NotifyType.End, "");
 
             IsStarted = false;
         }
 
         public void StopDialogue() => token?.Cancel();
 
-        public void ContinueDialogue() => runnerNode.Continue();
+        public void CancelWait() => runnerNode.Continue();
 
         public void JumpNode(string nodeID) => runnerNode.JumpNode(nodeID);
 

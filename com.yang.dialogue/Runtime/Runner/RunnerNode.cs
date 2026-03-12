@@ -290,12 +290,14 @@ namespace Yang.Dialogue
                     break;
             }
 
-            return "";
+            CurrentNode = "";
+
+            return CurrentNode;
         }
 
         public void JumpNode(string nodeName)
         {
-            if (nodeName == null && !nodes.ContainsKey(nodeName)) return;
+            if (nodeName == "" && !nodes.ContainsKey(nodeName)) return;
 
             CurrentNode = nodeName;
         }
