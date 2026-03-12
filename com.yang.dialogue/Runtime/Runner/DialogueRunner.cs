@@ -58,7 +58,7 @@ namespace Yang.Dialogue
             {
                 token = new();
 
-                while (!token.IsCancellationRequested)
+                while (true)
                 {
                     nextNode = await runnerNode.NextNode(nextNode, token);
 
@@ -67,8 +67,6 @@ namespace Yang.Dialogue
 
                 token.Dispose();
                 token = null;
-
-                foreach (IDialogueView view in views) view.OnNotify(NotifyType.End, "");
             }
 
             IsStarted = false;

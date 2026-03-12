@@ -6,18 +6,18 @@ namespace Yang.Dialogue
 {
     public abstract class DialogueViewBase : MonoBehaviour, IDialogueView
     {
-        public virtual Task OnDialogue(RunnerText speaker, RunnerText text, string message, RunnerToken token) => Task.CompletedTask;
+        public virtual Task OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token) => Task.CompletedTask;
 
-        public virtual Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, RunnerToken token) => Task.FromResult(-1);
+        public virtual Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, IRunnerToken token) => Task.FromResult(-1);
 
         public virtual void OnNotify(NotifyType type, string key) { }
     }
 
     public interface IDialogueView
     {
-        public Task OnDialogue(RunnerText speaker, RunnerText text, string message, RunnerToken token);
+        public Task OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token);
 
-        public Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, RunnerToken token);
+        public Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, IRunnerToken token);
 
         public void OnNotify(NotifyType type, string key);
     }

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -48,7 +47,7 @@ namespace Yang.Dialogue
             CurrentNode = startNode.guid;
         }
 
-        public async Task<string> NextNode(string currentNode, RunnerToken token)
+        public async Task<string> NextNode(string currentNode, IRunnerToken token)
         {
             NodeData nodeData = nodes[currentNode];
 
@@ -262,16 +261,11 @@ namespace Yang.Dialogue
 
                                     runnerEvent.OnEvent(datas[1].stringValue);
 
-                                    while (IsWait && !token.IsCancellationRequested) await Task.Yield();
+                                    while (IsWait && !token.IsStop) await Task.Yield();
                                     break;
 
                                 case WaitType.Seconds:
-                                    if (datas[1].TryGetValue(out float second))
-                                    {
-                                        TimeSpan delay = TimeSpan.FromSeconds(second);
-
-                                        await Task.Delay(delay, token.Token);
-                                    }
+                                    if (datas[1].TryGetValue(out float second)) await token.Delay(second);
                                     break;
                             }
                         }
@@ -290,9 +284,18 @@ namespace Yang.Dialogue
                     break;
             }
 
-            CurrentNode = "";
+            NotifyType notifyType;
 
-            return CurrentNode;
+            if (token.IsStop) notifyType = NotifyType.Stop;
+            else
+            {
+                notifyType = NotifyType.End;
+                CurrentNode = "";
+            }
+
+            foreach (IDialogueView view in runner.Views) view.OnNotify(notifyType, CurrentNode);
+
+            return "";
         }
 
         public void JumpNode(string nodeName)
