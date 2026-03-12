@@ -55,9 +55,28 @@ namespace Yang.UIController
             return false;
         }
 
+        public bool CheckFocus(T type)
+        {
+            if (popupDict.TryGetValue(type, out UIBase<T> popup)) return popup == activeUIs[^1];
+
+            return false;
+        }
+
         public void CloseAllPopup()
         {
             while (activeUIs.Count != 0) InactivePopup(activeUIs[0].UIType);
+        }
+
+        public void FocusPopup(T type)
+        {
+            if (popupDict.TryGetValue(type, out UIBase<T> popup) && popup.IsActive)
+            {
+                activeUIs.Remove(popup);
+
+                popup.transform.SetAsLastSibling();
+
+                activeUIs.Add(popup);
+            }
         }
 
         public void ActivePopup(T type) => SetActivePopup(type, true);
@@ -72,12 +91,7 @@ namespace Yang.UIController
 
                 popup.SetActive(active);
 
-                if (active)
-                {
-                    activeUIs.Add(popup);
-
-                    popup.transform.SetAsLastSibling();
-                }
+                if (active) FocusPopup(type);
                 else activeUIs.Remove(popup);
 
                 UIRaySystem.SetFocus(null);
