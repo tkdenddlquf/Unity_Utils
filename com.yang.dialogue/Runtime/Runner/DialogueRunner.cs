@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Localization.Settings;
 
 namespace Yang.Dialogue
 {
@@ -51,6 +52,8 @@ namespace Yang.Dialogue
             if (IsStarted) return;
 
             IsStarted = true;
+
+            await LocalizationSettings.InitializationOperation.Task;
 
             string nextNode = runnerNode.CurrentNode;
 
