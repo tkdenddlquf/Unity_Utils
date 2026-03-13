@@ -35,7 +35,7 @@ namespace Yang.Dialogue.Editor
                 OptionData optionData = new(DialogueType.WAIT_TYPE_000);
 
                 optionData.datas.Add(new(WaitType.Notify));
-                optionData.datas.Add(new(GenericData.Type.String));
+                optionData.datas.Add(new(GenericData.DataType.String));
 
                 data.AddOption(optionData);
 
@@ -56,17 +56,18 @@ namespace Yang.Dialogue.Editor
 
                 List<GenericData> datas = option.datas;
 
-                datas[0].TryGetValue(out WaitType waitType);
+                if (datas[0].TryGetEnum(out WaitType eResult))
+                {
+                    EnumField typeField = GetTypeField(eResult, option.type);
+                    FloatField secondsField = GetSecondsField(datas[1].TryGetFloat(out float fResult) ? fResult : 0, option.type);
+                    PopupField<string> eventField = GetEventField(so.Events, datas[1].ToString(), option.type);
 
-                EnumField typeField = GetTypeField(waitType, option.type);
-                FloatField secondsField = GetSecondsField(datas[1].floatValue, option.type);
-                PopupField<string> eventField = GetEventField(so.Events, datas[1].stringValue, option.type);
+                    extensionContainer.Add(typeField);
+                    extensionContainer.Add(secondsField);
+                    extensionContainer.Add(eventField);
 
-                extensionContainer.Add(typeField);
-                extensionContainer.Add(secondsField);
-                extensionContainer.Add(eventField);
-
-                SetDisplaySeconds(waitType);
+                    SetDisplaySeconds(eResult);
+                }
             }
         }
 

@@ -83,10 +83,10 @@ namespace Yang.Dialogue
 
                         OptionData message = nodeData.GetOption(messageIndex);
 
-                        RunnerText speaker = new(speakerTable.datas[0].stringValue, speakerEntry.datas[0].stringValue);
-                        RunnerText text = new(nodeData.GetPort(0), textTable.datas[0].stringValue, textEntry.datas[0].stringValue);
+                        RunnerText speaker = new(speakerTable.datas[0].ToString(), speakerEntry.datas[0].ToString());
+                        RunnerText text = new(nodeData.GetPort(0), textTable.datas[0].ToString(), textEntry.datas[0].ToString());
 
-                        foreach (IDialogueView view in runner.Views) await view.OnDialogue(speaker, text, message.datas[0].stringValue, token);
+                        foreach (IDialogueView view in runner.Views) await view.OnDialogue(speaker, text, message.datas[0].ToString(), token);
 
                         RunnerPort port = new(currentNode, text.portName);
 
@@ -112,7 +112,7 @@ namespace Yang.Dialogue
 
                             for (int j = 1; j < datas.Count; j++)
                             {
-                                if (!runner.IsTrigger(datas[j].stringValue))
+                                if (!runner.IsTrigger(datas[j].ToString()))
                                 {
                                     allExist = false;
 
@@ -122,7 +122,7 @@ namespace Yang.Dialogue
 
                             if (allExist)
                             {
-                                RunnerPort port = new(currentNode, datas[0].stringValue);
+                                RunnerPort port = new(currentNode, datas[0].ToString());
 
                                 if (links.TryGetValue(port, out RunnerPort target))
                                 {
@@ -137,7 +137,7 @@ namespace Yang.Dialogue
 
                         if (!found)
                         {
-                            RunnerPort port = new(currentNode, options[0].datas[0].stringValue);
+                            RunnerPort port = new(currentNode, options[0].datas[0].ToString());
 
                             if (links.TryGetValue(port, out RunnerPort target)) return target.guid;
                         }
@@ -152,12 +152,12 @@ namespace Yang.Dialogue
                         {
                             List<GenericData> datas = options[i].datas;
 
-                            if (datas[1].stringValue == "") continue;
+                            if (datas[1].ToString() == "") continue;
 
-                            if (datas[2].TryGetValue(out bool isTrigger))
+                            if (datas[2].TryGetBool(out bool isTrigger))
                             {
-                                if (isTrigger) runner.SetTrigger(datas[1].stringValue);
-                                else runner.UnsetTrigger(datas[1].stringValue);
+                                if (isTrigger) runner.SetTrigger(datas[1].ToString());
+                                else runner.UnsetTrigger(datas[1].ToString());
                             }
                         }
 
@@ -177,9 +177,9 @@ namespace Yang.Dialogue
                         {
                             List<GenericData> datas = options[i].datas;
 
-                            if (datas[1].stringValue == "") continue;
+                            if (datas[1].ToString() == "") continue;
 
-                            runnerEvent.OnEvent(datas[1].stringValue);
+                            runnerEvent.OnEvent(datas[1].ToString());
                         }
 
                         string portName = nodeData.GetPort(0);
@@ -210,18 +210,18 @@ namespace Yang.Dialogue
 
                         OptionData message = nodeData.GetOption(messageIndex);
 
-                        RunnerText speaker = new(speakerTable.datas[0].stringValue, speakerEntry.datas[0].stringValue);
+                        RunnerText speaker = new(speakerTable.datas[0].ToString(), speakerEntry.datas[0].ToString());
 
                         foreach (OptionData textEntry in nodeData.GetOptions(DialogueType.CHOICE_TYPE_003, _ => _.Count != 0))
                         {
-                            RunnerText data = new(textEntry.datas[0].stringValue, textTable.datas[0].stringValue, textEntry.datas[1].stringValue);
+                            RunnerText data = new(textEntry.datas[0].ToString(), textTable.datas[0].ToString(), textEntry.datas[1].ToString());
 
                             runnerDatas.Add(data);
                         }
 
                         foreach (IDialogueView view in runner.Views)
                         {
-                            int result = await view.OnChoice(speaker, runnerDatas, message.datas[0].stringValue, token);
+                            int result = await view.OnChoice(speaker, runnerDatas, message.datas[0].ToString(), token);
 
                             if (result != -1)
                             {
@@ -252,20 +252,20 @@ namespace Yang.Dialogue
 
                             List<GenericData> datas = option.datas;
 
-                            datas[0].TryGetValue(out WaitType type);
+                            datas[0].TryGetEnum(out WaitType type);
 
                             switch (type)
                             {
                                 case WaitType.Notify:
-                                    foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait, datas[1].stringValue);
+                                    foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait, datas[1].ToString());
 
-                                    runnerEvent.OnEvent(datas[1].stringValue);
+                                    runnerEvent.OnEvent(datas[1].ToString());
 
                                     while (IsWait && !token.IsStop) await Task.Yield();
                                     break;
 
                                 case WaitType.Seconds:
-                                    if (datas[1].TryGetValue(out float second)) await token.Delay(second);
+                                    if (datas[1].TryGetFloat(out float second)) await token.Delay(second);
                                     break;
                             }
                         }

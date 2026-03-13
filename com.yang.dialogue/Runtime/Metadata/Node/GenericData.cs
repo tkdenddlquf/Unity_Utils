@@ -1,10 +1,11 @@
-using System.Runtime.CompilerServices;
+using System;
+using System.Globalization;
 using UnityEngine;
 
-[System.Serializable]
+[Serializable]
 public struct GenericData
 {
-    public enum Type
+    public enum DataType : byte
     {
         Int,
         Float,
@@ -13,259 +14,250 @@ public struct GenericData
         Color,
         Guid,
         Enum,
-        String,
+        String
     }
 
-    public Type type;
+    [SerializeField] private DataType type;
 
-    public int intValue;
-    public float floatValue;
-    public long longValue;
-    public bool boolValue;
-    public Color colorValue;
-    public string guidValue;
-    public int enumValue;
-    public string stringValue;
+    [SerializeField] private int intValue;
+    [SerializeField] private float floatValue;
+    [SerializeField] private long longValue;
+    [SerializeField] private bool boolValue;
+    [SerializeField] private Color colorValue;
 
-    public GenericData(Type type)
+    [SerializeField] private int enumValue;
+
+    [SerializeField] private string guidValue;
+    [SerializeField] private string stringValue;
+
+    public readonly DataType Type => type;
+
+    public static GenericData Convert(string data)
     {
-        this.type = type;
-
-        intValue = default;
-        floatValue = default;
-        longValue = default;
-        boolValue = default;
-        colorValue = default;
-        guidValue = default;
-        enumValue = default;
-        stringValue = default;
-    }
-
-    public GenericData(string data)
-    {
-        intValue = default;
-        floatValue = default;
-        longValue = default;
-        boolValue = default;
-        colorValue = default;
-        guidValue = default;
-        enumValue = default;
-        stringValue = data;
+        GenericData result = new();
 
         if (int.TryParse(data, out int i))
         {
-            type = Type.Int;
+            result.type = DataType.Int;
+            result.intValue = i;
 
-            intValue = i;
+            return result;
         }
-        else if (float.TryParse(data, out float f))
+
+        if (long.TryParse(data, out long l))
         {
-            type = Type.Float;
+            result.type = DataType.Long;
+            result.longValue = l;
 
-            floatValue = f;
+            return result;
         }
-        else if (long.TryParse(data, out long l))
+
+        if (float.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
         {
-            type = Type.Long;
+            result.type = DataType.Float;
+            result.floatValue = f;
 
-            longValue = l;
+            return result;
         }
-        else if (bool.TryParse(data, out bool b))
+
+        if (bool.TryParse(data, out bool b))
         {
-            type = Type.Bool;
+            result.type = DataType.Bool;
+            result.boolValue = b;
 
-            boolValue = b;
+            return result;
         }
-        else if (ColorUtility.TryParseHtmlString(data, out Color c))
+
+        if (ColorUtility.TryParseHtmlString(data, out Color c))
         {
-            type = Type.Color;
+            result.type = DataType.Color;
+            result.colorValue = c;
 
-            colorValue = c;
+            return result;
         }
-        else if (System.Guid.TryParse(data, out System.Guid g))
+
+        if (Guid.TryParse(data, out Guid g))
         {
-            type = Type.Guid;
+            result.type = DataType.Guid;
+            result.guidValue = g.ToString();
 
-            guidValue = g.ToString();
+            return result;
         }
-        else type = Type.String;
+
+        result.type = DataType.String;
+        result.stringValue = data;
+
+        return result;
+    }
+
+    public GenericData(DataType type)
+    {
+        this = default;
+        this.type = type;
     }
 
     public GenericData(int value)
     {
-        type = Type.Int;
-
+        this = default;
+        type = DataType.Int;
         intValue = value;
-        floatValue = default;
-        longValue = default;
-        boolValue = default;
-        colorValue = default;
-        guidValue = default;
-        enumValue = default;
-        stringValue = default;
     }
 
     public GenericData(float value)
     {
-        type = Type.Float;
-
-        intValue = default;
+        this = default;
+        type = DataType.Float;
         floatValue = value;
-        longValue = default;
-        boolValue = default;
-        colorValue = default;
-        guidValue = default;
-        enumValue = default;
-        stringValue = default;
     }
 
     public GenericData(long value)
     {
-        type = Type.Float;
-
-        intValue = default;
-        floatValue = default;
+        this = default;
+        type = DataType.Long;
         longValue = value;
-        boolValue = default;
-        colorValue = default;
-        guidValue = default;
-        enumValue = default;
-        stringValue = default;
     }
 
     public GenericData(bool value)
     {
-        type = Type.Bool;
-
-        intValue = default;
-        floatValue = default;
-        longValue = default;
+        this = default;
+        type = DataType.Bool;
         boolValue = value;
-        colorValue = default;
-        guidValue = default;
-        enumValue = default;
-        stringValue = default;
     }
 
     public GenericData(Color value)
     {
-        type = Type.Color;
-
-        intValue = default;
-        floatValue = default;
-        longValue = default;
-        boolValue = default;
+        this = default;
+        type = DataType.Color;
         colorValue = value;
-        guidValue = default;
-        enumValue = default;
-        stringValue = default;
     }
 
-    public GenericData(System.Guid value)
+    public GenericData(Guid value)
     {
-        type = Type.Guid;
-
-        intValue = default;
-        floatValue = default;
-        longValue = default;
-        boolValue = default;
-        colorValue = default;
+        this = default;
+        type = DataType.Guid;
         guidValue = value.ToString();
-        enumValue = default;
-        stringValue = default;
     }
 
-    public GenericData(System.Enum value)
+    public GenericData(Enum value)
     {
-        type = Type.Enum;
-
-        intValue = default;
-        floatValue = default;
-        longValue = default;
-        boolValue = default;
-        colorValue = default;
-        guidValue = default;
+        this = default;
+        type = DataType.Enum;
         enumValue = System.Convert.ToInt32(value);
-        stringValue = default;
     }
 
-    public readonly bool TryGetValue<T>(out T result)
+    public GenericData(string value)
     {
-        switch (type)
+        this = default;
+        type = DataType.String;
+        stringValue = value;
+    }
+
+    public readonly bool TryGetInt(out int value)
+    {
+        if (type == DataType.Int)
         {
-            case Type.Int:
-                if (intValue is T iConvert)
-                {
-                    result = iConvert;
-
-                    return true;
-                }
-                break;
-
-            case Type.Float:
-                if (floatValue is T fConvert)
-                {
-                    result = fConvert;
-
-                    return true;
-                }
-                break;
-
-            case Type.Long:
-                if (longValue is T lConvert)
-                {
-                    result = lConvert;
-
-                    return true;
-                }
-                break;
-
-            case Type.Bool:
-                if (boolValue is T bConvert)
-                {
-                    result = bConvert;
-
-                    return true;
-                }
-                break;
-
-            case Type.Color:
-                if (colorValue is T cConvert)
-                {
-                    result = cConvert;
-
-                    return true;
-                }
-                break;
-
-            case Type.Guid:
-                System.Guid.TryParse(guidValue, out System.Guid guid);
-
-                if (guid is T gConvert)
-                {
-                    result = gConvert;
-
-                    return true;
-                }
-                break;
-
-            case Type.Enum:
-                result = Unsafe.As<int, T>(ref Unsafe.AsRef(enumValue));
-
-                return true;
-
-            case Type.String:
-                if (stringValue is T sConvert)
-                {
-                    result = sConvert;
-
-                    return true;
-                }
-                break;
+            value = intValue;
+            return true;
         }
 
-        result = default;
-
+        value = default;
         return false;
+    }
+
+    public readonly bool TryGetFloat(out float value)
+    {
+        if (type == DataType.Float)
+        {
+            value = floatValue;
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    public readonly bool TryGetLong(out long value)
+    {
+        if (type == DataType.Long)
+        {
+            value = longValue;
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    public readonly bool TryGetBool(out bool value)
+    {
+        if (type == DataType.Bool)
+        {
+            value = boolValue;
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    public readonly bool TryGetColor(out Color value)
+    {
+        if (type == DataType.Color)
+        {
+            value = colorValue;
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    public readonly bool TryGetGuid(out Guid value)
+    {
+        if (type == DataType.Guid && Guid.TryParse(guidValue, out value))
+            return true;
+
+        value = default;
+        return false;
+    }
+
+    public readonly bool TryGetEnum<T>(out T value) where T : struct, Enum
+    {
+        if (type == DataType.Enum)
+        {
+            value = (T)Enum.ToObject(typeof(T), enumValue);
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    public readonly bool TryGetString(out string value)
+    {
+        if (type == DataType.String)
+        {
+            value = stringValue;
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
+
+    public override string ToString()
+    {
+        return type switch
+        {
+            DataType.Int => intValue.ToString(),
+            DataType.Float => floatValue.ToString(),
+            DataType.Long => longValue.ToString(),
+            DataType.Bool => boolValue.ToString(),
+            DataType.Color => colorValue.ToString(),
+            DataType.Guid => guidValue,
+            DataType.Enum => enumValue.ToString(),
+            DataType.String => stringValue,
+            _ => ""
+        };
     }
 }

@@ -6,7 +6,6 @@ namespace Yang.Dialogue.Editor
 {
     public abstract class BaseNode : Node
     {
-        protected const string EMPTY_OPTION = "";
         protected const int ITEM_MIN_WIDTH = 150;
 
         public string GUID { get; private set; }
@@ -56,7 +55,7 @@ namespace Yang.Dialogue.Editor
 
             for (int i = 0; ; i++)
             {
-                if (!data.ContainsOption(baseID, _ => _.Count != 0 && _[0].stringValue == id)) return id;
+                if (!data.ContainsOption(baseID, _ => _.Count != 0 && _[0].ToString() == id)) return id;
 
                 id = $"{baseID} {i + 1}";
             }
@@ -104,7 +103,7 @@ namespace Yang.Dialogue.Editor
 
                 window.RemoveEdge(port);
 
-                int optionIndex = data.GetOptionIndex(_ => _.Count != 0 && _[0].stringValue == port.portName);
+                int optionIndex = data.GetOptionIndex(_ => _.Count != 0 && _[0].ToString() == port.portName);
 
                 data.RemoveAtOption(optionIndex);
                 data.RemovePort(portName);
