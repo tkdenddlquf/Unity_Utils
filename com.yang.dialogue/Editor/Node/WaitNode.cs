@@ -34,7 +34,7 @@ namespace Yang.Dialogue.Editor
         private void SetDefault()
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             if (data.portDatas.Count == 0)
             {
@@ -52,7 +52,7 @@ namespace Yang.Dialogue.Editor
         private void SetOptions()
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             List<GenericData> datas = data.optionDatas[0].data;
 
@@ -149,7 +149,7 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<Enum> evt)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Change Wait Option");
 
@@ -159,8 +159,6 @@ namespace Yang.Dialogue.Editor
 
             SetDisplaySeconds(type);
 
-            so.SetNode(GUID, data);
-
             EditorUtility.SetDirty(so);
 
             window.SetUnsaved();
@@ -169,13 +167,11 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<float> evt)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Change Wait Second");
 
             data.optionDatas[0].data[1] = new(evt.newValue);
-
-            so.SetNode(GUID, data);
 
             EditorUtility.SetDirty(so);
 
@@ -185,13 +181,11 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Change Wait Event");
 
             data.optionDatas[0].data[1] = new(evt.newValue);
-
-            so.SetNode(GUID, data);
 
             EditorUtility.SetDirty(so);
 

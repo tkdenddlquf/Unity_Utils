@@ -27,24 +27,9 @@ namespace Yang.Dialogue
         {
             if (so == null) return;
 
-            nodes.Clear();
-            links.Clear();
+            so.GetDatas(nodes, links);
 
-            NodeData startNode = so.startNode;
-
-            nodes.Add(startNode.guid, startNode);
-
-            foreach (NodeData node in so.GetNodes()) nodes.Add(node.guid, node);
-
-            foreach (LinkData link in so.GetLinks())
-            {
-                RunnerPort output = new(link.nodeGuid, link.outPortIndex);
-                RunnerPort input = new(link.targetGuid, -1);
-
-                links.Add(output, input);
-            }
-
-            CurrentNode = startNode.guid;
+            CurrentNode = so.StartGuid;
         }
 
         public async Task<string> NextNode(string currentNode, IRunnerToken token)

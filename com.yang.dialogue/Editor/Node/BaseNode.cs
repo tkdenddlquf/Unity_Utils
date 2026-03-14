@@ -52,13 +52,13 @@ namespace Yang.Dialogue.Editor
         protected void RemovePort(Port port)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             if (data.portDatas.Count > 1)
             {
                 int portIndex = port.parent.IndexOf(port);
 
-                LinkData link = so.GetLink(data.guid, portIndex);
+                LinkData link = window.GetLink(data.guid, portIndex);
 
                 Undo.RecordObject(so, "Remove Port");
 
@@ -66,8 +66,7 @@ namespace Yang.Dialogue.Editor
 
                 data.portDatas.RemoveAt(portIndex);
 
-                so.RemoveLink(link);
-                so.SetNode(GUID, data);
+                window.Links.Remove(link);
 
                 outputContainer.Remove(port);
 
@@ -84,16 +83,16 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
 
-            if (so.ContainsNode(evt.newValue)) idField.SetValueWithoutNotify(GUID);
+            if (window.ContainsNode(evt.newValue)) idField.SetValueWithoutNotify(GUID);
             else
             {
-                NodeData data = so.GetNode(GUID);
+                NodeData data = window.GetNode(GUID);
 
                 Undo.RecordObject(so, $"Change GUID");
 
                 data.guid = evt.newValue;
 
-                so.SetNode(GUID, data);
+                window.SetNode(GUID, data);
 
                 GUID = data.guid;
 

@@ -8,7 +8,8 @@ namespace Yang.Dialogue
     {
         public string key;
 
-        public NodeData startNode;
+        [SerializeField] private NodeData startNode;
+        public string StartGuid => startNode.guid;
 
         [SerializeReference] private IEventMarker events;
         public IEventMarker Events => events;
@@ -19,99 +20,22 @@ namespace Yang.Dialogue
         [SerializeField] private List<NodeData> nodes = new();
         [SerializeField] private List<LinkData> links = new();
 
-        #region Node
-        public NodeData GetNode(string guid)
+        public void GetDatas(Dictionary<string, NodeData> nodes, Dictionary<RunnerPort, RunnerPort> links)
         {
-            if (guid == startNode.guid) return startNode;
+            nodes.Clear();
+            links.Clear();
 
-            for (int i = 0; i < nodes.Count; i++)
+            nodes.Add(startNode.guid, startNode);
+
+            foreach (NodeData node in this.nodes) nodes.Add(node.guid, node);
+
+            foreach (LinkData link in this.links)
             {
-                if (nodes[i].guid == guid) return nodes[i];
-            }
+                RunnerPort output = new(link.nodeGuid, link.outPortIndex);
+                RunnerPort input = new(link.targetGuid, -1);
 
-            return default;
-        }
-
-        public IReadOnlyList<NodeData> GetNodes() => nodes;
-
-        public bool ContainsNode(string guid)
-        {
-            if (guid == startNode.guid) return true;
-
-            for (int i = 0; i < nodes.Count; i++)
-            {
-                if (nodes[i].guid == guid) return true;
-            }
-
-            return false;
-        }
-
-        public bool TryGetNode(string guid, out NodeData node)
-        {
-            if (guid == startNode.guid)
-            {
-                node = startNode;
-
-                return true;
-            }
-            else
-            {
-                for (int i = 0; i < nodes.Count; i++)
-                {
-                    if (nodes[i].guid == guid)
-                    {
-                        node = nodes[i];
-
-                        return true;
-                    }
-                }
-            }
-
-            node = default;
-
-            return false;
-        }
-
-        public void SetNode(string guid, NodeData data)
-        {
-            if (startNode.guid == guid) startNode = data;
-            else
-            {
-                for (int i = 0; i < nodes.Count; i++)
-                {
-                    if (nodes[i].guid == guid) nodes[i] = data;
-                }
+                links.Add(output, input);
             }
         }
-
-        public void AddNode(NodeData data) => nodes.Add(data);
-
-        public bool RemoveNode(string guid)
-        {
-            NodeData data = GetNode(guid);
-
-            return nodes.Remove(data);
-        }
-        #endregion
-
-        #region Link
-        public LinkData GetLink(string guid, int outPortIndex)
-        {
-            for (int i = 0; i < links.Count; i++)
-            {
-                if (links[i].nodeGuid == guid && links[i].outPortIndex == outPortIndex) return links[i];
-            }
-
-            return default;
-        }
-
-        public IReadOnlyList<LinkData> GetLinks() => links;
-
-        public void AddLink(LinkData data) => links.Add(data);
-
-        public bool RemoveLink(LinkData data) => links.Remove(data);
-
-        public bool ContainsLink(LinkData data) => links.Contains(data);
-        #endregion
     }
 }

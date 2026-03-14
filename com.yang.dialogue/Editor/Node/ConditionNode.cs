@@ -51,7 +51,7 @@ namespace Yang.Dialogue.Editor
         private void SetDefault()
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             if (data.portDatas.Count == 0)
             {
@@ -64,7 +64,7 @@ namespace Yang.Dialogue.Editor
         private void SetOptions()
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             KeyConverter.GetKeys(so.Conditions, conditions);
 
@@ -110,7 +110,7 @@ namespace Yang.Dialogue.Editor
         private void CreatePort(PortType type)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, $"Create Output {type}");
 
@@ -134,8 +134,6 @@ namespace Yang.Dialogue.Editor
 
             data.portDatas.Add(portOption);
 
-            so.SetNode(GUID, data);
-
             RefreshExpandedState();
             RefreshPorts();
 
@@ -156,7 +154,7 @@ namespace Yang.Dialogue.Editor
             if (newIndex < 1 || newIndex >= container.childCount) return;
 
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Move Port Index");
 
@@ -165,8 +163,6 @@ namespace Yang.Dialogue.Editor
             (portDatas[currentIndex], portDatas[newIndex]) = (portDatas[newIndex], portDatas[currentIndex]);
 
             container.Insert(newIndex, port);
-
-            so.SetNode(GUID, data);
 
             RefreshPorts();
 
@@ -178,7 +174,7 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<string> evt, Port port)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             int portIndex = port.parent.IndexOf(port);
 
@@ -194,7 +190,7 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<string> evt, Port port, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement);
@@ -326,7 +322,7 @@ namespace Yang.Dialogue.Editor
         private void CreateCondition(Port port, VisualElement itemContainer)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             int portIndex = port.parent.IndexOf(port);
 
@@ -371,7 +367,7 @@ namespace Yang.Dialogue.Editor
         private void RemoveConditionField(Port port, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             VisualElement itemContainer = itemElement.parent;
 

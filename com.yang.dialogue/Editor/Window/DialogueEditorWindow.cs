@@ -10,6 +10,11 @@ namespace Yang.Dialogue.Editor
     {
         private DialogueGraph graph;
 
+        private System.Reflection.FieldInfo startField;
+
+        private System.Reflection.FieldInfo nodeField;
+        private System.Reflection.FieldInfo linkField;
+
         private DialogueSO so;
         public DialogueSO SO
         {
@@ -18,12 +23,23 @@ namespace Yang.Dialogue.Editor
             {
                 so = value;
 
+                Nodes = (List<NodeData>)nodeField.GetValue(value);
+                Links = (List<LinkData>)linkField.GetValue(value);
+
                 RefreshView();
             }
         }
 
+        public List<NodeData> Nodes { get; private set; }
+        public List<LinkData> Links { get; private set; }
+
         private void OnEnable()
         {
+            startField = typeof(DialogueSO).GetField("startNode", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            nodeField = typeof(DialogueSO).GetField("nodes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            linkField = typeof(DialogueSO).GetField("links", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
             graph = new DialogueGraph(this);
             graph.StretchToParentSize();
 
@@ -134,11 +150,11 @@ namespace Yang.Dialogue.Editor
                 {
                     LinkData link = CreateLink(edge);
 
-                    if (!SO.ContainsLink(link))
+                    if (!Links.Contains(link))
                     {
                         Undo.RecordObject(SO, "Create Edge");
 
-                        SO.AddLink(link);
+                        Links.Add(link);
                     }
                 }
             }
@@ -151,18 +167,18 @@ namespace Yang.Dialogue.Editor
                     {
                         LinkData link = CreateLink(edge);
 
-                        if (SO.ContainsLink(link))
+                        if (Links.Contains(link))
                         {
                             Undo.RecordObject(SO, "Remove Edge");
 
-                            SO.RemoveLink(link);
+                            Links.Remove(link);
                         }
                     }
                     else if (element is BaseNode node)
                     {
                         Undo.RecordObject(SO, "Remove Node");
 
-                        SO.RemoveNode(node.GUID);
+                        RemoveNode(node.GUID);
                     }
                 }
             }
@@ -173,13 +189,13 @@ namespace Yang.Dialogue.Editor
                 {
                     if (element is BaseNode node)
                     {
-                        if (SO.TryGetNode(node.GUID, out NodeData data))
+                        if (TryGetNode(node.GUID, out NodeData data))
                         {
                             Undo.RecordObject(SO, "Move Node");
 
                             data.position = node.GetPosition().position;
 
-                            SO.SetNode(node.GUID, data);
+                            SetNode(node.GUID, data);
                         }
                     }
                 }
@@ -199,8 +215,8 @@ namespace Yang.Dialogue.Editor
 
             if (outputPort.node is BaseNode outputView && inputPort.node is BaseNode inputView)
             {
-                NodeData outputData = SO.GetNode(outputView.GUID);
-                NodeData inputData = SO.GetNode(inputView.GUID);
+                NodeData outputData = GetNode(outputView.GUID);
+                NodeData inputData = GetNode(inputView.GUID);
 
                 LinkData link = new()
                 {
@@ -223,31 +239,29 @@ namespace Yang.Dialogue.Editor
             foreach (Node node in graph.nodes) graph.RemoveElement(node);
             foreach (Edge edge in graph.edges) graph.RemoveElement(edge);
 
-            NodeData startNode = SO.startNode;
+            NodeData startNode = (NodeData)startField.GetValue(SO);
 
             if (string.IsNullOrEmpty(startNode.guid))
             {
-                SO.startNode = new NodeData(NodeType.Start);
+                startField.SetValue(SO, new NodeData(NodeType.Start));
 
-                startNode = SO.startNode;
+                startNode = (NodeData)startField.GetValue(SO);
+
+                EditorUtility.SetDirty(SO);
             }
 
             CreateNode(NodeType.Start, startNode.guid, startNode.position);
 
-            IReadOnlyList<NodeData> nodes = SO.GetNodes();
-
-            for (int i = 0; i < nodes.Count; i++)
+            for (int i = 0; i < Nodes.Count; i++)
             {
-                NodeData node = nodes[i];
+                NodeData node = Nodes[i];
 
                 CreateNode(node.type, node.guid, node.position);
             }
 
-            IReadOnlyList<LinkData> links = SO.GetLinks();
-
-            for (int i = 0; i < links.Count; i++)
+            for (int i = 0; i < Links.Count; i++)
             {
-                LinkData link = links[i];
+                LinkData link = Links[i];
 
                 BaseNode outputNode = null;
                 BaseNode inputNode = null;
@@ -256,7 +270,7 @@ namespace Yang.Dialogue.Editor
                 {
                     if (node is BaseNode view)
                     {
-                        NodeData data = SO.GetNode(view.GUID);
+                        NodeData data = GetNode(view.GUID);
 
                         if (data.guid == link.nodeGuid)
                         {
@@ -276,7 +290,7 @@ namespace Yang.Dialogue.Editor
 
                 if (outputNode == null || inputNode == null)
                 {
-                    SO.RemoveLink(link);
+                    Links.Remove(link);
 
                     i--;
 
@@ -286,7 +300,7 @@ namespace Yang.Dialogue.Editor
 
                 if (outputNode.outputContainer[link.outPortIndex] is not Port outputPort || inputNode.inputContainer[0] is not Port inputPort)
                 {
-                    SO.RemoveLink(link);
+                    Links.Remove(link);
 
                     i--;
 
@@ -310,7 +324,100 @@ namespace Yang.Dialogue.Editor
 
             graph.AddElement(node);
 
-            if (guid == SO.startNode.guid) node.capabilities &= ~Capabilities.Deletable;
+            if (guid == SO.StartGuid) node.capabilities &= ~Capabilities.Deletable;
+        }
+        #endregion
+
+        #region Node
+        public NodeData GetNode(string guid)
+        {
+            if (guid == SO.StartGuid) return (NodeData)startField.GetValue(SO);
+
+            for (int i = 0; i < Nodes.Count; i++)
+            {
+                if (Nodes[i].guid == guid) return Nodes[i];
+            }
+
+            return default;
+        }
+
+        public bool ContainsNode(string guid)
+        {
+            if (guid == SO.StartGuid) return true;
+
+            for (int i = 0; i < Nodes.Count; i++)
+            {
+                if (Nodes[i].guid == guid) return true;
+            }
+
+            return false;
+        }
+
+        public bool TryGetNode(string guid, out NodeData node)
+        {
+            if (guid == SO.StartGuid)
+            {
+                node = (NodeData)startField.GetValue(SO);
+
+                return true;
+            }
+            else
+            {
+                for (int i = 0; i < Nodes.Count; i++)
+                {
+                    if (Nodes[i].guid == guid)
+                    {
+                        node = Nodes[i];
+
+                        return true;
+                    }
+                }
+            }
+
+            node = default;
+
+            return false;
+        }
+
+        public void SetNode(string guid, NodeData data)
+        {
+            if (SO.StartGuid == guid) startField.SetValue(SO, data);
+            else
+            {
+                for (int i = 0; i < Nodes.Count; i++)
+                {
+                    if (Nodes[i].guid == guid) Nodes[i] = data;
+                }
+            }
+        }
+
+        public bool RemoveNode(string guid)
+        {
+            if (guid == SO.StartGuid) return false;
+
+            for (int i = 0; i < Nodes.Count; i++)
+            {
+                if (Nodes[i].guid == guid)
+                {
+                    Nodes.RemoveAt(i);
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        #endregion
+
+        #region Link
+        public LinkData GetLink(string guid, int outPortIndex)
+        {
+            for (int i = 0; i < Links.Count; i++)
+            {
+                if (Links[i].nodeGuid == guid && Links[i].outPortIndex == outPortIndex) return Links[i];
+            }
+
+            return default;
         }
         #endregion
     }

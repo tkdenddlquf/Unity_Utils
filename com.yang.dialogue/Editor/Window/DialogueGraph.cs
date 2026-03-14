@@ -75,7 +75,7 @@ namespace Yang.Dialogue.Editor
 
             NodeData data = new(type) { position = position };
 
-            so.AddNode(data);
+            window.Nodes.Add(data);
 
             BaseNode node = CreateNode(type, data.guid, position);
 
@@ -139,9 +139,9 @@ namespace Yang.Dialogue.Editor
 
             foreach (BaseNode node in nodes)
             {
-                NodeData nodeData = so.GetNode(node.GUID);
+                NodeData nodeData = window.GetNode(node.GUID);
 
-                if (nodeData.Equals(so.startNode)) continue;
+                if (nodeData.guid == so.StartGuid) continue;
 
                 data.nodes.Add(nodeData);
             }
@@ -163,7 +163,7 @@ namespace Yang.Dialogue.Editor
             {
                 NodeData newNodeData = new(nodeData);
 
-                so.AddNode(newNodeData);
+                window.Nodes.Add(newNodeData);
 
                 BaseNode node = CreateNode(newNodeData.type, newNodeData.guid, newNodeData.position);
 

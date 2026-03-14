@@ -39,7 +39,7 @@ namespace Yang.Dialogue.Editor
         private void SetDefault()
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             if (data.portDatas.Count == 0)
             {
@@ -54,7 +54,7 @@ namespace Yang.Dialogue.Editor
         private void SetOptions()
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             KeyConverter.GetKeys(so.Events, events);
 
@@ -73,7 +73,7 @@ namespace Yang.Dialogue.Editor
         private void CreateEvent()
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Create Event");
 
@@ -117,7 +117,7 @@ namespace Yang.Dialogue.Editor
         private void RemoveEventField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             VisualElement container = itemElement.parent;
 
@@ -140,7 +140,7 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<string> evt, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            NodeData data = window.GetNode(GUID);
 
             VisualElement container = itemElement.parent;
 

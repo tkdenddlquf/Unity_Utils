@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
@@ -14,11 +15,14 @@ namespace Yang.Dialogue.Editor
 
             serializedObject.Update();
 
+            PropertyField textField = new(serializedObject.FindProperty("key"));
+
             PopupField<string> eventPopup = GetPopup<IEventMarker>(root, "events");
             PopupField<string> conditionPopup = GetPopup<IConditionMarker>(root, "conditions");
 
             Button button = new(Open) { text = "Edit" };
 
+            root.Add(textField);
             root.Add(eventPopup);
             root.Add(conditionPopup);
             root.Add(button);
