@@ -6,23 +6,21 @@ namespace Yang.Dialogue
     public struct LinkData : IEquatable<LinkData>
     {
         public string nodeGuid;
-        public string portName;
-
         public string targetGuid;
-        public string targetPortName;
+
+        public int outPortIndex;
 
         #region Equatable
         public readonly bool Equals(LinkData other)
         {
             return nodeGuid == other.nodeGuid &&
-                   portName == other.portName &&
                    targetGuid == other.targetGuid &&
-                   targetPortName == other.targetPortName;
+                   outPortIndex == other.outPortIndex;
         }
 
         public readonly override bool Equals(object obj) => obj is LinkData other && Equals(other);
 
-        public readonly override int GetHashCode() => HashCode.Combine(nodeGuid, portName, targetGuid, targetPortName);
+        public readonly override int GetHashCode() => HashCode.Combine(nodeGuid, targetGuid, outPortIndex);
         #endregion
     }
 }

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.UIElements;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
@@ -9,13 +11,10 @@ namespace Yang.Dialogue.Editor
     /// 
     /// Option Data (Common)
     /// 0 : Key - string
-    /// 1 : Check - bool
     /// </summary>
-    public class TriggerNode : BaseNode
+    public class ObjectNode : BaseNode
     {
-        private readonly List<string> conditions = new();
-
-        public TriggerNode(DialogueEditorWindow window, string guid) : base(window, guid)
+        public ObjectNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
         }
@@ -34,7 +33,7 @@ namespace Yang.Dialogue.Editor
         {
             if (evt.target != this) return;
 
-            evt.menu.AppendAction("Add Trigger", _ => CreateTrigger());
+            evt.menu.AppendAction("Add Object", _ => CreateEvent());
         }
 
         private void SetDefault()
@@ -44,10 +43,7 @@ namespace Yang.Dialogue.Editor
 
             if (data.portDatas.Count == 0)
             {
-                DataWrapper optionData = new(
-                    new(GenericData.DataType.String),
-                    new(true)
-                );
+                DataWrapper optionData = new(new GenericData(GenericData.DataType.Object));
 
                 data.optionDatas.Add(optionData);
 
@@ -60,33 +56,28 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            KeyConverter.GetKeys(so.Conditions, conditions);
-
             IReadOnlyList<DataWrapper> optionDatas = data.optionDatas;
 
             for (int i = 0; i < optionDatas.Count; i++)
             {
                 IReadOnlyList<GenericData> optionData = optionDatas[i].data;
 
-                string key = optionData[0].ToString();
+                optionData[0].TryGetObject(out Object target);
 
-                if (optionData[1].TryGetBool(out bool result)) AddTriggerField(key, result);
+                AddEventField(target);
             }
         }
 
-        private void CreateTrigger()
+        private void CreateEvent()
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            Undo.RecordObject(so, "Create Trigger");
+            Undo.RecordObject(so, "Create Object");
 
-            DataWrapper optionData = new(
-                new(GenericData.DataType.String),
-                new(true)
-            );
+            DataWrapper optionData = new(new GenericData(GenericData.DataType.Object));
 
-            AddTriggerField("", true);
+            AddEventField(null);
 
             data.optionDatas.Add(optionData);
 
@@ -95,7 +86,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void AddTriggerField(string key, bool check)
+        private void AddEventField(Object target)
         {
             DialogueSO so = window.SO;
             VisualElement container = new();
@@ -103,30 +94,21 @@ namespace Yang.Dialogue.Editor
             container.style.flexDirection = FlexDirection.Row;
             container.style.alignItems = Align.Center;
 
-            Toggle toggle = new() { value = check };
-
-            toggle.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
-
-            KeyConverter.GetKeys(so.Conditions, conditions);
-
-            int index = conditions.IndexOf(key);
-
-            PopupField<string> field = new(conditions, index);
+            ObjectField field = new() { value = target };
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
 
-            Button removeButton = new(() => RemoveTriggerField(container)) { text = "X" };
+            Button removeButton = new(() => RemoveEventField(container)) { text = "X" };
 
-            container.Add(toggle);
             container.Add(field);
             container.Add(removeButton);
 
             extensionContainer.Add(container);
         }
 
-        private void RemoveTriggerField(VisualElement itemElement)
+        private void RemoveEventField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
@@ -137,7 +119,7 @@ namespace Yang.Dialogue.Editor
             {
                 int optionIndex = container.IndexOf(itemElement);
 
-                Undo.RecordObject(so, "Remove Trigger");
+                Undo.RecordObject(so, "Remove Object");
 
                 data.optionDatas.RemoveAt(optionIndex);
 
@@ -149,7 +131,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<string> evt, VisualElement itemElement)
+        private void ChangedCallback(ChangeEvent<Object> evt, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
@@ -158,27 +140,9 @@ namespace Yang.Dialogue.Editor
 
             int optionIndex = container.IndexOf(itemElement);
 
-            Undo.RecordObject(so, "Change Trigger Option");
+            Undo.RecordObject(so, "Change Object Option");
 
             data.optionDatas[optionIndex].data[0] = new(evt.newValue);
-
-            EditorUtility.SetDirty(so);
-
-            window.SetUnsaved();
-        }
-
-        private void ChangedCallback(ChangeEvent<bool> evt, VisualElement itemElement)
-        {
-            DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
-
-            VisualElement container = itemElement.parent;
-
-            int optionIndex = container.IndexOf(itemElement);
-
-            Undo.RecordObject(so, "Change Trigger Check Option");
-
-            data.optionDatas[optionIndex].data[1] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 

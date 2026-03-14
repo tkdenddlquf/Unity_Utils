@@ -1,11 +1,17 @@
 using System;
 using System.Collections.Generic;
 using UnityEditor;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
 {
+    /// <summary>
+    /// Port Data (Unused)
+    /// 
+    /// Option Data (Unique)
+    /// 0 : WaitType - enum
+    /// 1 : Value - float, string
+    /// </summary>
     public class WaitNode : BaseNode
     {
         private readonly List<string> events = new();
@@ -19,8 +25,8 @@ namespace Yang.Dialogue.Editor
         {
             SetDefault();
 
-            CreatePort(Direction.Input, Port.Capacity.Multi);
-            CreatePort(Direction.Output, Port.Capacity.Single);
+            CreateInputPort();
+            CreateOutputPort();
 
             SetOptions();
         }
@@ -30,16 +36,16 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            if (data.OptionCount == 0)
+            if (data.portDatas.Count == 0)
             {
-                OptionData optionData = new(DialogueType.WAIT_TYPE_000);
+                DataWrapper optionData = new(
+                    new(WaitType.Notify),
+                    new(GenericData.DataType.String)
+                );
 
-                optionData.datas.Add(new(WaitType.Notify));
-                optionData.datas.Add(new(GenericData.DataType.String));
+                data.optionDatas.Add(optionData);
 
-                data.AddOption(optionData);
-
-                so.SetNode(GUID, data);
+                data.portDatas.Add(new());
             }
         }
 
@@ -48,26 +54,19 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(DialogueType.WAIT_TYPE_000, _ => _.Count != 0);
+            List<GenericData> datas = data.optionDatas[0].data;
 
-            if (optionIndex != -1)
+            if (datas[0].TryGetEnum(out WaitType eResult))
             {
-                OptionData option = data.GetOption(optionIndex);
+                EnumField typeField = GetTypeField(eResult);
+                FloatField secondsField = GetSecondsField(datas[1].TryGetFloat(out float fResult) ? fResult : 0);
+                PopupField<string> eventField = GetEventField(so.Events, datas[1].ToString());
 
-                List<GenericData> datas = option.datas;
+                extensionContainer.Add(typeField);
+                extensionContainer.Add(secondsField);
+                extensionContainer.Add(eventField);
 
-                if (datas[0].TryGetEnum(out WaitType eResult))
-                {
-                    EnumField typeField = GetTypeField(eResult, option.type);
-                    FloatField secondsField = GetSecondsField(datas[1].TryGetFloat(out float fResult) ? fResult : 0, option.type);
-                    PopupField<string> eventField = GetEventField(so.Events, datas[1].ToString(), option.type);
-
-                    extensionContainer.Add(typeField);
-                    extensionContainer.Add(secondsField);
-                    extensionContainer.Add(eventField);
-
-                    SetDisplaySeconds(eResult);
-                }
+                SetDisplaySeconds(eResult);
             }
         }
 
@@ -101,7 +100,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private EnumField GetTypeField(WaitType waitType, string type)
+        private EnumField GetTypeField(WaitType waitType)
         {
             EnumField field = new("Type", waitType);
 
@@ -110,12 +109,12 @@ namespace Yang.Dialogue.Editor
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type));
+            field.RegisterValueChangedCallback(ChangedCallback);
 
             return field;
         }
 
-        private FloatField GetSecondsField(float data, string type)
+        private FloatField GetSecondsField(float data)
         {
             FloatField field = new("Seconds") { value = data };
 
@@ -124,12 +123,12 @@ namespace Yang.Dialogue.Editor
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type));
+            field.RegisterValueChangedCallback(ChangedCallback);
 
             return field;
         }
 
-        private PopupField<string> GetEventField(IEventMarker marker, string data, string type)
+        private PopupField<string> GetEventField(IEventMarker marker, string data)
         {
             KeyConverter.GetKeys(marker, events);
 
@@ -142,83 +141,61 @@ namespace Yang.Dialogue.Editor
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type));
+            field.RegisterValueChangedCallback(ChangedCallback);
 
             return field;
         }
 
-        private void ChangedCallback(ChangeEvent<Enum> evt, string type)
+        private void ChangedCallback(ChangeEvent<Enum> evt)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0);
+            Undo.RecordObject(so, "Change Wait Option");
 
-            if (optionIndex != -1)
-            {
-                Undo.RecordObject(so, "Change Wait Option");
+            WaitType type = (WaitType)evt.newValue;
 
-                OptionData optionData = data.GetOption(optionIndex);
+            data.optionDatas[0].data[0] = new(type);
 
-                optionData.datas[0] = new(evt.newValue);
+            SetDisplaySeconds(type);
 
-                SetDisplaySeconds((WaitType)evt.newValue);
+            so.SetNode(GUID, data);
 
-                data.SetOption(optionIndex, optionData);
-                so.SetNode(GUID, data);
+            EditorUtility.SetDirty(so);
 
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
-            }
+            window.SetUnsaved();
         }
 
-        private void ChangedCallback(ChangeEvent<float> evt, string type)
+        private void ChangedCallback(ChangeEvent<float> evt)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0);
+            Undo.RecordObject(so, "Change Wait Second");
 
-            if (optionIndex != -1)
-            {
-                Undo.RecordObject(so, "Change Wait Second");
+            data.optionDatas[0].data[1] = new(evt.newValue);
 
-                OptionData optionData = data.GetOption(optionIndex);
+            so.SetNode(GUID, data);
 
-                optionData.datas[1] = new(evt.newValue);
+            EditorUtility.SetDirty(so);
 
-                data.SetOption(optionIndex, optionData);
-                so.SetNode(GUID, data);
-
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
-            }
+            window.SetUnsaved();
         }
 
-        private void ChangedCallback(ChangeEvent<string> evt, string type)
+        private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0);
+            Undo.RecordObject(so, "Change Wait Event");
 
-            if (optionIndex != -1)
-            {
-                Undo.RecordObject(so, "Change Wait Event");
+            data.optionDatas[0].data[1] = new(evt.newValue);
 
-                OptionData optionData = data.GetOption(optionIndex);
+            so.SetNode(GUID, data);
 
-                optionData.datas[1] = new(evt.newValue);
+            EditorUtility.SetDirty(so);
 
-                data.SetOption(optionIndex, optionData);
-                so.SetNode(GUID, data);
-
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
-            }
+            window.SetUnsaved();
         }
     }
 }

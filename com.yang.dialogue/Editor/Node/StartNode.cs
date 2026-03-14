@@ -1,5 +1,3 @@
-using UnityEditor.Experimental.GraphView;
-
 namespace Yang.Dialogue.Editor
 {
     public class StartNode : BaseNode
@@ -11,7 +9,7 @@ namespace Yang.Dialogue.Editor
 
         public override void SetPorts()
         {
-            CreatePort(Direction.Output, Port.Capacity.Single);
+            CreateOutputPort();
         }
     }
 }

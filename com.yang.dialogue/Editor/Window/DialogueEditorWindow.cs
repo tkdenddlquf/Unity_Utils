@@ -205,10 +205,9 @@ namespace Yang.Dialogue.Editor
                 LinkData link = new()
                 {
                     nodeGuid = outputData.guid,
-                    portName = outputPort.portName,
-
                     targetGuid = inputData.guid,
-                    targetPortName = inputPort.portName,
+
+                    outPortIndex = outputPort.parent.IndexOf(outputPort),
                 };
 
                 return link;
@@ -284,10 +283,8 @@ namespace Yang.Dialogue.Editor
                     continue;
                 }
 
-                Port outputPort = outputNode.outputContainer.Query<Port>().Where(x => x.portName == link.portName).First();
-                Port inputPort = inputNode.inputContainer.Query<Port>().Where(x => x.portName == link.targetPortName).First();
 
-                if (outputPort == null || inputPort == null)
+                if (outputNode.outputContainer[link.outPortIndex] is not Port outputPort || inputNode.inputContainer[0] is not Port inputPort)
                 {
                     SO.RemoveLink(link);
 

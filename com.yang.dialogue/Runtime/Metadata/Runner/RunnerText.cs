@@ -2,14 +2,14 @@ namespace Yang.Dialogue
 {
     public struct RunnerText
     {
-        public string portName;
+        public int portIndex;
 
         public string table;
         public string entry;
 
-        public RunnerText(string portName, string table, string entry)
+        public RunnerText(int portIndex, string table, string entry)
         {
-            this.portName = portName;
+            this.portIndex = portIndex;
 
             this.table = table;
             this.entry = entry;
@@ -17,7 +17,7 @@ namespace Yang.Dialogue
 
         public RunnerText(string table, string entry)
         {
-            portName = "";
+            portIndex = 0;
 
             this.table = table;
             this.entry = entry;

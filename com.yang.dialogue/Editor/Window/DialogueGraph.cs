@@ -39,10 +39,14 @@ namespace Yang.Dialogue.Editor
             DropdownMenu menu = evt.menu;
 
             menu.AppendAction("Add Dialogue", _ => AddNode(NodeType.Dialogue, nodePos));
-            menu.AppendAction("Add Condition", _ => AddNode(NodeType.Condition, nodePos));
+            menu.AppendAction("Add Choice", _ => AddNode(NodeType.Choice, nodePos));
+            menu.AppendSeparator();
             menu.AppendAction("Add Trigger", _ => AddNode(NodeType.Trigger, nodePos));
             menu.AppendAction("Add Event", _ => AddNode(NodeType.Event, nodePos));
-            menu.AppendAction("Add Choice", _ => AddNode(NodeType.Choice, nodePos));
+            menu.AppendAction("Add Object", _ => AddNode(NodeType.Object, nodePos));
+            menu.AppendSeparator();
+            menu.AppendAction("Add Condition", _ => AddNode(NodeType.Condition, nodePos));
+            menu.AppendSeparator();
             menu.AppendAction("Add Wait", _ => AddNode(NodeType.Wait, nodePos));
         }
 
@@ -109,6 +113,7 @@ namespace Yang.Dialogue.Editor
                 NodeType.Event => new EventNode(window, guid),
                 NodeType.Choice => new ChoiceNode(window, guid),
                 NodeType.Wait => new WaitNode(window, guid),
+                NodeType.Object => new ObjectNode(window, guid),
                 _ => null,
             };
 

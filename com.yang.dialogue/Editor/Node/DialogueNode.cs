@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEditor;
-using UnityEditor.Experimental.GraphView;
 using UnityEditor.Localization;
 using UnityEngine;
 using UnityEngine.Localization.Tables;
@@ -8,6 +7,28 @@ using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
 {
+    /// <summary>
+    /// Port Data (Unused)
+    /// 
+    /// Option Data (0 : Speaker Table)
+    /// 0 : Name - string
+    /// 1 : Guid - guid
+    /// 
+    /// Option Data (1 : Speaker Entry)
+    /// 0 : Key - string
+    /// 1 : ID - long
+    /// 
+    /// Option Data (2 : Text Table)
+    /// 0 : Name - string
+    /// 1 : Guid - guis
+    /// 
+    /// Option Data (3 : Text Entry)
+    /// 0 : Key - string
+    /// 1 : ID - long
+    /// 
+    /// Option Data (4 : Message)
+    /// 0 : Text - string
+    /// </summary>
     public class DialogueNode : BaseNode
     {
         private readonly List<string> tables = new();
@@ -25,8 +46,8 @@ namespace Yang.Dialogue.Editor
         {
             SetDefault();
 
-            CreatePort(Direction.Input, Port.Capacity.Multi);
-            CreatePort(Direction.Output, Port.Capacity.Single);
+            CreateInputPort();
+            CreateOutputPort();
 
             SetOptions();
         }
@@ -36,76 +57,55 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            if (data.OptionCount == 0)
+            if (data.portDatas.Count == 0)
             {
-                OptionData speakerTable = new(DialogueType.DIALOGUE_TYPE_000);
-                OptionData speakerEntry = new(DialogueType.DIALOGUE_TYPE_001);
+                DataWrapper speakerTable = new(
+                    new(GenericData.DataType.String),
+                    new(GenericData.DataType.Guid)
+                );
 
-                OptionData textTable = new(DialogueType.DIALOGUE_TYPE_002);
-                OptionData textEntry = new(DialogueType.DIALOGUE_TYPE_003);
+                DataWrapper speakerEntry = new(
+                    new(GenericData.DataType.String),
+                    new(GenericData.DataType.Long)
+                );
 
-                OptionData message = new(DialogueType.DIALOGUE_TYPE_004);
+                DataWrapper textTable = new(
+                    new(GenericData.DataType.String),
+                    new(GenericData.DataType.Guid)
+                );
 
-                speakerTable.datas.Add(new(GenericData.DataType.String));
-                speakerTable.datas.Add(new(GenericData.DataType.Guid));
+                DataWrapper textEntry = new(
+                    new(GenericData.DataType.String),
+                    new(GenericData.DataType.Long)
+                );
 
-                speakerEntry.datas.Add(new(GenericData.DataType.String));
-                speakerEntry.datas.Add(new(GenericData.DataType.Long));
+                DataWrapper message = new(new GenericData(GenericData.DataType.String));
 
-                textTable.datas.Add(new(GenericData.DataType.String));
-                textTable.datas.Add(new(GenericData.DataType.Guid));
+                data.optionDatas.Add(speakerTable);
+                data.optionDatas.Add(speakerEntry);
 
-                textEntry.datas.Add(new(GenericData.DataType.String));
-                textEntry.datas.Add(new(GenericData.DataType.Long));
+                data.optionDatas.Add(textTable);
+                data.optionDatas.Add(textEntry);
 
-                message.datas.Add(new(GenericData.DataType.String));
+                data.optionDatas.Add(message);
 
-                data.AddOption(speakerTable);
-                data.AddOption(speakerEntry);
-
-                data.AddOption(textTable);
-                data.AddOption(textEntry);
-
-                data.AddOption(message);
-
-                so.SetNode(GUID, data);
+                data.portDatas.Add(new());
             }
         }
 
         private void SetOptions()
         {
-            DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            AddTableField(speakerEntries, true);
+            AddEntryField(speakerEntries, true);
 
-            foreach (OptionData option in data.GetOptions())
-            {
-                switch (option.type)
-                {
-                    case DialogueType.DIALOGUE_TYPE_000:
-                        AddTableField(option.datas, option.type, speakerEntries);
-                        break;
+            AddTableField(textEntries, false);
+            AddEntryField(textEntries, false);
 
-                    case DialogueType.DIALOGUE_TYPE_001:
-                        AddEntryField(option.datas, option.type, speakerEntries);
-                        break;
-
-                    case DialogueType.DIALOGUE_TYPE_002:
-                        AddTableField(option.datas, option.type, textEntries);
-                        break;
-
-                    case DialogueType.DIALOGUE_TYPE_003:
-                        AddEntryField(option.datas, option.type, textEntries);
-                        break;
-
-                    case DialogueType.DIALOGUE_TYPE_004:
-                        AddMessageField(option.datas, option.type);
-                        break;
-                }
-            }
+            AddMessageField();
         }
 
         #region Table
-        private void ChangedCallback(ChangeEvent<string> evt, string type, List<EntryData> entries)
+        private void ChangedCallback(ChangeEvent<string> evt, List<EntryData> entries, bool speaker)
         {
             int index = tables.IndexOf(evt.newValue);
 
@@ -114,41 +114,40 @@ namespace Yang.Dialogue.Editor
                 DialogueSO so = window.SO;
                 NodeData data = so.GetNode(GUID);
 
-                int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0);
+                SetEntries(collections[index], entries);
 
-                if (optionIndex != -1)
-                {
-                    Undo.RecordObject(so, $"Change {type}");
+                Undo.RecordObject(so, speaker ? "Change Speaker Table" : "Change Text Table");
 
-                    SetEntries(collections[index], entries);
+                List<GenericData> optionData = data.optionDatas[speaker ? 0 : 2].data;
 
-                    OptionData option = data.GetOption(optionIndex);
+                optionData[0] = new(collections[index].TableCollectionName);
+                optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
 
-                    option.datas[0] = new(collections[index].TableCollectionName);
-                    option.datas[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
+                so.SetNode(GUID, data);
 
-                    data.SetOption(optionIndex, option);
-                    so.SetNode(GUID, data);
+                EditorUtility.SetDirty(so);
 
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
+                window.SetUnsaved();
             }
         }
 
-        private void AddTableField(List<GenericData> datas, string type, List<EntryData> entries)
+        private void AddTableField(List<EntryData> entries, bool speaker)
         {
-            int index = GetTableIndex(datas[0].ToString(), datas[1].TryGetGuid(out System.Guid guid) ? guid : default);
+            DialogueSO so = window.SO;
+            NodeData data = so.GetNode(GUID);
 
-            PopupField<string> field = new(type, tables, index);
+            List<GenericData> optionData = data.optionDatas[speaker ? 0 : 2].data;
+
+            int index = GetTableIndex(optionData[0].ToString(), optionData[1].TryGetGuid(out System.Guid guid) ? guid : default);
+
+            PopupField<string> field = new(speaker ? "Speaker Table" : "Entry Table", tables, index);
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type, entries));
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, entries, speaker));
 
             extensionContainer.Add(field);
 
@@ -156,8 +155,8 @@ namespace Yang.Dialogue.Editor
             {
                 SetEntries(collections[index], entries);
 
-                datas[0] = new(collections[index].TableCollectionName);
-                datas[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
+                optionData[0] = new(collections[index].TableCollectionName);
+                optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
             }
         }
 
@@ -193,7 +192,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Entry
-        private void ChangedCallback(ChangeEvent<EntryData> evt, string type, List<EntryData> entries)
+        private void ChangedCallback(ChangeEvent<EntryData> evt, List<EntryData> entries, bool speaker)
         {
             int index = entries.IndexOf(evt.newValue);
 
@@ -202,41 +201,38 @@ namespace Yang.Dialogue.Editor
                 DialogueSO so = window.SO;
                 NodeData data = so.GetNode(GUID);
 
-                int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0);
+                List<GenericData> optionData = data.optionDatas[speaker ? 1 : 3].data;
 
-                if (optionIndex != -1)
-                {
-                    Undo.RecordObject(so, $"Change {type}");
+                Undo.RecordObject(so, $"Change Speaker Entry");
 
-                    OptionData option = data.GetOption(optionIndex);
+                optionData[0] = new(entries[index].key);
+                optionData[1] = new(entries[index].id);
 
-                    option.datas[0] = new(entries[index].key);
-                    option.datas[1] = new(entries[index].id);
+                if (index != -1 && evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = entries[index].tooltip;
 
-                    data.SetOption(optionIndex, option);
-                    so.SetNode(GUID, data);
+                EditorUtility.SetDirty(so);
 
-                    if (evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = entries[index].tooltip;
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
+                window.SetUnsaved();
             }
         }
 
-        private void AddEntryField(List<GenericData> datas, string type, List<EntryData> entries)
+        private void AddEntryField(List<EntryData> entries, bool speaker)
         {
+            DialogueSO so = window.SO;
+            NodeData data = so.GetNode(GUID);
+
+            List<GenericData> datas = data.optionDatas[speaker ? 1 : 3].data;
+
             int index = entries.IndexOf(new EntryData(datas[1].TryGetLong(out long result) ? result : 0, datas[0].ToString()));
 
-            PopupField<EntryData> field = new(type, entries, index);
+            PopupField<EntryData> field = new(speaker ? "Speaker Entry" : "Text Entry", entries, index);
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type, entries));
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, entries, speaker));
 
             extensionContainer.Add(field);
 
@@ -275,40 +271,35 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Message
-        private void ChangedCallback(ChangeEvent<string> evt, string type)
+        private void MessageChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0);
+            Undo.RecordObject(so, "Change Choice Message");
 
-            if (optionIndex != -1)
-            {
-                Undo.RecordObject(so, $"Change {type}");
+            data.optionDatas[4].data[0] = new(evt.newValue);
 
-                OptionData option = data.GetOption(optionIndex);
+            so.SetNode(GUID, data);
 
-                option.datas[0] = new(evt.newValue);
+            EditorUtility.SetDirty(so);
 
-                data.SetOption(optionIndex, option);
-                so.SetNode(GUID, data);
-
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
-            }
+            window.SetUnsaved();
         }
 
-        private void AddMessageField(List<GenericData> datas, string type)
+        private void AddMessageField()
         {
-            TextField field = new(type) { value = datas[0].ToString() };
+            DialogueSO so = window.SO;
+            NodeData data = so.GetNode(GUID);
+
+            TextField field = new("Message") { value = data.optionDatas[4].data[0].ToString() };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, type));
+            field.RegisterValueChangedCallback(MessageChangedCallback);
 
             extensionContainer.Add(field);
         }

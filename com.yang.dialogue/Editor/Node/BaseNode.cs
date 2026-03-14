@@ -27,64 +27,24 @@ namespace Yang.Dialogue.Editor
 
         public abstract void SetPorts();
 
-        protected string CreatePortName(Direction direction = Direction.Output)
+        protected Port CreateInputPort()
         {
-            string portName = direction.ToString();
+            Port port = InstantiatePort(Orientation.Horizontal, Direction.Input, Port.Capacity.Multi, typeof(bool));
 
-            for (int i = 0; ; i++)
-            {
-                bool find = true;
+            port.portName = "Input";
 
-                foreach (VisualElement element in outputContainer.Children())
-                {
-                    if (element is Port port && port.portName == portName) find = false;
-                }
+            inputContainer.Add(port);
 
-                if (find) return portName;
-
-                portName = $"{direction} {i + 1}";
-            }
+            return port;
         }
 
-        protected string CreateID(string baseID)
+        protected Port CreateOutputPort()
         {
-            DialogueSO so = window.SO;
-            NodeData data = so.GetNode(GUID);
+            Port port = InstantiatePort(Orientation.Horizontal, Direction.Output, Port.Capacity.Single, typeof(bool));
 
-            string id = baseID;
+            port.portName = "Output";
 
-            for (int i = 0; ; i++)
-            {
-                if (!data.ContainsOption(baseID, _ => _.Count != 0 && _[0].ToString() == id)) return id;
-
-                id = $"{baseID} {i + 1}";
-            }
-        }
-
-        protected Port CreatePort(Direction direction, Port.Capacity capacity, string portName = "")
-        {
-            Port port = InstantiatePort(Orientation.Horizontal, direction, capacity, typeof(bool));
-
-            if (portName == "") portName = CreatePortName(direction);
-
-            port.portName = portName;
-
-            switch (direction)
-            {
-                case Direction.Input:
-                    inputContainer.Add(port);
-                    break;
-
-                case Direction.Output:
-                    DialogueSO so = window.SO;
-                    NodeData data = so.GetNode(GUID);
-
-                    outputContainer.Add(port);
-
-                    data.AddPort(portName);
-                    so.SetNode(GUID, data);
-                    break;
-            }
+            outputContainer.Add(port);
 
             return port;
         }
@@ -94,19 +54,17 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            if (outputContainer.childCount > 1)
+            if (data.portDatas.Count > 1)
             {
-                string portName = port.portName;
-                LinkData link = so.GetLink(data.guid, portName);
+                int portIndex = port.parent.IndexOf(port);
+
+                LinkData link = so.GetLink(data.guid, portIndex);
 
                 Undo.RecordObject(so, "Remove Port");
 
                 window.RemoveEdge(port);
 
-                int optionIndex = data.GetOptionIndex(_ => _.Count != 0 && _[0].ToString() == port.portName);
-
-                data.RemoveAtOption(optionIndex);
-                data.RemovePort(portName);
+                data.portDatas.RemoveAt(portIndex);
 
                 so.RemoveLink(link);
                 so.SetNode(GUID, data);

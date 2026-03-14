@@ -86,8 +86,6 @@ namespace Yang.Dialogue
 
         public void AddNode(NodeData data) => nodes.Add(data);
 
-        public bool RemoveNode(NodeData data) => nodes.Remove(data);
-
         public bool RemoveNode(string guid)
         {
             NodeData data = GetNode(guid);
@@ -97,22 +95,14 @@ namespace Yang.Dialogue
         #endregion
 
         #region Link
-        public LinkData GetLink(string guid, string portName)
+        public LinkData GetLink(string guid, int outPortIndex)
         {
             for (int i = 0; i < links.Count; i++)
             {
-                if (links[i].nodeGuid == guid && links[i].portName == portName) return links[i];
+                if (links[i].nodeGuid == guid && links[i].outPortIndex == outPortIndex) return links[i];
             }
 
             return default;
-        }
-
-        public IEnumerable<LinkData> GetLinks(string guid)
-        {
-            for (int i = 0; i < links.Count; i++)
-            {
-                if (links[i].nodeGuid == guid) yield return links[i];
-            }
         }
 
         public IReadOnlyList<LinkData> GetLinks() => links;

@@ -1,10 +1,15 @@
 using System.Collections.Generic;
 using UnityEditor;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
 {
+    /// <summary>
+    /// Port Data (Unused)
+    /// 
+    /// Option Data (Common)
+    /// 0 : Key - string
+    /// </summary>
     public class EventNode : BaseNode
     {
         private readonly List<string> events = new();
@@ -18,8 +23,8 @@ namespace Yang.Dialogue.Editor
         {
             SetDefault();
 
-            CreatePort(Direction.Input, Port.Capacity.Multi);
-            CreatePort(Direction.Output, Port.Capacity.Single);
+            CreateInputPort();
+            CreateOutputPort();
 
             SetOptions();
         }
@@ -28,7 +33,7 @@ namespace Yang.Dialogue.Editor
         {
             if (evt.target != this) return;
 
-            evt.menu.AppendAction("Add Event", _ => CreateEvent(DialogueType.EVENT_TYPE_000));
+            evt.menu.AppendAction("Add Event", _ => CreateEvent());
         }
 
         private void SetDefault()
@@ -36,17 +41,13 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            if (data.OptionCount == 0)
+            if (data.portDatas.Count == 0)
             {
-                string id = CreateID(DialogueType.EVENT_TYPE_000);
-                OptionData optionData = new(DialogueType.EVENT_TYPE_000);
+                DataWrapper optionData = new(new GenericData(GenericData.DataType.String));
 
-                optionData.datas.Add(new(id));
-                optionData.datas.Add(new(GenericData.DataType.String));
+                data.optionDatas.Add(optionData);
 
-                data.AddOption(optionData);
-
-                so.SetNode(GUID, data);
+                data.portDatas.Add(new());
             }
         }
 
@@ -57,53 +58,37 @@ namespace Yang.Dialogue.Editor
 
             KeyConverter.GetKeys(so.Events, events);
 
-            foreach (OptionData option in data.GetOptions())
+            IReadOnlyList<DataWrapper> optionDatas = data.optionDatas;
+
+            for (int i = 0; i < optionDatas.Count; i++)
             {
-                List<GenericData> datas = option.datas;
+                IReadOnlyList<GenericData> optionData = optionDatas[i].data;
 
-                switch (option.type)
-                {
-                    case DialogueType.EVENT_TYPE_000:
-                        int index = events.IndexOf(datas[1].ToString());
+                string key = optionData[0].ToString();
 
-                        AddEventField(datas[0].ToString(), index);
-                        break;
-                }
+                AddEventField(key);
             }
         }
 
-        private void CreateEvent(string type)
+        private void CreateEvent()
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            string id = CreateID(type);
+            Undo.RecordObject(so, "Create Event");
 
-            Undo.RecordObject(so, $"Create {type}");
+            DataWrapper optionData = new(new GenericData(GenericData.DataType.String));
 
-            OptionData newOption = new(type);
+            AddEventField("");
 
-            newOption.datas.Add(new(id));
-
-            switch (type)
-            {
-                case DialogueType.EVENT_TYPE_000:
-                    AddEventField(id, -1);
-
-                    newOption.datas.Add(new(GenericData.DataType.String));
-                    break;
-            }
-
-            data.AddOption(newOption);
-
-            so.SetNode(GUID, data);
+            data.optionDatas.Add(optionData);
 
             EditorUtility.SetDirty(so);
 
             window.SetUnsaved();
         }
 
-        private void AddEventField(string id, int index)
+        private void AddEventField(string key)
         {
             DialogueSO so = window.SO;
             VisualElement container = new();
@@ -113,13 +98,15 @@ namespace Yang.Dialogue.Editor
 
             KeyConverter.GetKeys(so.Events, events);
 
+            int index = events.IndexOf(key);
+
             PopupField<string> field = new(events, index);
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, id, DialogueType.EVENT_TYPE_000));
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
 
-            Button removeButton = new(() => RemoveEventContainer(container, id, DialogueType.EVENT_TYPE_000)) { text = "X" };
+            Button removeButton = new(() => RemoveEventField(container)) { text = "X" };
 
             container.Add(field);
             container.Add(removeButton);
@@ -127,22 +114,22 @@ namespace Yang.Dialogue.Editor
             extensionContainer.Add(container);
         }
 
-        private void RemoveEventContainer(VisualElement container, string id, string type)
+        private void RemoveEventField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0].ToString() == id);
+            VisualElement container = itemElement.parent;
 
-            if (optionIndex != -1 && extensionContainer.childCount > 1)
+            if (container.childCount > 1)
             {
+                int optionIndex = container.IndexOf(itemElement);
+
                 Undo.RecordObject(so, "Remove Event");
 
-                data.RemoveAtOption(optionIndex);
+                data.optionDatas.RemoveAt(optionIndex);
 
-                so.SetNode(GUID, data);
-
-                extensionContainer.Remove(container);
+                container.Remove(itemElement);
 
                 EditorUtility.SetDirty(so);
 
@@ -150,28 +137,22 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<string> evt, string id, string type)
+        private void ChangedCallback(ChangeEvent<string> evt, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0].ToString() == id);
+            VisualElement container = itemElement.parent;
 
-            if (optionIndex != -1)
-            {
-                Undo.RecordObject(so, "Change Event Option");
+            int optionIndex = container.IndexOf(itemElement);
 
-                OptionData optionData = data.GetOption(optionIndex);
+            Undo.RecordObject(so, "Change Event Option");
 
-                optionData.datas[1] = new(evt.newValue);
+            data.optionDatas[optionIndex].data[0] = new(evt.newValue);
 
-                data.SetOption(optionIndex, optionData);
-                so.SetNode(GUID, data);
+            EditorUtility.SetDirty(so);
 
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
-            }
+            window.SetUnsaved();
         }
     }
 }

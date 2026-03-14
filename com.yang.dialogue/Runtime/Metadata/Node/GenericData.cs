@@ -16,6 +16,7 @@ namespace Yang.Dialogue
             Color,
             Guid,
             Enum,
+            Object,
             String
         }
 
@@ -24,12 +25,9 @@ namespace Yang.Dialogue
         [SerializeField] private int intValue;
         [SerializeField] private float floatValue;
         [SerializeField] private long longValue;
-        [SerializeField] private bool boolValue;
-        [SerializeField] private Color colorValue;
+        [SerializeField] private Color32 colorValue;
 
-        [SerializeField] private int enumValue;
-
-        [SerializeField] private string guidValue;
+        [SerializeField] private UnityEngine.Object objectValue;
         [SerializeField] private string stringValue;
 
         public readonly DataType Type => type;
@@ -65,7 +63,7 @@ namespace Yang.Dialogue
             if (bool.TryParse(data, out bool b))
             {
                 result.type = DataType.Bool;
-                result.boolValue = b;
+                result.intValue = b ? 1 : 0;
 
                 return result;
             }
@@ -81,7 +79,7 @@ namespace Yang.Dialogue
             if (Guid.TryParse(data, out Guid g))
             {
                 result.type = DataType.Guid;
-                result.guidValue = g.ToString();
+                result.stringValue = g.ToString();
 
                 return result;
             }
@@ -95,62 +93,88 @@ namespace Yang.Dialogue
         public GenericData(DataType type)
         {
             this = default;
+
             this.type = type;
         }
 
         public GenericData(int value)
         {
             this = default;
+
             type = DataType.Int;
+
             intValue = value;
         }
 
         public GenericData(float value)
         {
             this = default;
+
             type = DataType.Float;
+
             floatValue = value;
         }
 
         public GenericData(long value)
         {
             this = default;
+
             type = DataType.Long;
+
             longValue = value;
         }
 
         public GenericData(bool value)
         {
             this = default;
+
             type = DataType.Bool;
-            boolValue = value;
+
+            intValue = value ? 1 : 0;
         }
 
-        public GenericData(Color value)
+        public GenericData(Color32 value)
         {
             this = default;
+
             type = DataType.Color;
+
             colorValue = value;
         }
 
         public GenericData(Guid value)
         {
             this = default;
+
             type = DataType.Guid;
-            guidValue = value.ToString();
+
+            stringValue = value.ToString();
         }
 
         public GenericData(Enum value)
         {
             this = default;
+
             type = DataType.Enum;
-            enumValue = System.Convert.ToInt32(value);
+
+            intValue = System.Convert.ToInt32(value);
+        }
+
+        public GenericData(UnityEngine.Object value)
+        {
+            this = default;
+
+            type = DataType.Object;
+
+            objectValue = value;
         }
 
         public GenericData(string value)
         {
             this = default;
+
             type = DataType.String;
+
             stringValue = value;
         }
 
@@ -159,10 +183,12 @@ namespace Yang.Dialogue
             if (type == DataType.Int)
             {
                 value = intValue;
+
                 return true;
             }
 
             value = default;
+
             return false;
         }
 
@@ -171,10 +197,12 @@ namespace Yang.Dialogue
             if (type == DataType.Float)
             {
                 value = floatValue;
+
                 return true;
             }
 
             value = default;
+
             return false;
         }
 
@@ -183,10 +211,12 @@ namespace Yang.Dialogue
             if (type == DataType.Long)
             {
                 value = longValue;
+
                 return true;
             }
 
             value = default;
+
             return false;
         }
 
@@ -194,32 +224,36 @@ namespace Yang.Dialogue
         {
             if (type == DataType.Bool)
             {
-                value = boolValue;
+                value = intValue == 1;
+
                 return true;
             }
 
             value = default;
+
             return false;
         }
 
-        public readonly bool TryGetColor(out Color value)
+        public readonly bool TryGetColor(out Color32 value)
         {
             if (type == DataType.Color)
             {
                 value = colorValue;
+
                 return true;
             }
 
             value = default;
+
             return false;
         }
 
         public readonly bool TryGetGuid(out Guid value)
         {
-            if (type == DataType.Guid && Guid.TryParse(guidValue, out value))
-                return true;
+            if (type == DataType.Guid && Guid.TryParse(stringValue, out value)) return true;
 
             value = default;
+
             return false;
         }
 
@@ -227,11 +261,27 @@ namespace Yang.Dialogue
         {
             if (type == DataType.Enum)
             {
-                value = (T)Enum.ToObject(typeof(T), enumValue);
+                value = (T)Enum.ToObject(typeof(T), intValue);
+
                 return true;
             }
 
             value = default;
+
+            return false;
+        }
+
+        public readonly bool TryGetObject(out UnityEngine.Object value)
+        {
+            if (type == DataType.Object)
+            {
+                value = objectValue;
+
+                return true;
+            }
+
+            value = default;
+
             return false;
         }
 
@@ -240,10 +290,12 @@ namespace Yang.Dialogue
             if (type == DataType.String)
             {
                 value = stringValue;
+
                 return true;
             }
 
             value = default;
+
             return false;
         }
 
@@ -252,12 +304,13 @@ namespace Yang.Dialogue
             return type switch
             {
                 DataType.Int => intValue.ToString(),
-                DataType.Float => floatValue.ToString(),
+                DataType.Float => floatValue.ToString(CultureInfo.InvariantCulture),
                 DataType.Long => longValue.ToString(),
-                DataType.Bool => boolValue.ToString(),
+                DataType.Bool => (intValue == 1).ToString(),
                 DataType.Color => colorValue.ToString(),
-                DataType.Guid => guidValue,
-                DataType.Enum => enumValue.ToString(),
+                DataType.Guid => stringValue,
+                DataType.Enum => intValue.ToString(),
+                DataType.Object => objectValue == null ? "" : objectValue.ToString(),
                 DataType.String => stringValue,
                 _ => ""
             };

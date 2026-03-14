@@ -9,5 +9,6 @@ namespace Yang.Dialogue
         Event,
         Choice,
         Wait,
+        Object,
     }
 }

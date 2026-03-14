@@ -5,8 +5,25 @@ using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
 {
+    /// <summary>
+    /// Port Data (0 : Default)
+    /// 0 : PortType - enum
+    /// 
+    /// Port Data (Common)
+    /// 0 : PortType - enum
+    /// 1~ : Condition - string
+    /// 
+    /// Option Data (Unused)
+    /// </summary>
     public class ConditionNode : BaseNode
     {
+        private enum PortType
+        {
+            Default,
+            Single,
+            Multi,
+        }
+
         private readonly List<string> conditions = new();
 
         public ConditionNode(DialogueEditorWindow window, string guid) : base(window, guid)
@@ -18,7 +35,7 @@ namespace Yang.Dialogue.Editor
         {
             SetDefault();
 
-            CreatePort(Direction.Input, Port.Capacity.Multi);
+            CreateInputPort();
 
             SetOptions();
         }
@@ -27,8 +44,8 @@ namespace Yang.Dialogue.Editor
         {
             if (evt.target != this) return;
 
-            evt.menu.AppendAction("Add Single Port", _ => CreatePort(DialogueType.CONDITION_TYPE_002));
-            evt.menu.AppendAction("Add Multi Port", _ => CreatePort(DialogueType.CONDITION_TYPE_003));
+            evt.menu.AppendAction("Add Single Port", _ => CreatePort(PortType.Single));
+            evt.menu.AppendAction("Add Multi Port", _ => CreatePort(PortType.Multi));
         }
 
         private void SetDefault()
@@ -36,16 +53,11 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            if (data.OptionCount == 0)
+            if (data.portDatas.Count == 0)
             {
-                string portName = CreatePortName();
-                OptionData optionData = new(DialogueType.CONDITION_TYPE_001);
+                DataWrapper portData = new(new GenericData(PortType.Default));
 
-                optionData.datas.Add(new(portName));
-
-                data.AddOption(optionData);
-
-                so.SetNode(GUID, data);
+                data.portDatas.Add(portData);
             }
         }
 
@@ -56,70 +68,71 @@ namespace Yang.Dialogue.Editor
 
             KeyConverter.GetKeys(so.Conditions, conditions);
 
-            foreach (OptionData option in data.GetOptions())
+            IReadOnlyList<DataWrapper> portDatas = data.portDatas;
+
+            for (int i = 0; i < portDatas.Count; i++)
             {
-                List<GenericData> datas = option.datas;
+                IReadOnlyList<GenericData> portOptions = portDatas[i].data;
 
-                switch (option.type)
+                if (portOptions[0].TryGetEnum(out PortType portType))
                 {
-                    case DialogueType.CONDITION_TYPE_001:
-                        AddDefaultPort(datas[0].ToString());
-                        break;
+                    switch (portType)
+                    {
+                        case PortType.Default:
+                            AddDefaultPort();
+                            break;
 
-                    case DialogueType.CONDITION_TYPE_002:
-                        {
-                            int index = conditions.IndexOf(datas[1].ToString());
+                        case PortType.Single:
+                            {
+                                int index = conditions.IndexOf(portOptions[1].ToString());
 
-                            AddSinglePort(datas[0].ToString(), index);
-                        }
-                        break;
+                                AddSinglePort(index);
+                            }
+                            break;
 
-                    case DialogueType.CONDITION_TYPE_003:
-                        string portName = datas[0].ToString();
-                        VisualElement itemContainer = AddMultiPort(portName);
+                        case PortType.Multi:
+                            {
+                                VisualElement itemContainer = AddMultiPort();
 
-                        for (int i = 0; i < datas.Count; i++)
-                        {
-                            int index = conditions.IndexOf(datas[i].ToString());
+                                for (int j = 1; j < portOptions.Count; j++)
+                                {
+                                    int index = conditions.IndexOf(portOptions[j].ToString());
 
-                            AddConditionField(portName, option.type, itemContainer, index);
-                        }
-                        break;
+                                    AddConditionField(outputContainer[i] as Port, itemContainer, index);
+                                }
+                            }
+                            break;
+                    }
                 }
             }
         }
 
-        private void CreatePort(string type)
+        private void CreatePort(PortType type)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            string portName = CreatePortName();
-
             Undo.RecordObject(so, $"Create Output {type}");
 
-            OptionData option = new(type);
-
-            option.datas.Add(new(portName));
+            DataWrapper portOption = new(
+                new(type),
+                new(GenericData.DataType.String)
+            );
 
             switch (type)
             {
-                case DialogueType.CONDITION_TYPE_002:
-                    AddSinglePort(portName, -1);
-
-                    option.datas.Add(new(GenericData.DataType.String));
+                case PortType.Single:
+                    AddSinglePort(-1);
                     break;
 
-                case DialogueType.CONDITION_TYPE_003:
-                    VisualElement itemContainer = AddMultiPort(portName);
+                case PortType.Multi:
+                    VisualElement itemContainer = AddMultiPort();
 
-                    option.datas.Add(new(GenericData.DataType.String));
-
-                    AddConditionField(portName, type, itemContainer, -1);
+                    AddConditionField(outputContainer[data.portDatas.Count] as Port, itemContainer, -1);
                     break;
             }
 
-            data.AddOption(option);
+            data.portDatas.Add(portOption);
 
             so.SetNode(GUID, data);
 
@@ -147,12 +160,9 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Move Port Index");
 
-            int optionIndex = data.GetOptionIndex(_ => _.Count != 0 && _[0].ToString() == port.portName);
+            List<DataWrapper> portDatas = data.portDatas;
 
-            OptionData option = data.GetOption(optionIndex);
-
-            data.RemoveAtOption(optionIndex);
-            data.InsertOption(optionIndex + direction, option);
+            (portDatas[currentIndex], portDatas[newIndex]) = (portDatas[newIndex], portDatas[currentIndex]);
 
             container.Insert(newIndex, port);
 
@@ -165,52 +175,43 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void ChangedCallback(ChangeEvent<string> evt, string portName, string type)
+        private void ChangedCallback(ChangeEvent<string> evt, Port port)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int index = 1;
-            int optionIndex = -1;
+            int portIndex = port.parent.IndexOf(port);
 
-            switch (type)
-            {
-                case DialogueType.CONDITION_TYPE_002:
-                    optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0].ToString() == portName);
-                    break;
+            Undo.RecordObject(so, "Change Port Option");
 
-                case DialogueType.CONDITION_TYPE_003:
-                    if (evt.currentTarget is PopupField<string> dropdown)
-                    {
-                        VisualElement container = dropdown.parent;
+            data.portDatas[portIndex].data[1] = new(evt.newValue);
 
-                        index = container.parent.IndexOf(container) + 1;
-                        optionIndex = data.GetOptionIndex(type, _ => _.Count > index && _[0].ToString() == portName);
-                    }
-                    break;
-            }
+            EditorUtility.SetDirty(so);
 
-            if (optionIndex != -1)
-            {
-                Undo.RecordObject(so, "Change Port Option");
+            window.SetUnsaved();
+        }
 
-                OptionData optionData = data.GetOption(optionIndex);
+        private void ChangedCallback(ChangeEvent<string> evt, Port port, VisualElement itemElement)
+        {
+            DialogueSO so = window.SO;
+            NodeData data = so.GetNode(GUID);
 
-                optionData.datas[index] = new(evt.newValue);
+            int portIndex = port.parent.IndexOf(port);
+            int itemIndex = itemElement.parent.IndexOf(itemElement);
 
-                data.SetOption(optionIndex, optionData);
-                so.SetNode(GUID, data);
+            Undo.RecordObject(so, "Change Port Option");
 
-                EditorUtility.SetDirty(so);
+            data.portDatas[portIndex].data[itemIndex] = new(evt.newValue);
 
-                window.SetUnsaved();
-            }
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
         }
 
         #region Default Port
-        private void AddDefaultPort(string portName)
+        private void AddDefaultPort()
         {
-            Port port = CreatePort(Direction.Output, Port.Capacity.Single, portName);
+            Port port = CreateOutputPort();
 
             VisualElement container = new();
 
@@ -232,9 +233,9 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Single Port
-        private void AddSinglePort(string portName, int index)
+        private void AddSinglePort(int selectIndex)
         {
-            Port port = CreatePort(Direction.Output, Port.Capacity.Single, portName);
+            Port port = CreateOutputPort();
 
             DialogueSO so = window.SO;
             VisualElement container = new();
@@ -244,11 +245,11 @@ namespace Yang.Dialogue.Editor
 
             KeyConverter.GetKeys(so.Conditions, conditions);
 
-            PopupField<string> field = new(conditions, index);
+            PopupField<string> field = new(conditions, selectIndex);
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, portName, DialogueType.CONDITION_TYPE_002));
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port));
 
             Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
             Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
@@ -265,12 +266,12 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Multi Port
-        private VisualElement AddMultiPort(string portName)
+        private VisualElement AddMultiPort()
         {
-            Port port = CreatePort(Direction.Output, Port.Capacity.Single, portName);
+            Port port = CreateOutputPort();
 
             DialogueSO so = window.SO;
-            VisualElement container = new();
+            VisualElement portElement = new();
 
             VisualElement groupContainer = new();
 
@@ -279,9 +280,9 @@ namespace Yang.Dialogue.Editor
 
             VisualElement line = new();
 
-            container.style.flexGrow = 1;
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Stretch;
+            portElement.style.flexGrow = 1;
+            portElement.style.flexDirection = FlexDirection.Row;
+            portElement.style.alignItems = Align.Stretch;
 
             groupContainer.style.flexGrow = 1;
             groupContainer.style.flexDirection = FlexDirection.Column;
@@ -299,7 +300,7 @@ namespace Yang.Dialogue.Editor
             buttonContainer.style.alignItems = Align.FlexEnd;
             buttonContainer.style.alignSelf = Align.FlexEnd;
 
-            Button createButton = new(() => CreateCondition(portName, DialogueType.CONDITION_TYPE_003, itemContainer)) { text = "+" };
+            Button createButton = new(() => CreateCondition(port, itemContainer)) { text = "+" };
             Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
             Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
             Button removeButton = new(() => RemovePort(port)) { text = "X" };
@@ -312,85 +313,78 @@ namespace Yang.Dialogue.Editor
             groupContainer.Add(itemContainer);
             groupContainer.Add(buttonContainer);
 
-            container.Add(groupContainer);
-            container.Add(line);
+            portElement.Add(groupContainer);
+            portElement.Add(line);
 
             port.style.height = StyleKeyword.Auto;
             port.Q<Label>("type").style.display = DisplayStyle.None;
-            port.Add(container);
+            port.Add(portElement);
 
             return itemContainer;
         }
 
-        private void CreateCondition(string portName, string type, VisualElement itemContainer)
+        private void CreateCondition(Port port, VisualElement itemContainer)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int optionIndex = data.GetOptionIndex(type, _ => _.Count != 0 && _[0].ToString() == portName);
+            int portIndex = port.parent.IndexOf(port);
 
-            if (optionIndex != -1)
-            {
-                Undo.RecordObject(so, $"Add {type} Option");
+            List<GenericData> portOptionDatas = data.portDatas[portIndex].data;
 
-                OptionData optionData = data.GetOption(optionIndex);
+            Undo.RecordObject(so, $"Add Multi Port Condition");
 
-                AddConditionField(portName, type,itemContainer, -1);
+            AddConditionField(port, itemContainer, -1);
 
-                optionData.datas.Add(new(GenericData.DataType.String));
+            portOptionDatas.Add(new(GenericData.DataType.String));
 
-                EditorUtility.SetDirty(so);
+            EditorUtility.SetDirty(so);
 
-                window.SetUnsaved();
-            }
+            window.SetUnsaved();
         }
 
-        private void AddConditionField(string portName, string type, VisualElement itemContainer, int index)
+        private void AddConditionField(Port port, VisualElement itemContainer, int selectIndex)
         {
             DialogueSO so = window.SO;
 
-            VisualElement container = new();
+            VisualElement itemElement = new();
 
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Center;
+            itemElement.style.flexDirection = FlexDirection.Row;
+            itemElement.style.alignItems = Align.Center;
 
             KeyConverter.GetKeys(so.Conditions, conditions);
 
-            PopupField<string> field = new(conditions, index);
+            PopupField<string> field = new(conditions, selectIndex);
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, portName, type));
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port, itemElement));
 
-            Button remove = new(() => RemoveConditionField(portName, type, container)) { text = "-" };
+            Button remove = new(() => RemoveConditionField(port, itemElement)) { text = "-" };
 
-            container.Add(field);
-            container.Add(remove);
+            itemElement.Add(field);
+            itemElement.Add(remove);
 
-            itemContainer.Add(container);
+            itemContainer.Add(itemElement);
         }
 
-        private void RemoveConditionField(string portName, string type, VisualElement container)
+        private void RemoveConditionField(Port port, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
             NodeData data = so.GetNode(GUID);
 
-            int index = data.GetOptionIndex(type, _ => _.Count > 1 && _[0].ToString() == portName);
+            VisualElement itemContainer = itemElement.parent;
 
-            VisualElement itemContainer = container.parent;
+            int portIndex = port.parent.IndexOf(port);
+            int itemIndex = itemContainer.IndexOf(itemElement);
 
-            if (index != -1 && itemContainer.childCount > 1)
+            if (itemIndex > 0)
             {
-                Undo.RecordObject(so, $"Remove {type} Option");
+                Undo.RecordObject(so, "Remove Multi Port Condition");
 
-                OptionData optionData = data.GetOption(index);
+                itemContainer.Remove(itemElement);
 
-                int containerIndex = itemContainer.IndexOf(container);
-
-                itemContainer.RemoveAt(containerIndex);
-                optionData.datas.RemoveAt(containerIndex + 1);
-
-                data.SetOption(index, optionData);
+                data.portDatas[portIndex].data.RemoveAt(itemIndex);
 
                 EditorUtility.SetDirty(so);
 
