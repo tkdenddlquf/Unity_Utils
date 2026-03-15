@@ -3,9 +3,9 @@ using System.Collections.Generic;
 namespace Yang.Dialogue
 {
     [System.Serializable]
-    public class DataWrapper
+    public struct DataWrapper
     {
-        public List<GenericData> data = new();
+        public List<GenericData> data;
 
         public DataWrapper(DataWrapper wrapper)
         {
@@ -19,7 +19,7 @@ namespace Yang.Dialogue
 
         public DataWrapper(params GenericData[] data)
         {
-            for (int i = 0; i < data.Length; i++) this.data.Add(data[i]);
+            this.data = new(data);
         }
     }
 }

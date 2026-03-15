@@ -200,7 +200,7 @@ namespace Yang.Dialogue.Editor
 
                 List<GenericData> optionData = data.optionDatas[speaker ? 1 : 3].data;
 
-                Undo.RecordObject(so, $"Change Speaker Entry");
+                Undo.RecordObject(so, "Change Speaker Entry");
 
                 optionData[0] = new(entries[index].key);
                 optionData[1] = new(entries[index].id);

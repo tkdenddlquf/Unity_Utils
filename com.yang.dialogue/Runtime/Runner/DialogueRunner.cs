@@ -23,6 +23,24 @@ namespace Yang.Dialogue
 
         public string CurrentNode => runnerNode.CurrentNode;
 
+        public event System.Action EndCallback
+        {
+            add => runnerNode.EndCallback += value;
+            remove => runnerNode.EndCallback -= value;
+        }
+
+        public event System.Action<string, System.Action> StopCallback
+        {
+            add => runnerNode.StopCallback += value;
+            remove => runnerNode.StopCallback -= value;
+        }
+
+        public event System.Action<Object> ObjectCallback
+        {
+            add => runnerNode.ObjectCallback += value;
+            remove => runnerNode.ObjectCallback -= value;
+        }
+
         public bool IsStarted { get; private set; }
 
         private void Awake() => Init();
@@ -38,13 +56,13 @@ namespace Yang.Dialogue
             SetDialogue(so);
         }
 
-        public void SetDialogue(DialogueSO so)
+        public void SetDialogue(DialogueSO so, string node = "")
         {
             if (so == null || IsStarted) return;
 
             this.so = so;
 
-            runnerNode.SetDatas(so);
+            runnerNode.SetDatas(so, node);
         }
 
         public async void StartDialogue()
@@ -76,8 +94,6 @@ namespace Yang.Dialogue
         }
 
         public void StopDialogue() => token?.Cancel();
-
-        public void CancelWait() => runnerNode.Continue();
 
         public void JumpNode(string nodeID) => runnerNode.JumpNode(nodeID);
 

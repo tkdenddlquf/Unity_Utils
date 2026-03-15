@@ -112,7 +112,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = window.GetNode(GUID);
 
-            Undo.RecordObject(so, $"Create Output {type}");
+            Undo.RecordObject(so, "Create Output {type}");
 
             DataWrapper portOption = new(
                 new(type),
@@ -328,7 +328,7 @@ namespace Yang.Dialogue.Editor
 
             List<GenericData> portOptionDatas = data.portDatas[portIndex].data;
 
-            Undo.RecordObject(so, $"Add Multi Port Condition");
+            Undo.RecordObject(so, "Add Multi Port Condition");
 
             AddConditionField(port, itemContainer, -1);
 

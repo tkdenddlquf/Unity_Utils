@@ -88,7 +88,7 @@ namespace Yang.Dialogue.Editor
             {
                 NodeData data = window.GetNode(GUID);
 
-                Undo.RecordObject(so, $"Change GUID");
+                Undo.RecordObject(so, "Change GUID");
 
                 data.guid = evt.newValue;
 

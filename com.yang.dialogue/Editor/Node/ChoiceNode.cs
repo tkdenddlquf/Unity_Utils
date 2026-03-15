@@ -232,7 +232,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             NodeData data = window.GetNode(GUID);
 
-            Undo.RecordObject(so, $"Create Choice Entry");
+            Undo.RecordObject(so, "Create Choice Entry");
 
             DataWrapper portOption = new(
                 new(GenericData.DataType.String),
@@ -262,7 +262,7 @@ namespace Yang.Dialogue.Editor
 
                 List<GenericData> optionData = data.optionDatas[0].data;
 
-                Undo.RecordObject(so, $"Change Speaker Entry");
+                Undo.RecordObject(so, "Change Speaker Entry");
 
                 optionData[0] = new(speakerEntries[index].key);
                 optionData[1] = new(speakerEntries[index].id);
@@ -286,7 +286,7 @@ namespace Yang.Dialogue.Editor
 
                 int portIndex = port.parent.IndexOf(port);
 
-                Undo.RecordObject(so, $"Change Port Option");
+                Undo.RecordObject(so, "Change Port Option");
 
                 List<GenericData> portDatas = data.portDatas[portIndex].data;
 
@@ -363,8 +363,8 @@ namespace Yang.Dialogue.Editor
             {
                 field.tooltip = textEntries[index].tooltip;
 
-                datas[1] = new(textEntries[index].key);
-                datas[2] = new(textEntries[index].id);
+                datas[0] = new(textEntries[index].key);
+                datas[1] = new(textEntries[index].id);
             }
         }
 

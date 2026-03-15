@@ -7,7 +7,9 @@ namespace Yang.Dialogue
     {
         public string CurrentNode { get; private set; }
 
-        public bool IsWait { get; private set; }
+        public event System.Action EndCallback;
+        public event System.Action<string, System.Action> StopCallback;
+        public event System.Action<UnityEngine.Object> ObjectCallback;
 
         private readonly List<RunnerText> runnerDatas = new();
 
@@ -23,13 +25,13 @@ namespace Yang.Dialogue
             this.runnerEvent = runnerEvent;
         }
 
-        public void SetDatas(DialogueSO so)
+        public void SetDatas(DialogueSO so, string node = "")
         {
             if (so == null) return;
 
             so.GetDatas(nodes, links);
 
-            CurrentNode = so.StartGuid;
+            if (!JumpNode(node)) CurrentNode = so.StartGuid;
         }
 
         public async Task<string> NextNode(string currentNode, IRunnerToken token)
@@ -211,7 +213,6 @@ namespace Yang.Dialogue
 
                 case NodeType.Wait:
                     {
-                        IsWait = true;
                         CurrentNode = currentNode;
 
                         IReadOnlyList<GenericData> datas = nodeData.optionDatas[0].data;
@@ -221,11 +222,13 @@ namespace Yang.Dialogue
                             switch (type)
                             {
                                 case WaitType.Notify:
-                                    foreach (IDialogueView view in runner.Views) view.OnNotify(NotifyType.Wait, datas[1].ToString());
+                                    bool isWait = true;
+
+                                    foreach (IDialogueView view in runner.Views) StopCallback?.Invoke(datas[1].ToString(), () => isWait = false);
 
                                     runnerEvent.OnEvent(datas[1].ToString());
 
-                                    while (IsWait && !token.IsStop) await Task.Yield();
+                                    while (isWait && !token.IsStop) await Task.Yield();
                                     break;
 
                                 case WaitType.Seconds:
@@ -244,29 +247,42 @@ namespace Yang.Dialogue
                         }
                     }
                     break;
+
+                case NodeType.Object:
+                    {
+                        IReadOnlyList<DataWrapper> optionDatas = nodeData.optionDatas;
+
+                        for (int i = 0; i < optionDatas.Count; i++)
+                        {
+                            IReadOnlyList<GenericData> datas = optionDatas[i].data;
+
+                            if (datas[0].TryGetObject(out UnityEngine.Object value)) ObjectCallback?.Invoke(value);
+                        }
+
+                        RunnerPort port = new(currentNode, 0);
+
+                        if (links.TryGetValue(port, out RunnerPort target)) return target.guid;
+                    }
+                    break;
             }
 
-            NotifyType notifyType;
-
-            if (token.IsStop) notifyType = NotifyType.Stop;
+            if (token.IsStop) StopCallback?.Invoke("", null);
             else
             {
-                notifyType = NotifyType.End;
+                EndCallback?.Invoke();
                 CurrentNode = "";
             }
-
-            foreach (IDialogueView view in runner.Views) view.OnNotify(notifyType, CurrentNode);
 
             return "";
         }
 
-        public void JumpNode(string nodeName)
+        public bool JumpNode(string nodeName)
         {
-            if (nodeName == "" && !nodes.ContainsKey(nodeName)) return;
+            if (nodeName == "" && !nodes.ContainsKey(nodeName)) return false;
 
             CurrentNode = nodeName;
-        }
 
-        public void Continue() => IsWait = false;
+            return true;
+        }
     }
 }
