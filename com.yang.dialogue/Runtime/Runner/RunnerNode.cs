@@ -9,9 +9,9 @@ namespace Yang.Dialogue
 
         public event System.Action EndCallback;
         public event System.Action<string, System.Action> StopCallback;
-        public event System.Action<UnityEngine.Object> ObjectCallback;
 
         private readonly List<RunnerText> runnerDatas = new();
+        private readonly List<UnityEngine.Object> runnerObjects = new();
 
         private readonly DialogueRunner runner;
         private readonly RunnerEvent runnerEvent;
@@ -250,18 +250,29 @@ namespace Yang.Dialogue
 
                 case NodeType.Object:
                     {
+                        CurrentNode = currentNode;
+
+                        runnerObjects.Clear();
+
                         IReadOnlyList<DataWrapper> optionDatas = nodeData.optionDatas;
 
                         for (int i = 0; i < optionDatas.Count; i++)
                         {
                             IReadOnlyList<GenericData> datas = optionDatas[i].data;
 
-                            if (datas[0].TryGetObject(out UnityEngine.Object value)) ObjectCallback?.Invoke(value);
+                            if (datas[0].TryGetObject(out UnityEngine.Object value)) runnerObjects.Add(value);
                         }
+
+                        foreach (IDialogueView view in runner.Views) await view.OnObject(runnerObjects, token);
 
                         RunnerPort port = new(currentNode, 0);
 
-                        if (links.TryGetValue(port, out RunnerPort target)) return target.guid;
+                        if (links.TryGetValue(port, out RunnerPort target))
+                        {
+                            CurrentNode = target.guid;
+
+                            return CurrentNode;
+                        }
                     }
                     break;
             }

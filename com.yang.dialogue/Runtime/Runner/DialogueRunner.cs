@@ -35,12 +35,6 @@ namespace Yang.Dialogue
             remove => runnerNode.StopCallback -= value;
         }
 
-        public event System.Action<Object> ObjectCallback
-        {
-            add => runnerNode.ObjectCallback += value;
-            remove => runnerNode.ObjectCallback -= value;
-        }
-
         public bool IsStarted { get; private set; }
 
         private void Awake() => Init();
