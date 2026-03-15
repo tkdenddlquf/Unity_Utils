@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Localization.Settings;
 
 namespace Yang.Dialogue
 {
@@ -13,11 +12,11 @@ namespace Yang.Dialogue
         private readonly List<IDialogueView> views = new();
         public List<IDialogueView> Views => views;
 
-        private RunnerNode runnerNode;
-        private RunnerEvent runnerEvent;
-        private RunnerTrigger runnerTrigger;
-
         private RunnerToken token;
+
+        private RunnerNode runnerNode;
+        private readonly RunnerEvent runnerEvent = new();
+        private readonly RunnerTrigger runnerTrigger = new();
 
         private readonly DialogueWrapper wrapper = new();
 
@@ -25,14 +24,28 @@ namespace Yang.Dialogue
 
         public event System.Action EndCallback
         {
-            add => runnerNode.EndCallback += value;
-            remove => runnerNode.EndCallback -= value;
+            add
+            {
+                if (runnerNode != null) runnerNode.EndCallback += value;
+            }
+
+            remove
+            {
+                if (runnerNode != null) runnerNode.EndCallback -= value;
+            }
         }
 
         public event System.Action<string, System.Action> StopCallback
         {
-            add => runnerNode.StopCallback += value;
-            remove => runnerNode.StopCallback -= value;
+            add
+            {
+                if (runnerNode != null) runnerNode.StopCallback += value;
+            }
+
+            remove
+            {
+                if (runnerNode != null) runnerNode.StopCallback -= value;
+            }
         }
 
         public bool IsStarted { get; private set; }
@@ -41,8 +54,6 @@ namespace Yang.Dialogue
 
         private void Init()
         {
-            runnerEvent = new();
-            runnerTrigger = new();
             runnerNode = new(this, runnerEvent);
 
             views.InsertRange(0, viewBases);
@@ -64,8 +75,6 @@ namespace Yang.Dialogue
             if (IsStarted) return;
 
             IsStarted = true;
-
-            await LocalizationSettings.InitializationOperation.Task;
 
             string nextNode = runnerNode.CurrentNode;
 
