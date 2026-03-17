@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
@@ -33,34 +34,28 @@ namespace Yang.Dialogue.Editor
 
         private void SetDefault()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
-
-            if (data.portDatas.Count == 0)
+            if (portDatas.Count == 0)
             {
                 DataWrapper optionData = new(
                     new(WaitType.Notify),
                     new(GenericData.DataType.String)
                 );
 
-                data.optionDatas.Add(optionData);
+                optionDatas.Add(optionData);
 
-                data.portDatas.Add(new());
+                portDatas.Add(new());
             }
         }
 
         private void SetOptions()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
+            List<GenericData> optionData = optionDatas[0].data;
 
-            List<GenericData> datas = data.optionDatas[0].data;
-
-            if (datas[0].TryGetEnum(out WaitType eResult))
+            if (optionData[0].TryGetEnum(out WaitType eResult))
             {
                 EnumField typeField = GetTypeField(eResult);
-                FloatField secondsField = GetSecondsField(datas[1].TryGetFloat(out float fResult) ? fResult : 0);
-                PopupField<string> eventField = GetEventField(so.Events, datas[1].ToString());
+                FloatField secondsField = GetSecondsField(optionData[1].TryGetFloat(out float fResult) ? fResult : 0);
+                PopupField<string> eventField = GetEventField(window.SO.Events, optionData[1].ToString());
 
                 extensionContainer.Add(typeField);
                 extensionContainer.Add(secondsField);
@@ -142,6 +137,10 @@ namespace Yang.Dialogue.Editor
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
             field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = "";
+            });
 
             return field;
         }
@@ -149,13 +148,12 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<Enum> evt)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Change Wait Option");
 
             WaitType type = (WaitType)evt.newValue;
 
-            data.optionDatas[0].data[0] = new(type);
+            optionDatas[0].data[0] = new(type);
 
             SetDisplaySeconds(type);
 
@@ -167,11 +165,10 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<float> evt)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Change Wait Second");
 
-            data.optionDatas[0].data[1] = new(evt.newValue);
+            optionDatas[0].data[1] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 
@@ -181,11 +178,10 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Change Wait Event");
 
-            data.optionDatas[0].data[1] = new(evt.newValue);
+            optionDatas[0].data[1] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 

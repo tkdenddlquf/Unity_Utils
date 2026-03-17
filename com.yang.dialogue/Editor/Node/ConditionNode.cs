@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
@@ -50,25 +51,17 @@ namespace Yang.Dialogue.Editor
 
         private void SetDefault()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
-
-            if (data.portDatas.Count == 0)
+            if (portDatas.Count == 0)
             {
                 DataWrapper portData = new(new GenericData(PortType.Default));
 
-                data.portDatas.Add(portData);
+                portDatas.Add(portData);
             }
         }
 
         private void SetOptions()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
-
-            KeyConverter.GetKeys(so.Conditions, conditions);
-
-            IReadOnlyList<DataWrapper> portDatas = data.portDatas;
+            KeyConverter.GetKeys(window.SO.Conditions, conditions);
 
             for (int i = 0; i < portDatas.Count; i++)
             {
@@ -110,7 +103,6 @@ namespace Yang.Dialogue.Editor
         private void CreatePort(PortType type)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Create Output {type}");
 
@@ -128,11 +120,11 @@ namespace Yang.Dialogue.Editor
                 case PortType.Multi:
                     VisualElement itemContainer = AddMultiPort();
 
-                    AddConditionField(outputContainer[data.portDatas.Count] as Port, itemContainer, -1);
+                    AddConditionField(outputContainer[portDatas.Count] as Port, itemContainer, -1);
                     break;
             }
 
-            data.portDatas.Add(portOption);
+            portDatas.Add(portOption);
 
             RefreshExpandedState();
             RefreshPorts();
@@ -154,11 +146,8 @@ namespace Yang.Dialogue.Editor
             if (newIndex < 1 || newIndex >= container.childCount) return;
 
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Move Port Index");
-
-            List<DataWrapper> portDatas = data.portDatas;
 
             (portDatas[currentIndex], portDatas[newIndex]) = (portDatas[newIndex], portDatas[currentIndex]);
 
@@ -174,13 +163,12 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<string> evt, Port port)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             int portIndex = port.parent.IndexOf(port);
 
             Undo.RecordObject(so, "Change Port Option");
 
-            data.portDatas[portIndex].data[1] = new(evt.newValue);
+            portDatas[portIndex].data[1] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 
@@ -190,14 +178,13 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<string> evt, Port port, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement);
 
             Undo.RecordObject(so, "Change Port Option");
 
-            data.portDatas[portIndex].data[itemIndex] = new(evt.newValue);
+            portDatas[portIndex].data[itemIndex] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 
@@ -246,6 +233,10 @@ namespace Yang.Dialogue.Editor
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = "";
+            });
 
             Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
             Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
@@ -322,17 +313,16 @@ namespace Yang.Dialogue.Editor
         private void CreateCondition(Port port, VisualElement itemContainer)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             int portIndex = port.parent.IndexOf(port);
 
-            List<GenericData> portOptionDatas = data.portDatas[portIndex].data;
+            List<GenericData> portData = portDatas[portIndex].data;
 
             Undo.RecordObject(so, "Add Multi Port Condition");
 
             AddConditionField(port, itemContainer, -1);
 
-            portOptionDatas.Add(new(GenericData.DataType.String));
+            portData.Add(new(GenericData.DataType.String));
 
             EditorUtility.SetDirty(so);
 
@@ -341,20 +331,22 @@ namespace Yang.Dialogue.Editor
 
         private void AddConditionField(Port port, VisualElement itemContainer, int selectIndex)
         {
-            DialogueSO so = window.SO;
-
             VisualElement itemElement = new();
 
             itemElement.style.flexDirection = FlexDirection.Row;
             itemElement.style.alignItems = Align.Center;
 
-            KeyConverter.GetKeys(so.Conditions, conditions);
+            KeyConverter.GetKeys(window.SO.Conditions, conditions);
 
             PopupField<string> field = new(conditions, selectIndex);
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port, itemElement));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = "";
+            });
 
             Button remove = new(() => RemoveConditionField(port, itemElement)) { text = "-" };
 
@@ -367,7 +359,6 @@ namespace Yang.Dialogue.Editor
         private void RemoveConditionField(Port port, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             VisualElement itemContainer = itemElement.parent;
 
@@ -380,7 +371,7 @@ namespace Yang.Dialogue.Editor
 
                 itemContainer.Remove(itemElement);
 
-                data.portDatas[portIndex].data.RemoveAt(itemIndex);
+                portDatas[portIndex].data.RemoveAt(itemIndex);
 
                 EditorUtility.SetDirty(so);
 

@@ -66,6 +66,14 @@ namespace Yang.Dialogue.Editor
             return compatiblePorts;
         }
 
+        public override EventPropagation DeleteSelection()
+        {
+            Focusable focused = panel?.focusController?.focusedElement;
+
+            if (focused == this) return base.DeleteSelection();
+            else return EventPropagation.Stop;
+        }
+
         #region Node
         private void AddNode(NodeType type, Vector2 position)
         {

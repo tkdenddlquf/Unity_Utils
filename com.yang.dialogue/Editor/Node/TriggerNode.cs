@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
@@ -17,7 +18,6 @@ namespace Yang.Dialogue.Editor
 
         public TriggerNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
-
         }
 
         public override void SetPorts()
@@ -39,29 +39,22 @@ namespace Yang.Dialogue.Editor
 
         private void SetDefault()
         {
-            NodeData data = window.GetNode(GUID);
-
-            if (data.portDatas.Count == 0)
+            if (portDatas.Count == 0)
             {
                 DataWrapper optionData = new(
                     new(GenericData.DataType.String),
                     new(true)
                 );
 
-                data.optionDatas.Add(optionData);
+                optionDatas.Add(optionData);
 
-                data.portDatas.Add(new());
+                portDatas.Add(new());
             }
         }
 
         private void SetOptions()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
-
-            KeyConverter.GetKeys(so.Conditions, conditions);
-
-            IReadOnlyList<DataWrapper> optionDatas = data.optionDatas;
+            KeyConverter.GetKeys(window.SO.Conditions, conditions);
 
             for (int i = 0; i < optionDatas.Count; i++)
             {
@@ -76,7 +69,6 @@ namespace Yang.Dialogue.Editor
         private void CreateTrigger()
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Create Trigger");
 
@@ -87,7 +79,7 @@ namespace Yang.Dialogue.Editor
 
             AddTriggerField("", true);
 
-            data.optionDatas.Add(optionData);
+            optionDatas.Add(optionData);
 
             EditorUtility.SetDirty(so);
 
@@ -96,7 +88,6 @@ namespace Yang.Dialogue.Editor
 
         private void AddTriggerField(string key, bool check)
         {
-            DialogueSO so = window.SO;
             VisualElement container = new();
 
             container.style.flexDirection = FlexDirection.Row;
@@ -106,7 +97,7 @@ namespace Yang.Dialogue.Editor
 
             toggle.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
 
-            KeyConverter.GetKeys(so.Conditions, conditions);
+            KeyConverter.GetKeys(window.SO.Conditions, conditions);
 
             int index = conditions.IndexOf(key);
 
@@ -115,6 +106,10 @@ namespace Yang.Dialogue.Editor
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = "";
+            });
 
             Button removeButton = new(() => RemoveTriggerField(container)) { text = "X" };
 
@@ -128,7 +123,6 @@ namespace Yang.Dialogue.Editor
         private void RemoveTriggerField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             VisualElement container = itemElement.parent;
 
@@ -138,7 +132,7 @@ namespace Yang.Dialogue.Editor
 
                 Undo.RecordObject(so, "Remove Trigger");
 
-                data.optionDatas.RemoveAt(optionIndex);
+                optionDatas.RemoveAt(optionIndex);
 
                 container.Remove(itemElement);
 
@@ -151,7 +145,6 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<string> evt, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             VisualElement container = itemElement.parent;
 
@@ -159,7 +152,7 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Change Trigger Option");
 
-            data.optionDatas[optionIndex].data[0] = new(evt.newValue);
+            optionDatas[optionIndex].data[0] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 
@@ -169,7 +162,6 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<bool> evt, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             VisualElement container = itemElement.parent;
 
@@ -177,7 +169,7 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Change Trigger Check Option");
 
-            data.optionDatas[optionIndex].data[1] = new(evt.newValue);
+            optionDatas[optionIndex].data[1] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 

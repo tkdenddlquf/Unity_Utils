@@ -9,6 +9,9 @@ namespace Yang.Dialogue.Editor
     [CustomEditor(typeof(DialogueSO))]
     public class DialogueSOEditor : UnityEditor.Editor
     {
+        PopupField<string> eventPopup;
+        PopupField<string> conditionPopup;
+
         public override VisualElement CreateInspectorGUI()
         {
             VisualElement root = new();
@@ -17,8 +20,8 @@ namespace Yang.Dialogue.Editor
 
             PropertyField textField = new(serializedObject.FindProperty("key"));
 
-            PopupField<string> eventPopup = GetPopup<IEventMarker>(root, "events");
-            PopupField<string> conditionPopup = GetPopup<IConditionMarker>(root, "conditions");
+            eventPopup = GetMarkerPopup<IEventMarker>("events");
+            conditionPopup = GetMarkerPopup<IConditionMarker>("conditions");
 
             Button button = new(Open) { text = "Edit" };
 
@@ -39,7 +42,7 @@ namespace Yang.Dialogue.Editor
             window.SO = target as DialogueSO;
         }
 
-        private PopupField<string> GetPopup<T>(VisualElement root, string propName)
+        private PopupField<string> GetMarkerPopup<T>(string propName)
         {
             List<Type> types = new();
 
@@ -78,29 +81,21 @@ namespace Yang.Dialogue.Editor
 
             PopupField<string> typePopup = new(containerProp.displayName, typeNames, currentIndex);
 
+            typePopup.TrackPropertyValue(containerProp, _ =>
+            {
+                typePopup.SetValueWithoutNotify(_.managedReferenceValue.ToString());
+            });
             typePopup.RegisterValueChangedCallback(evt =>
             {
-                int newIndex = -1;
-
-                for (int i = 0; i < typeNames.Count; i++)
-                {
-                    if (typeNames[i] == evt.newValue)
-                    {
-                        newIndex = i;
-                        break;
-                    }
-                }
+                int newIndex = typeNames.IndexOf(evt.newValue);
 
                 if (newIndex < 0) return;
 
-                Type newType = types[newIndex];
+                Undo.RecordObject(target, $"Changed {propName}");
 
-                containerProp.managedReferenceValue = Activator.CreateInstance(newType);
+                containerProp.managedReferenceValue = Activator.CreateInstance(types[newIndex]);
 
                 serializedObject.ApplyModifiedProperties();
-
-                root.Clear();
-                root.Add(CreateInspectorGUI());
             });
 
             return typePopup;

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
@@ -38,27 +39,19 @@ namespace Yang.Dialogue.Editor
 
         private void SetDefault()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
-
-            if (data.portDatas.Count == 0)
+            if (portDatas.Count == 0)
             {
                 DataWrapper optionData = new(new GenericData(GenericData.DataType.String));
 
-                data.optionDatas.Add(optionData);
+                optionDatas.Add(optionData);
 
-                data.portDatas.Add(new());
+                portDatas.Add(new());
             }
         }
 
         private void SetOptions()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
-
-            KeyConverter.GetKeys(so.Events, events);
-
-            IReadOnlyList<DataWrapper> optionDatas = data.optionDatas;
+            KeyConverter.GetKeys(window.SO.Events, events);
 
             for (int i = 0; i < optionDatas.Count; i++)
             {
@@ -73,7 +66,6 @@ namespace Yang.Dialogue.Editor
         private void CreateEvent()
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Create Event");
 
@@ -81,7 +73,7 @@ namespace Yang.Dialogue.Editor
 
             AddEventField("");
 
-            data.optionDatas.Add(optionData);
+            optionDatas.Add(optionData);
 
             EditorUtility.SetDirty(so);
 
@@ -90,13 +82,12 @@ namespace Yang.Dialogue.Editor
 
         private void AddEventField(string key)
         {
-            DialogueSO so = window.SO;
             VisualElement container = new();
 
             container.style.flexDirection = FlexDirection.Row;
             container.style.alignItems = Align.Center;
 
-            KeyConverter.GetKeys(so.Events, events);
+            KeyConverter.GetKeys(window.SO.Events, events);
 
             int index = events.IndexOf(key);
 
@@ -105,6 +96,10 @@ namespace Yang.Dialogue.Editor
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = "";
+            });
 
             Button removeButton = new(() => RemoveEventField(container)) { text = "X" };
 
@@ -117,7 +112,6 @@ namespace Yang.Dialogue.Editor
         private void RemoveEventField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             VisualElement container = itemElement.parent;
 
@@ -127,7 +121,7 @@ namespace Yang.Dialogue.Editor
 
                 Undo.RecordObject(so, "Remove Event");
 
-                data.optionDatas.RemoveAt(optionIndex);
+                optionDatas.RemoveAt(optionIndex);
 
                 container.Remove(itemElement);
 
@@ -140,7 +134,6 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<string> evt, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             VisualElement container = itemElement.parent;
 
@@ -148,7 +141,7 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Change Event Option");
 
-            data.optionDatas[optionIndex].data[0] = new(evt.newValue);
+            optionDatas[optionIndex].data[0] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 

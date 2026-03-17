@@ -30,15 +30,16 @@ namespace Yang.Dialogue.Editor
     /// </summary>
     public class ChoiceNode : BaseNode
     {
-        private readonly List<string> tables = new();
+        private readonly List<string> tables;
         private readonly List<EntryData> speakerEntries = new();
         private readonly List<EntryData> textEntries = new();
 
-        private IReadOnlyList<LocalizationTableCollection> collections;
+        private readonly IReadOnlyList<LocalizationTableCollection> collections;
 
         public ChoiceNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
-            SetTables();
+            tables = window.Tables;
+            collections = window.collections;
         }
 
         public override void SetPorts()
@@ -59,9 +60,7 @@ namespace Yang.Dialogue.Editor
 
         private void SetDefault()
         {
-            NodeData data = window.GetNode(GUID);
-
-            if (data.portDatas.Count == 0)
+            if (portDatas.Count == 0)
             {
                 DataWrapper speakerTable = new(
                     new(GenericData.DataType.String),
@@ -85,22 +84,18 @@ namespace Yang.Dialogue.Editor
 
                 DataWrapper message = new(new GenericData(GenericData.DataType.String));
 
-                data.optionDatas.Add(speakerTable);
-                data.optionDatas.Add(speakerEntry);
+                optionDatas.Add(speakerTable);
+                optionDatas.Add(speakerEntry);
 
-                data.optionDatas.Add(textTable);
-                data.portDatas.Add(textEntry);
+                optionDatas.Add(textTable);
+                portDatas.Add(textEntry);
 
-                data.optionDatas.Add(message);
+                optionDatas.Add(message);
             }
         }
 
         private void SetOptions()
         {
-            NodeData data = window.GetNode(GUID);
-
-            List<DataWrapper> portDatas = data.portDatas;
-
             AddTableField(speakerEntries, true);
 
             AddSpeakerEntryField();
@@ -124,11 +119,8 @@ namespace Yang.Dialogue.Editor
             if (newIndex < 1 || newIndex >= container.childCount) return;
 
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Move Port Index");
-
-            List<DataWrapper> portDatas = data.portDatas;
 
             (portDatas[currentIndex], portDatas[newIndex]) = (portDatas[newIndex], portDatas[currentIndex]);
 
@@ -149,13 +141,12 @@ namespace Yang.Dialogue.Editor
             if (index != -1)
             {
                 DialogueSO so = window.SO;
-                NodeData data = window.GetNode(GUID);
 
                 SetEntries(collections[index], entries);
 
                 Undo.RecordObject(so, speaker ? "Change Speaker Table" : "Change Text Table");
 
-                List<GenericData> optionData = data.optionDatas[speaker ? 0 : 2].data;
+                List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
                 optionData[0] = new(collections[index].TableCollectionName);
                 optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
@@ -168,10 +159,7 @@ namespace Yang.Dialogue.Editor
 
         private void AddTableField(List<EntryData> entries, bool speaker)
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
-
-            List<GenericData> optionData = data.optionDatas[speaker ? 0 : 2].data;
+            List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
             int index = GetTableIndex(optionData[0].ToString(), optionData[1].TryGetGuid(out System.Guid guid) ? guid : default);
 
@@ -183,6 +171,10 @@ namespace Yang.Dialogue.Editor
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, entries, speaker));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = "";
+            });
 
             extensionContainer.Add(field);
 
@@ -192,24 +184,6 @@ namespace Yang.Dialogue.Editor
 
                 optionData[0] = new(collections[index].TableCollectionName);
                 optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
-            }
-        }
-
-        private void SetTables()
-        {
-            collections = LocalizationEditorSettings.GetStringTableCollections();
-
-            tables.Clear();
-
-            if (collections != null)
-            {
-                foreach (LocalizationTableCollection collection in collections)
-                {
-                    string tableName = collection.TableCollectionName;
-                    string group = collection.Group;
-
-                    tables.Add(string.IsNullOrEmpty(group) ? tableName : $"{group}/{tableName}");
-                }
             }
         }
 
@@ -230,7 +204,6 @@ namespace Yang.Dialogue.Editor
         private void CreateChoiceEntry()
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Create Choice Entry");
 
@@ -241,7 +214,7 @@ namespace Yang.Dialogue.Editor
 
             AddChoiceEntryField(portOption.data);
 
-            data.portDatas.Add(portOption);
+            portDatas.Add(portOption);
 
             RefreshExpandedState();
             RefreshPorts();
@@ -258,9 +231,8 @@ namespace Yang.Dialogue.Editor
             if (index != -1)
             {
                 DialogueSO so = window.SO;
-                NodeData data = window.GetNode(GUID);
 
-                List<GenericData> optionData = data.optionDatas[0].data;
+                List<GenericData> optionData = optionDatas[0].data;
 
                 Undo.RecordObject(so, "Change Speaker Entry");
 
@@ -282,16 +254,15 @@ namespace Yang.Dialogue.Editor
             if (index != -1)
             {
                 DialogueSO so = window.SO;
-                NodeData data = window.GetNode(GUID);
 
                 int portIndex = port.parent.IndexOf(port);
 
                 Undo.RecordObject(so, "Change Port Option");
 
-                List<GenericData> portDatas = data.portDatas[portIndex].data;
+                List<GenericData> portData = portDatas[portIndex].data;
 
-                portDatas[0] = new(textEntries[index].key);
-                portDatas[1] = new(textEntries[index].id);
+                portData[0] = new(textEntries[index].key);
+                portData[1] = new(textEntries[index].id);
 
                 if (index != -1 && evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = textEntries[index].tooltip;
 
@@ -303,12 +274,9 @@ namespace Yang.Dialogue.Editor
 
         private void AddSpeakerEntryField()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
+            List<GenericData> optionData = optionDatas[1].data;
 
-            List<GenericData> datas = data.optionDatas[1].data;
-
-            int index = speakerEntries.IndexOf(new EntryData(datas[1].TryGetLong(out long result) ? result : 0, datas[0].ToString()));
+            int index = speakerEntries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
 
             PopupField<EntryData> field = new("Speaker Entry", speakerEntries, index);
 
@@ -318,6 +286,10 @@ namespace Yang.Dialogue.Editor
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
             field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = default;
+            });
 
             extensionContainer.Add(field);
 
@@ -325,8 +297,8 @@ namespace Yang.Dialogue.Editor
             {
                 field.tooltip = speakerEntries[index].tooltip;
 
-                datas[0] = new(speakerEntries[index].key);
-                datas[1] = new(speakerEntries[index].id);
+                optionData[0] = new(speakerEntries[index].key);
+                optionData[1] = new(speakerEntries[index].id);
             }
         }
 
@@ -346,6 +318,10 @@ namespace Yang.Dialogue.Editor
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = default;
+            });
 
             Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
             Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
@@ -397,11 +373,10 @@ namespace Yang.Dialogue.Editor
         private void MessageChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Change Choice Message");
 
-            data.optionDatas[3].data[0] = new(evt.newValue);
+            optionDatas[3].data[0] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 
@@ -411,11 +386,10 @@ namespace Yang.Dialogue.Editor
         private void AddMessageField()
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
-            List<GenericData> datas = data.optionDatas[3].data;
+            List<GenericData> optionData = optionDatas[3].data;
 
-            TextField field = new("Message") { value = datas[0].ToString() };
+            TextField field = new("Message") { value = optionData[0].ToString() };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;

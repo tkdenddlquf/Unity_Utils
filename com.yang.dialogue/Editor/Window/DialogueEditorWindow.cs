@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
+using UnityEditor.Localization;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -15,16 +16,34 @@ namespace Yang.Dialogue.Editor
         private System.Reflection.FieldInfo nodeField;
         private System.Reflection.FieldInfo linkField;
 
+        private string saveData;
+
+        public IReadOnlyList<LocalizationTableCollection> collections;
+
+        public List<string> Tables { get; } = new();
+
         private DialogueSO so;
         public DialogueSO SO
         {
             get => so;
             set
             {
+                CheckSave();
+
                 so = value;
 
-                Nodes = (List<NodeData>)nodeField.GetValue(value);
-                Links = (List<LinkData>)linkField.GetValue(value);
+                saveData = JsonUtility.ToJson(value);
+
+                if (value != null)
+                {
+                    Nodes = (List<NodeData>)nodeField.GetValue(value);
+                    Links = (List<LinkData>)linkField.GetValue(value);
+                }
+                else
+                {
+                    Nodes = null;
+                    Links = null;
+                }
 
                 RefreshView();
             }
@@ -51,6 +70,9 @@ namespace Yang.Dialogue.Editor
             Undo.postprocessModifications -= OnPostprocessModifications;
             Undo.postprocessModifications += OnPostprocessModifications;
 
+            EditorApplication.quitting -= CheckSave;
+            EditorApplication.quitting += CheckSave;
+
             graph.graphViewChanged -= OnGraphViewChanged;
             graph.graphViewChanged += OnGraphViewChanged;
 
@@ -58,7 +80,11 @@ namespace Yang.Dialogue.Editor
 
             hasUnsavedChanges = false;
 
-            if (SO != null) RefreshView();
+            SetTables();
+
+            SO = SO;
+
+            RefreshView();
         }
 
         private void OnDisable()
@@ -68,6 +94,8 @@ namespace Yang.Dialogue.Editor
             Undo.undoRedoPerformed -= OnUndoRedo;
 
             Undo.postprocessModifications -= OnPostprocessModifications;
+
+            EditorApplication.quitting -= CheckSave;
 
             graph.graphViewChanged -= OnGraphViewChanged;
 
@@ -87,13 +115,41 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        private void CheckSave()
+        {
+            if (!hasUnsavedChanges) return;
+
+            bool save = EditorUtility.DisplayDialog(
+                "Unsaved Changes",
+                "There are unsaved changes. Do you want to save them before quitting?",
+                "Save",
+                "Don't Save"
+            );
+
+            if (save) SaveChanges();
+            else DiscardChanges();
+        }
+
         public override void SaveChanges()
         {
             if (SO == null) return;
 
             AssetDatabase.SaveAssetIfDirty(SO);
 
+            saveData = JsonUtility.ToJson(SO);
+
             base.SaveChanges();
+        }
+
+        public override void DiscardChanges()
+        {
+            if (SO == null) return;
+
+            JsonUtility.FromJsonOverwrite(saveData, SO);
+
+            AssetDatabase.SaveAssetIfDirty(SO);
+
+            base.DiscardChanges();
         }
 
         public void OnUndoRedo() => RefreshView();
@@ -118,6 +174,24 @@ namespace Yang.Dialogue.Editor
             }
 
             return mods;
+        }
+
+        private void SetTables()
+        {
+            collections = LocalizationEditorSettings.GetStringTableCollections();
+
+            Tables.Clear();
+
+            if (collections != null)
+            {
+                foreach (LocalizationTableCollection collection in collections)
+                {
+                    string tableName = collection.TableCollectionName;
+                    string group = collection.Group;
+
+                    Tables.Add(string.IsNullOrEmpty(group) ? tableName : $"{group}/{tableName}");
+                }
+            }
         }
 
         #region View
@@ -234,82 +308,83 @@ namespace Yang.Dialogue.Editor
 
         private void RefreshView()
         {
-            if (SO == null) return;
-
-            foreach (Node node in graph.nodes) graph.RemoveElement(node);
-            foreach (Edge edge in graph.edges) graph.RemoveElement(edge);
-
-            NodeData startNode = (NodeData)startField.GetValue(SO);
-
-            if (string.IsNullOrEmpty(startNode.guid))
+            if (SO != null)
             {
-                startField.SetValue(SO, new NodeData(NodeType.Start));
+                foreach (Node node in graph.nodes) graph.RemoveElement(node);
+                foreach (Edge edge in graph.edges) graph.RemoveElement(edge);
 
-                startNode = (NodeData)startField.GetValue(SO);
+                NodeData startNode = (NodeData)startField.GetValue(SO);
 
-                EditorUtility.SetDirty(SO);
-            }
-
-            CreateNode(NodeType.Start, startNode.guid, startNode.position);
-
-            for (int i = 0; i < Nodes.Count; i++)
-            {
-                NodeData node = Nodes[i];
-
-                CreateNode(node.type, node.guid, node.position);
-            }
-
-            for (int i = 0; i < Links.Count; i++)
-            {
-                LinkData link = Links[i];
-
-                BaseNode outputNode = null;
-                BaseNode inputNode = null;
-
-                foreach (Node node in graph.nodes)
+                if (string.IsNullOrEmpty(startNode.guid))
                 {
-                    if (node is BaseNode view)
+                    startField.SetValue(SO, new NodeData(NodeType.Start));
+
+                    startNode = (NodeData)startField.GetValue(SO);
+
+                    EditorUtility.SetDirty(SO);
+                }
+
+                CreateNode(NodeType.Start, startNode.guid, startNode.position);
+
+                for (int i = 0; i < Nodes.Count; i++)
+                {
+                    NodeData node = Nodes[i];
+
+                    CreateNode(node.type, node.guid, node.position);
+                }
+
+                for (int i = 0; i < Links.Count; i++)
+                {
+                    LinkData link = Links[i];
+
+                    BaseNode outputNode = null;
+                    BaseNode inputNode = null;
+
+                    foreach (Node node in graph.nodes)
                     {
-                        NodeData data = GetNode(view.GUID);
-
-                        if (data.guid == link.nodeGuid)
+                        if (node is BaseNode view)
                         {
-                            outputNode = view;
+                            NodeData data = GetNode(view.GUID);
 
-                            continue;
-                        }
+                            if (data.guid == link.nodeGuid)
+                            {
+                                outputNode = view;
 
-                        if (data.guid == link.targetGuid)
-                        {
-                            inputNode = view;
+                                continue;
+                            }
 
-                            continue;
+                            if (data.guid == link.targetGuid)
+                            {
+                                inputNode = view;
+
+                                continue;
+                            }
                         }
                     }
+
+                    if (outputNode == null || inputNode == null)
+                    {
+                        Links.Remove(link);
+
+                        i--;
+
+                        continue;
+                    }
+
+
+                    if (outputNode.outputContainer[link.outPortIndex] is not Port outputPort || inputNode.inputContainer[0] is not Port inputPort)
+                    {
+                        Links.Remove(link);
+
+                        i--;
+
+                        continue;
+                    }
+
+                    Edge edge = outputPort.ConnectTo(inputPort);
+
+                    graph.AddElement(edge);
                 }
-
-                if (outputNode == null || inputNode == null)
-                {
-                    Links.Remove(link);
-
-                    i--;
-
-                    continue;
-                }
-
-
-                if (outputNode.outputContainer[link.outPortIndex] is not Port outputPort || inputNode.inputContainer[0] is not Port inputPort)
-                {
-                    Links.Remove(link);
-
-                    i--;
-
-                    continue;
-                }
-
-                Edge edge = outputPort.ConnectTo(inputPort);
-
-                graph.AddElement(edge);
             }
 
             graph.ClearSelection();
@@ -328,7 +403,7 @@ namespace Yang.Dialogue.Editor
         }
         #endregion
 
-        #region Node
+        #region Data
         public NodeData GetNode(string guid)
         {
             if (guid == SO.StartGuid) return (NodeData)startField.GetValue(SO);
@@ -407,9 +482,7 @@ namespace Yang.Dialogue.Editor
 
             return false;
         }
-        #endregion
 
-        #region Link
         public LinkData GetLink(string guid, int outPortIndex)
         {
             for (int i = 0; i < Links.Count; i++)

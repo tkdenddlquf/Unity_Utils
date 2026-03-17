@@ -52,13 +52,13 @@ namespace Yang.Dialogue
                     {
                         CurrentNode = currentNode;
 
-                        IReadOnlyList<GenericData> speakerTable = nodeData.optionDatas[0].data;
-                        IReadOnlyList<GenericData> speakerEntry = nodeData.optionDatas[1].data;
+                        IReadOnlyList<GenericData> speakerTable = nodeData.OptionDatas[0].data;
+                        IReadOnlyList<GenericData> speakerEntry = nodeData.OptionDatas[1].data;
 
-                        IReadOnlyList<GenericData> textTable = nodeData.optionDatas[2].data;
-                        IReadOnlyList<GenericData> textEntry = nodeData.optionDatas[3].data;
+                        IReadOnlyList<GenericData> textTable = nodeData.OptionDatas[2].data;
+                        IReadOnlyList<GenericData> textEntry = nodeData.OptionDatas[3].data;
 
-                        IReadOnlyList<GenericData> message = nodeData.optionDatas[4].data;
+                        IReadOnlyList<GenericData> message = nodeData.OptionDatas[4].data;
 
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
                         RunnerText text = new(textTable[0].ToString(), textEntry[0].ToString());
@@ -78,7 +78,7 @@ namespace Yang.Dialogue
 
                 case NodeType.Condition:
                     {
-                        IReadOnlyList<DataWrapper> portDatas = nodeData.portDatas;
+                        IReadOnlyList<DataWrapper> portDatas = nodeData.PortDatas;
 
                         bool found = false;
 
@@ -123,7 +123,7 @@ namespace Yang.Dialogue
 
                 case NodeType.Trigger:
                     {
-                        IReadOnlyList<DataWrapper> optionDatas = nodeData.optionDatas;
+                        IReadOnlyList<DataWrapper> optionDatas = nodeData.OptionDatas;
 
                         for (int i = 0; i < optionDatas.Count; i++)
                         {
@@ -148,7 +148,7 @@ namespace Yang.Dialogue
 
                 case NodeType.Event:
                     {
-                        IReadOnlyList<DataWrapper> optionDatas = nodeData.optionDatas;
+                        IReadOnlyList<DataWrapper> optionDatas = nodeData.OptionDatas;
 
                         for (int i = 0; i < optionDatas.Count; i++)
                         {
@@ -173,14 +173,14 @@ namespace Yang.Dialogue
 
                         runnerDatas.Clear();
 
-                        IReadOnlyList<DataWrapper> textEntries = nodeData.portDatas;
+                        IReadOnlyList<DataWrapper> textEntries = nodeData.PortDatas;
 
-                        IReadOnlyList<GenericData> speakerTable = nodeData.optionDatas[0].data;
-                        IReadOnlyList<GenericData> speakerEntry = nodeData.optionDatas[1].data;
+                        IReadOnlyList<GenericData> speakerTable = nodeData.OptionDatas[0].data;
+                        IReadOnlyList<GenericData> speakerEntry = nodeData.OptionDatas[1].data;
 
-                        IReadOnlyList<GenericData> textTable = nodeData.optionDatas[2].data;
+                        IReadOnlyList<GenericData> textTable = nodeData.OptionDatas[2].data;
 
-                        IReadOnlyList<GenericData> message = nodeData.optionDatas[3].data;
+                        IReadOnlyList<GenericData> message = nodeData.OptionDatas[3].data;
 
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
 
@@ -215,7 +215,7 @@ namespace Yang.Dialogue
                     {
                         CurrentNode = currentNode;
 
-                        IReadOnlyList<GenericData> datas = nodeData.optionDatas[0].data;
+                        IReadOnlyList<GenericData> datas = nodeData.OptionDatas[0].data;
 
                         if (datas[0].TryGetEnum(out WaitType type))
                         {
@@ -254,7 +254,7 @@ namespace Yang.Dialogue
 
                         runnerObjects.Clear();
 
-                        IReadOnlyList<DataWrapper> optionDatas = nodeData.optionDatas;
+                        IReadOnlyList<DataWrapper> optionDatas = nodeData.OptionDatas;
 
                         for (int i = 0; i < optionDatas.Count; i++)
                         {

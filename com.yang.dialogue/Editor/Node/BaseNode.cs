@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine.UIElements;
@@ -6,17 +7,31 @@ namespace Yang.Dialogue.Editor
 {
     public abstract class BaseNode : Node
     {
+        protected DialogueEditorWindow window;
+
         protected const int ITEM_MIN_WIDTH = 150;
 
-        public string GUID { get; private set; }
+        protected readonly List<DataWrapper> portDatas;
+        protected readonly List<DataWrapper> optionDatas;
+
+        private readonly System.Reflection.FieldInfo portDataField;
+        private readonly System.Reflection.FieldInfo optionDataField;
 
         private readonly TextField idField;
 
-        protected DialogueEditorWindow window;
+        public string GUID { get; private set; }
 
         protected BaseNode(DialogueEditorWindow window, string guid)
         {
             this.window = window;
+
+            NodeData data = window.GetNode(guid);
+
+            portDataField = typeof(NodeData).GetField("portDatas", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            optionDataField = typeof(NodeData).GetField("optionDatas", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            portDatas = (List<DataWrapper>)portDataField.GetValue(data);
+            optionDatas = (List<DataWrapper>)optionDataField.GetValue(data);
 
             GUID = guid;
 
@@ -52,19 +67,18 @@ namespace Yang.Dialogue.Editor
         protected void RemovePort(Port port)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
-            if (data.portDatas.Count > 1)
+            if (portDatas.Count > 1)
             {
                 int portIndex = port.parent.IndexOf(port);
 
-                LinkData link = window.GetLink(data.guid, portIndex);
+                LinkData link = window.GetLink(GUID, portIndex);
 
                 Undo.RecordObject(so, "Remove Port");
 
                 window.RemoveEdge(port);
 
-                data.portDatas.RemoveAt(portIndex);
+                portDatas.RemoveAt(portIndex);
 
                 window.Links.Remove(link);
 

@@ -38,25 +38,18 @@ namespace Yang.Dialogue.Editor
 
         private void SetDefault()
         {
-            NodeData data = window.GetNode(GUID);
-
-            if (data.portDatas.Count == 0)
+            if (portDatas.Count == 0)
             {
                 DataWrapper optionData = new(new GenericData(GenericData.DataType.Object));
 
-                data.optionDatas.Add(optionData);
+                optionDatas.Add(optionData);
 
-                data.portDatas.Add(new());
+                portDatas.Add(new());
             }
         }
 
         private void SetOptions()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
-
-            IReadOnlyList<DataWrapper> optionDatas = data.optionDatas;
-
             for (int i = 0; i < optionDatas.Count; i++)
             {
                 IReadOnlyList<GenericData> optionData = optionDatas[i].data;
@@ -70,7 +63,6 @@ namespace Yang.Dialogue.Editor
         private void CreateEvent()
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Create Object");
 
@@ -78,7 +70,7 @@ namespace Yang.Dialogue.Editor
 
             AddEventField(null);
 
-            data.optionDatas.Add(optionData);
+            optionDatas.Add(optionData);
 
             EditorUtility.SetDirty(so);
 
@@ -87,7 +79,6 @@ namespace Yang.Dialogue.Editor
 
         private void AddEventField(Object target)
         {
-            DialogueSO so = window.SO;
             VisualElement container = new();
 
             container.style.flexDirection = FlexDirection.Row;
@@ -110,7 +101,6 @@ namespace Yang.Dialogue.Editor
         private void RemoveEventField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             VisualElement container = itemElement.parent;
 
@@ -120,7 +110,7 @@ namespace Yang.Dialogue.Editor
 
                 Undo.RecordObject(so, "Remove Object");
 
-                data.optionDatas.RemoveAt(optionIndex);
+                optionDatas.RemoveAt(optionIndex);
 
                 container.Remove(itemElement);
 
@@ -133,7 +123,6 @@ namespace Yang.Dialogue.Editor
         private void ChangedCallback(ChangeEvent<Object> evt, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             VisualElement container = itemElement.parent;
 
@@ -141,7 +130,7 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Change Object Option");
 
-            data.optionDatas[optionIndex].data[0] = new(evt.newValue);
+            optionDatas[optionIndex].data[0] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 

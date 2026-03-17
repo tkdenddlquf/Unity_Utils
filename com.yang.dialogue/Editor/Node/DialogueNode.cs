@@ -31,15 +31,16 @@ namespace Yang.Dialogue.Editor
     /// </summary>
     public class DialogueNode : BaseNode
     {
-        private readonly List<string> tables = new();
+        private readonly List<string> tables;
         private readonly List<EntryData> speakerEntries = new();
         private readonly List<EntryData> textEntries = new();
 
-        private IReadOnlyList<LocalizationTableCollection> collections;
+        private readonly IReadOnlyList<LocalizationTableCollection> collections;
 
         public DialogueNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
-            SetTables();
+            tables = window.Tables;
+            collections = window.collections;
         }
 
         public override void SetPorts()
@@ -54,9 +55,7 @@ namespace Yang.Dialogue.Editor
 
         private void SetDefault()
         {
-            NodeData data = window.GetNode(GUID);
-
-            if (data.portDatas.Count == 0)
+            if (portDatas.Count == 0)
             {
                 DataWrapper speakerTable = new(
                     new(GenericData.DataType.String),
@@ -80,15 +79,15 @@ namespace Yang.Dialogue.Editor
 
                 DataWrapper message = new(new GenericData(GenericData.DataType.String));
 
-                data.optionDatas.Add(speakerTable);
-                data.optionDatas.Add(speakerEntry);
+                optionDatas.Add(speakerTable);
+                optionDatas.Add(speakerEntry);
 
-                data.optionDatas.Add(textTable);
-                data.optionDatas.Add(textEntry);
+                optionDatas.Add(textTable);
+                optionDatas.Add(textEntry);
 
-                data.optionDatas.Add(message);
+                optionDatas.Add(message);
 
-                data.portDatas.Add(new());
+                portDatas.Add(new());
             }
         }
 
@@ -111,13 +110,12 @@ namespace Yang.Dialogue.Editor
             if (index != -1)
             {
                 DialogueSO so = window.SO;
-                NodeData data = window.GetNode(GUID);
 
                 SetEntries(collections[index], entries);
 
                 Undo.RecordObject(so, speaker ? "Change Speaker Table" : "Change Text Table");
 
-                List<GenericData> optionData = data.optionDatas[speaker ? 0 : 2].data;
+                List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
                 optionData[0] = new(collections[index].TableCollectionName);
                 optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
@@ -131,9 +129,8 @@ namespace Yang.Dialogue.Editor
         private void AddTableField(List<EntryData> entries, bool speaker)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
-            List<GenericData> optionData = data.optionDatas[speaker ? 0 : 2].data;
+            List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
             int index = GetTableIndex(optionData[0].ToString(), optionData[1].TryGetGuid(out System.Guid guid) ? guid : default);
 
@@ -145,6 +142,10 @@ namespace Yang.Dialogue.Editor
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, entries, speaker));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = "";
+            });
 
             extensionContainer.Add(field);
 
@@ -154,24 +155,6 @@ namespace Yang.Dialogue.Editor
 
                 optionData[0] = new(collections[index].TableCollectionName);
                 optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
-            }
-        }
-
-        private void SetTables()
-        {
-            collections = LocalizationEditorSettings.GetStringTableCollections();
-
-            tables.Clear();
-
-            if (collections != null)
-            {
-                foreach (LocalizationTableCollection collection in collections)
-                {
-                    string tableName = collection.TableCollectionName;
-                    string group = collection.Group;
-
-                    tables.Add(string.IsNullOrEmpty(group) ? tableName : $"{group}/{tableName}");
-                }
             }
         }
 
@@ -196,9 +179,8 @@ namespace Yang.Dialogue.Editor
             if (index != -1)
             {
                 DialogueSO so = window.SO;
-                NodeData data = window.GetNode(GUID);
 
-                List<GenericData> optionData = data.optionDatas[speaker ? 1 : 3].data;
+                List<GenericData> optionData = optionDatas[speaker ? 1 : 3].data;
 
                 Undo.RecordObject(so, "Change Speaker Entry");
 
@@ -215,9 +197,7 @@ namespace Yang.Dialogue.Editor
 
         private void AddEntryField(List<EntryData> entries, bool speaker)
         {
-            NodeData data = window.GetNode(GUID);
-
-            List<GenericData> datas = data.optionDatas[speaker ? 1 : 3].data;
+            List<GenericData> datas = optionDatas[speaker ? 1 : 3].data;
 
             int index = entries.IndexOf(new EntryData(datas[1].TryGetLong(out long result) ? result : 0, datas[0].ToString()));
 
@@ -229,6 +209,10 @@ namespace Yang.Dialogue.Editor
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, entries, speaker));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete) field.value = default;
+            });
 
             extensionContainer.Add(field);
 
@@ -270,11 +254,10 @@ namespace Yang.Dialogue.Editor
         private void MessageChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
 
             Undo.RecordObject(so, "Change Choice Message");
 
-            data.optionDatas[4].data[0] = new(evt.newValue);
+            optionDatas[4].data[0] = new(evt.newValue);
 
             EditorUtility.SetDirty(so);
 
@@ -283,10 +266,7 @@ namespace Yang.Dialogue.Editor
 
         private void AddMessageField()
         {
-            DialogueSO so = window.SO;
-            NodeData data = window.GetNode(GUID);
-
-            TextField field = new("Message") { value = data.optionDatas[4].data[0].ToString() };
+            TextField field = new("Message") { value = optionDatas[4].data[0].ToString() };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;

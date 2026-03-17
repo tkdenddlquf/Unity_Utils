@@ -9,8 +9,11 @@ namespace Yang.Dialogue
         public string guid;
         public NodeType type;
 
-        public List<DataWrapper> portDatas;
-        public List<DataWrapper> optionDatas;
+        [SerializeField] private List<DataWrapper> portDatas;
+        public readonly IReadOnlyList<DataWrapper> PortDatas => portDatas;
+
+        [SerializeField] private List<DataWrapper> optionDatas;
+        public readonly IReadOnlyList<DataWrapper> OptionDatas => optionDatas;
 
 #if UNITY_EDITOR
         public Vector2 position;
