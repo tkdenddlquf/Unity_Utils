@@ -232,7 +232,7 @@ namespace Yang.Dialogue.Editor
             {
                 DialogueSO so = window.SO;
 
-                List<GenericData> optionData = optionDatas[0].data;
+                List<GenericData> optionData = optionDatas[1].data;
 
                 Undo.RecordObject(so, "Change Speaker Entry");
 
