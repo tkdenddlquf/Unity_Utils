@@ -6,7 +6,15 @@ namespace Yang.Dialogue
 {
     public class RunnerToken : CancellationTokenSource, IRunnerToken
     {
+        internal string targetNode;
+
         public bool IsStop => IsCancellationRequested;
+
+        public string PointNode { get; internal set; }
+
+        public void Stop() => Cancel();
+
+        public void SetTarget(string nodeName) => targetNode = nodeName;
 
         public async Task Delay(float second)
         {
@@ -19,6 +27,12 @@ namespace Yang.Dialogue
     public interface IRunnerToken
     {
         public bool IsStop { get; }
+
+        public string PointNode { get; }
+
+        public void Stop();
+
+        public void SetTarget(string nodeName);
 
         public Task Delay(float second);
     }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Plastic.Antlr3.Runtime;
 using UnityEngine;
 
 namespace Yang.Dialogue
@@ -12,29 +13,15 @@ namespace Yang.Dialogue
         private readonly List<IDialogueView> views = new();
         public List<IDialogueView> Views => views;
 
-        private RunnerToken token;
-
         private RunnerNode runnerNode;
         private readonly RunnerEvent runnerEvent = new();
         private readonly RunnerTrigger runnerTrigger = new();
 
         private readonly DialogueWrapper wrapper = new();
 
-        public string CurrentNode => runnerNode.CurrentNode;
+        private readonly Dictionary<string, RunnerTask> tasks = new();
 
-        public event System.Action EndCallback
-        {
-            add
-            {
-                if (runnerNode != null) runnerNode.EndCallback += value;
-            }
-
-            remove
-            {
-                if (runnerNode != null) runnerNode.EndCallback -= value;
-            }
-        }
-
+        public event System.Action EndCallback;
         public event System.Action<string, System.Action> StopCallback
         {
             add
@@ -54,67 +41,83 @@ namespace Yang.Dialogue
 
         private void Init()
         {
-            runnerNode = new(this, runnerEvent);
+            runnerNode = new(runnerEvent, runnerTrigger);
 
             views.InsertRange(0, viewBases);
 
             SetDialogue(so);
         }
 
-        public void SetDialogue(DialogueSO so, string node = "")
+        public void SetDialogue(DialogueSO so)
         {
             if (so == null || IsStarted) return;
 
             this.so = so;
 
-            runnerNode.SetDatas(so, node);
+            tasks.Clear();
+
+            runnerNode.SetDatas(so);
         }
 
-        public async void StartDialogue()
+        public async void StartDialogue(string key, string nodeName = "")
         {
-            if (IsStarted) return;
+            if (so == null || IsStarted) return;
 
             IsStarted = true;
 
-            string nextNode = runnerNode.CurrentNode;
+            string nextNode;
 
-            if (nextNode != "")
-            {
-                token = new();
+            if (runnerNode.CheckNode(nodeName)) nextNode = nodeName;
+            else if (tasks.TryGetValue(key, out RunnerTask task)) nextNode = task.currentNode;
+            else nextNode = so.StartGuid;
 
-                while (true)
-                {
-                    nextNode = await runnerNode.NextNode(nextNode, token);
+            tasks.Remove(key);
 
-                    if (nextNode == "") break;
-                }
+            RunnerTask newTask = new(nextNode);
 
-                token.Dispose();
-                token = null;
-            }
+            tasks.Add(key, newTask);
+
+            while (await runnerNode.NextNode(Views, newTask.token)) tasks[key] = new(newTask.token);
+
+            if (!newTask.token.IsStop) EndCallback?.Invoke();
+
+            newTask.token.Dispose();
+            tasks.Remove(key);
 
             IsStarted = false;
         }
 
-        public void StopDialogue() => token?.Cancel();
+        public void StopDialogue(string key)
+        {
+            if (tasks.TryGetValue(key, out RunnerTask task)) task.token?.Stop();
+        }
 
-        public void JumpNode(string nodeID) => runnerNode.JumpNode(nodeID);
+        public void JumpNode(string key, string nodeName)
+        {
+            if (tasks.TryGetValue(key, out RunnerTask task)) task.token?.SetTarget(nodeName);
+        }
 
         public DialogueWrapper Save()
         {
             if (so == null) return null;
 
-            wrapper.SetDatas(so.key, runnerNode.CurrentNode, runnerTrigger.Triggers);
+            wrapper.SetDatas(tasks, runnerTrigger.Triggers);
 
             return wrapper;
         }
 
         public void Load(DialogueWrapper wrapper)
         {
-            if (so == null && wrapper == null && so.key != wrapper.key) return;
+            if (so == null && wrapper == null) return;
 
-            runnerNode.JumpNode(wrapper.currentNode);
-            runnerTrigger.SetDatas(wrapper.triggers);
+            for (int i = 0; i < wrapper.Keys.Count; i++)
+            {
+                RunnerTask task = new() { currentNode = wrapper.Names[i] };
+
+                tasks.Add(wrapper.Keys[i], task);
+            }
+
+            runnerTrigger.SetDatas(wrapper.Triggers);
         }
 
         #region Event

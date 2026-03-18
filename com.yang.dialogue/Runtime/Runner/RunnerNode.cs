@@ -5,52 +5,43 @@ namespace Yang.Dialogue
 {
     public class RunnerNode
     {
-        public string CurrentNode { get; private set; }
-
-        public event System.Action EndCallback;
         public event System.Action<string, System.Action> StopCallback;
 
         private readonly List<RunnerText> runnerDatas = new();
         private readonly List<UnityEngine.Object> runnerObjects = new();
 
-        private readonly DialogueRunner runner;
         private readonly RunnerEvent runnerEvent;
+        private readonly RunnerTrigger runnerTrigger;
 
         private readonly Dictionary<string, NodeData> nodes = new();
         private readonly Dictionary<RunnerPort, RunnerPort> links = new();
 
-        public RunnerNode(DialogueRunner runner, RunnerEvent runnerEvent)
+        public RunnerNode(RunnerEvent runnerEvent, RunnerTrigger runnerTrigger)
         {
-            this.runner = runner;
             this.runnerEvent = runnerEvent;
+            this.runnerTrigger = runnerTrigger;
         }
 
-        public void SetDatas(DialogueSO so, string node = "")
+        public void SetDatas(DialogueSO so)
         {
             if (so == null) return;
 
             so.GetDatas(nodes, links);
-
-            if (!JumpNode(node)) CurrentNode = so.StartGuid;
         }
 
-        public async Task<string> NextNode(string currentNode, IRunnerToken token)
+        public async Task<bool> NextNode(IReadOnlyList<IDialogueView> views, RunnerToken token)
         {
-            NodeData nodeData = nodes[currentNode];
+            NodeData nodeData = nodes[token.targetNode];
 
             switch (nodeData.type)
             {
                 case NodeType.Start:
-                    {
-                        RunnerPort port = new(currentNode, 0);
-
-                        if (links.TryGetValue(port, out RunnerPort target)) return target.guid;
-                    }
+                    if (CheckProceed(token, 0)) return true;
                     break;
 
                 case NodeType.Dialogue:
                     {
-                        CurrentNode = currentNode;
+                        token.PointNode = token.targetNode;
 
                         IReadOnlyList<GenericData> speakerTable = nodeData.OptionDatas[0].data;
                         IReadOnlyList<GenericData> speakerEntry = nodeData.OptionDatas[1].data;
@@ -63,16 +54,9 @@ namespace Yang.Dialogue
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
                         RunnerText text = new(textTable[0].ToString(), textEntry[0].ToString());
 
-                        foreach (IDialogueView view in runner.Views) await view.OnDialogue(speaker, text, message[0].ToString(), token);
+                        foreach (IDialogueView view in views) await view.OnDialogue(speaker, text, message[0].ToString(), token);
 
-                        RunnerPort port = new(currentNode, 0);
-
-                        if (links.TryGetValue(port, out RunnerPort target))
-                        {
-                            CurrentNode = target.guid;
-
-                            return CurrentNode;
-                        }
+                        if (CheckProceed(token, 0)) return true;
                     }
                     break;
 
@@ -89,7 +73,7 @@ namespace Yang.Dialogue
 
                             for (int j = 0; j < datas.Count; j++)
                             {
-                                if (!runner.IsTrigger(datas[j].ToString()))
+                                if (!runnerTrigger.IsTrigger(datas[j].ToString()))
                                 {
                                     allExist = false;
 
@@ -97,27 +81,10 @@ namespace Yang.Dialogue
                                 }
                             }
 
-                            if (allExist)
-                            {
-                                RunnerPort port = new(currentNode, i);
-
-                                if (links.TryGetValue(port, out RunnerPort target))
-                                {
-                                    currentNode = target.guid;
-
-                                    found = true;
-
-                                    break;
-                                }
-                            }
+                            if (allExist && CheckProceed(token, i)) return true;
                         }
 
-                        if (!found)
-                        {
-                            RunnerPort port = new(currentNode, 0);
-
-                            if (links.TryGetValue(port, out RunnerPort target)) return target.guid;
-                        }
+                        if (!found && CheckProceed(token, 0)) return true;
                     }
                     break;
 
@@ -135,14 +102,12 @@ namespace Yang.Dialogue
 
                             if (datas[1].TryGetBool(out bool isTrigger))
                             {
-                                if (isTrigger) runner.SetTrigger(value);
-                                else runner.UnsetTrigger(value);
+                                if (isTrigger) runnerTrigger.SetTrigger(value);
+                                else runnerTrigger.UnsetTrigger(value);
                             }
                         }
 
-                        RunnerPort port = new(currentNode, 0);
-
-                        if (links.TryGetValue(port, out RunnerPort target)) return target.guid;
+                        if (CheckProceed(token, 0)) return true;
                     }
                     break;
 
@@ -161,15 +126,13 @@ namespace Yang.Dialogue
                             runnerEvent.OnEvent(value);
                         }
 
-                        RunnerPort port = new(currentNode, 0);
-
-                        if (links.TryGetValue(port, out RunnerPort target)) return target.guid;
+                        if (CheckProceed(token, 0)) return true;
                     }
                     break;
 
                 case NodeType.Choice:
                     {
-                        CurrentNode = currentNode;
+                        token.PointNode = token.targetNode;
 
                         runnerDatas.Clear();
 
@@ -191,20 +154,14 @@ namespace Yang.Dialogue
                             runnerDatas.Add(data);
                         }
 
-                        foreach (IDialogueView view in runner.Views)
+                        foreach (IDialogueView view in views)
                         {
                             int result = await view.OnChoice(speaker, runnerDatas, message[0].ToString(), token);
 
                             if (result != -1)
                             {
-                                RunnerPort port = new(currentNode, runnerDatas[result].portIndex);
+                                if (CheckProceed(token, runnerDatas[result].portIndex)) return true;
 
-                                if (links.TryGetValue(port, out RunnerPort target))
-                                {
-                                    CurrentNode = target.guid;
-
-                                    return CurrentNode;
-                                }
                                 break;
                             }
                         }
@@ -213,7 +170,7 @@ namespace Yang.Dialogue
 
                 case NodeType.Wait:
                     {
-                        CurrentNode = currentNode;
+                        token.PointNode = token.targetNode;
 
                         IReadOnlyList<GenericData> datas = nodeData.OptionDatas[0].data;
 
@@ -224,7 +181,7 @@ namespace Yang.Dialogue
                                 case WaitType.Notify:
                                     bool isWait = true;
 
-                                    foreach (IDialogueView view in runner.Views) StopCallback?.Invoke(datas[1].ToString(), () => isWait = false);
+                                    foreach (IDialogueView view in views) StopCallback?.Invoke(datas[1].ToString(), () => isWait = false);
 
                                     runnerEvent.OnEvent(datas[1].ToString());
 
@@ -237,20 +194,13 @@ namespace Yang.Dialogue
                             }
                         }
 
-                        RunnerPort port = new(currentNode, 0);
-
-                        if (links.TryGetValue(port, out RunnerPort target))
-                        {
-                            CurrentNode = target.guid;
-
-                            return CurrentNode;
-                        }
+                        if (CheckProceed(token, 0)) return true;
                     }
                     break;
 
                 case NodeType.Object:
                     {
-                        CurrentNode = currentNode;
+                        token.PointNode = token.targetNode;
 
                         runnerObjects.Clear();
 
@@ -263,37 +213,45 @@ namespace Yang.Dialogue
                             if (datas[0].TryGetObject(out UnityEngine.Object value)) runnerObjects.Add(value);
                         }
 
-                        foreach (IDialogueView view in runner.Views) await view.OnObject(runnerObjects, token);
+                        foreach (IDialogueView view in views) await view.OnObject(runnerObjects, token);
 
-                        RunnerPort port = new(currentNode, 0);
-
-                        if (links.TryGetValue(port, out RunnerPort target))
-                        {
-                            CurrentNode = target.guid;
-
-                            return CurrentNode;
-                        }
+                        if (CheckProceed(token, 0)) return true;
                     }
                     break;
             }
 
             if (token.IsStop) StopCallback?.Invoke("", null);
-            else
-            {
-                EndCallback?.Invoke();
-                CurrentNode = "";
-            }
 
-            return "";
+            return false;
         }
 
-        public bool JumpNode(string nodeName)
+        public bool CheckNode(string nodeName)
         {
             if (nodeName == "" && !nodes.ContainsKey(nodeName)) return false;
 
-            CurrentNode = nodeName;
-
             return true;
+        }
+
+        private bool CheckProceed(RunnerToken token, int portIndex)
+        {
+            if (token.IsStop) return false;
+
+            if (CheckNode(token.targetNode)) return true;
+            else
+            {
+                RunnerPort port = new(token.targetNode, portIndex);
+
+                if (links.TryGetValue(port, out RunnerPort targetPort))
+                {
+                    token.targetNode = targetPort.guid;
+
+                    return true;
+                }
+            }
+
+            token.targetNode = token.PointNode;
+
+            return false;
         }
     }
 }

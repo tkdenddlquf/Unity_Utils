@@ -18,14 +18,11 @@ namespace Yang.Dialogue.Editor
 
             serializedObject.Update();
 
-            PropertyField textField = new(serializedObject.FindProperty("key"));
-
             eventPopup = GetMarkerPopup<IEventMarker>("events");
             conditionPopup = GetMarkerPopup<IConditionMarker>("conditions");
 
             Button button = new(Open) { text = "Edit" };
 
-            root.Add(textField);
             root.Add(eventPopup);
             root.Add(conditionPopup);
             root.Add(button);

@@ -6,19 +6,27 @@ namespace Yang.Dialogue
     [System.Serializable]
     public class DialogueWrapper
     {
-        public string key;
+        [SerializeField] private List<string> keys = new();
+        public IReadOnlyList<string> Keys => keys;
 
-        public string currentNode;
+        [SerializeField] private List<string> names = new();
+        public IReadOnlyList<string> Names => names;
 
-        public readonly List<string> triggers = new();
+        [SerializeField] private List<string> triggers = new();
+        public IReadOnlyList<string> Triggers => triggers;
 
-        public void SetDatas(string key, string currentNode, IReadOnlyCollection<string> triggers)
+        public void SetDatas(IReadOnlyDictionary<string, RunnerTask> tasks, IReadOnlyCollection<string> triggers)
         {
-            this.key = key;
-
-            this.currentNode = currentNode;
+            keys.Clear();
+            names.Clear();
 
             this.triggers.Clear();
+
+            foreach (var task in tasks)
+            {
+                keys.Add(task.Key);
+                names.Add(task.Value.currentNode);
+            }
 
             foreach (string trigger in triggers) this.triggers.Add(trigger);
         }

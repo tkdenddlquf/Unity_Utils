@@ -8,7 +8,7 @@ public class RunnerTrigger
 
     private readonly Dictionary<string, System.Action<bool>> callbacks = new();
 
-    public void SetDatas(List<string> triggers)
+    public void SetDatas(IReadOnlyList<string> triggers)
     {
         this.triggers.Clear();
 
