@@ -12,9 +12,15 @@ namespace Yang.Dialogue
 
         public string PointNode { get; internal set; }
 
+        public bool IsChangedTarget { get; private set; }
+
         public void Stop() => Cancel();
 
-        public void SetTarget(string nodeName) => targetNode = nodeName;
+        public void SetTarget(string nodeName)
+        {
+            IsChangedTarget = true;
+            targetNode = nodeName;
+        }
 
         public async Task Delay(float second)
         {

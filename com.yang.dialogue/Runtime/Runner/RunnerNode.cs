@@ -36,7 +36,7 @@ namespace Yang.Dialogue
             switch (nodeData.type)
             {
                 case NodeType.Start:
-                    if (CheckProceed(token, 0)) return true;
+                    if (CheckNext(token, 0)) return true;
                     break;
 
                 case NodeType.Dialogue:
@@ -56,7 +56,7 @@ namespace Yang.Dialogue
 
                         foreach (IDialogueView view in views) await view.OnDialogue(speaker, text, message[0].ToString(), token);
 
-                        if (CheckProceed(token, 0)) return true;
+                        if (CheckNext(token, 0)) return true;
                     }
                     break;
 
@@ -81,10 +81,10 @@ namespace Yang.Dialogue
                                 }
                             }
 
-                            if (allExist && CheckProceed(token, i)) return true;
+                            if (allExist && CheckNext(token, i)) return true;
                         }
 
-                        if (!found && CheckProceed(token, 0)) return true;
+                        if (!found && CheckNext(token, 0)) return true;
                     }
                     break;
 
@@ -107,7 +107,7 @@ namespace Yang.Dialogue
                             }
                         }
 
-                        if (CheckProceed(token, 0)) return true;
+                        if (CheckNext(token, 0)) return true;
                     }
                     break;
 
@@ -126,7 +126,7 @@ namespace Yang.Dialogue
                             runnerEvent.OnEvent(value);
                         }
 
-                        if (CheckProceed(token, 0)) return true;
+                        if (CheckNext(token, 0)) return true;
                     }
                     break;
 
@@ -160,7 +160,7 @@ namespace Yang.Dialogue
 
                             if (result != -1)
                             {
-                                if (CheckProceed(token, runnerDatas[result].portIndex)) return true;
+                                if (CheckNext(token, runnerDatas[result].portIndex)) return true;
 
                                 break;
                             }
@@ -194,7 +194,7 @@ namespace Yang.Dialogue
                             }
                         }
 
-                        if (CheckProceed(token, 0)) return true;
+                        if (CheckNext(token, 0)) return true;
                     }
                     break;
 
@@ -215,7 +215,7 @@ namespace Yang.Dialogue
 
                         foreach (IDialogueView view in views) await view.OnObject(runnerObjects, token);
 
-                        if (CheckProceed(token, 0)) return true;
+                        if (CheckNext(token, 0)) return true;
                     }
                     break;
             }
@@ -232,11 +232,11 @@ namespace Yang.Dialogue
             return true;
         }
 
-        private bool CheckProceed(RunnerToken token, int portIndex)
+        private bool CheckNext(RunnerToken token, int portIndex)
         {
             if (token.IsStop) return false;
 
-            if (CheckNode(token.targetNode)) return true;
+            if (token.IsChangedTarget && CheckNode(token.targetNode)) return true;
             else
             {
                 RunnerPort port = new(token.targetNode, portIndex);
