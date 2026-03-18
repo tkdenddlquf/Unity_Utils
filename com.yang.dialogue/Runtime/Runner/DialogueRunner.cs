@@ -74,15 +74,21 @@ namespace Yang.Dialogue
             tasks.Remove(key);
 
             RunnerTask newTask = new(nextNode);
+            RunnerToken token = newTask.token;
 
             tasks.Add(key, newTask);
 
-            while (await runnerNode.NextNode(Views, newTask.token)) tasks[key] = new(newTask.token);
+            while (await runnerNode.NextNode(Views, token)) tasks[key] = new(token);
 
-            if (!newTask.token.IsStop) EndCallback?.Invoke();
+            if (token.IsStop) tasks[key] = new() { currentNode = token.PointNode };
+            else
+            {
+                EndCallback?.Invoke();
 
-            newTask.token.Dispose();
-            tasks.Remove(key);
+                tasks.Remove(key);
+            }
+
+            token.Dispose();
 
             IsStarted = false;
         }
