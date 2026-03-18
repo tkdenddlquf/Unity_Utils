@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Unity.Plastic.Antlr3.Runtime;
 using UnityEngine;
 
 namespace Yang.Dialogue
@@ -35,8 +34,6 @@ namespace Yang.Dialogue
             }
         }
 
-        public bool IsStarted { get; private set; }
-
         private void Awake() => Init();
 
         private void Init()
@@ -50,7 +47,21 @@ namespace Yang.Dialogue
 
         public void SetDialogue(DialogueSO so)
         {
-            if (so == null || IsStarted) return;
+            if (so == null) return;
+
+            bool isStarted = false;
+
+            foreach (RunnerTask task in tasks.Values)
+            {
+                if (task.token != null)
+                {
+                    isStarted = true;
+
+                    break;
+                }
+            }
+
+            if (isStarted) return;
 
             this.so = so;
 
@@ -61,15 +72,18 @@ namespace Yang.Dialogue
 
         public async void StartDialogue(string key, string nodeName = "")
         {
-            if (so == null || IsStarted) return;
+            if (so == null) return;
 
-            IsStarted = true;
+            string nextNode = "";
 
-            string nextNode;
+            if (tasks.TryGetValue(key, out RunnerTask task))
+            {
+                if (task.token != null) return;
+                else nextNode = task.currentNode;
+            }
 
             if (runnerNode.CheckNode(nodeName)) nextNode = nodeName;
-            else if (tasks.TryGetValue(key, out RunnerTask task)) nextNode = task.currentNode;
-            else nextNode = so.StartGuid;
+            else if (nextNode == "") nextNode = so.StartGuid;
 
             tasks.Remove(key);
 
@@ -89,8 +103,13 @@ namespace Yang.Dialogue
             }
 
             token.Dispose();
+        }
 
-            IsStarted = false;
+        public bool IsStarted(string key)
+        {
+            if (tasks.TryGetValue(key, out RunnerTask task)) return task.token != null;
+
+            return false;
         }
 
         public void StopDialogue(string key)
