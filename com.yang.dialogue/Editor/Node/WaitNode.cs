@@ -139,7 +139,11 @@ namespace Yang.Dialogue.Editor
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(evt =>
             {
-                if (evt.keyCode == KeyCode.Delete) field.value = "";
+                if (evt.keyCode == KeyCode.Delete)
+                {
+                    field.value = "";
+                    window.SetUnsaved();
+                }
             });
 
             return field;

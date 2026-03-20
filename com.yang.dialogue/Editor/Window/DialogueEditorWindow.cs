@@ -78,8 +78,6 @@ namespace Yang.Dialogue.Editor
 
             graph.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
-            hasUnsavedChanges = false;
-
             SetTables();
 
             SO = SO;

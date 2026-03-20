@@ -70,7 +70,7 @@ namespace Yang.Dialogue
             runnerNode.SetDatas(so);
         }
 
-        public async void StartDialogue(string key, string nodeName = "")
+        public async void StartDialogue(string key, string nodeName = "", List<IDialogueView> views = null)
         {
             if (so == null) return;
 
@@ -92,7 +92,7 @@ namespace Yang.Dialogue
 
             tasks.Add(key, newTask);
 
-            while (await runnerNode.NextNode(Views, token)) tasks[key] = new(token);
+            while (await runnerNode.NextNode(views ?? Views, token)) tasks[key] = new(token);
 
             if (token.IsStop) tasks[key] = new() { currentNode = token.PointNode };
             else

@@ -235,7 +235,11 @@ namespace Yang.Dialogue.Editor
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port));
             field.RegisterCallback<KeyDownEvent>(evt =>
             {
-                if (evt.keyCode == KeyCode.Delete) field.value = "";
+                if (evt.keyCode == KeyCode.Delete)
+                {
+                    field.value = "";
+                    window.SetUnsaved();
+                }
             });
 
             Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
@@ -345,7 +349,11 @@ namespace Yang.Dialogue.Editor
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port, itemElement));
             field.RegisterCallback<KeyDownEvent>(evt =>
             {
-                if (evt.keyCode == KeyCode.Delete) field.value = "";
+                if (evt.keyCode == KeyCode.Delete)
+                {
+                    field.value = "";
+                    window.SetUnsaved();
+                }
             });
 
             Button remove = new(() => RemoveConditionField(port, itemElement)) { text = "-" };

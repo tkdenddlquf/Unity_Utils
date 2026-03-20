@@ -108,7 +108,11 @@ namespace Yang.Dialogue.Editor
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
             field.RegisterCallback<KeyDownEvent>(evt =>
             {
-                if (evt.keyCode == KeyCode.Delete) field.value = "";
+                if (evt.keyCode == KeyCode.Delete)
+                {
+                    field.value = "";
+                    window.SetUnsaved();
+                }
             });
 
             Button removeButton = new(() => RemoveTriggerField(container)) { text = "X" };

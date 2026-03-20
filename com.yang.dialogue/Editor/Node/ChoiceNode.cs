@@ -173,7 +173,11 @@ namespace Yang.Dialogue.Editor
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, entries, speaker));
             field.RegisterCallback<KeyDownEvent>(evt =>
             {
-                if (evt.keyCode == KeyCode.Delete) field.value = "";
+                if (evt.keyCode == KeyCode.Delete)
+                {
+                    field.value = "";
+                    window.SetUnsaved();
+                }
             });
 
             extensionContainer.Add(field);
@@ -288,7 +292,11 @@ namespace Yang.Dialogue.Editor
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(evt =>
             {
-                if (evt.keyCode == KeyCode.Delete) field.value = default;
+                if (evt.keyCode == KeyCode.Delete)
+                {
+                    field.value = default;
+                    window.SetUnsaved();
+                }
             });
 
             extensionContainer.Add(field);
@@ -320,7 +328,11 @@ namespace Yang.Dialogue.Editor
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port));
             field.RegisterCallback<KeyDownEvent>(evt =>
             {
-                if (evt.keyCode == KeyCode.Delete) field.value = default;
+                if (evt.keyCode == KeyCode.Delete)
+                {
+                    field.value = default;
+                    window.SetUnsaved();
+                }
             });
 
             Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
