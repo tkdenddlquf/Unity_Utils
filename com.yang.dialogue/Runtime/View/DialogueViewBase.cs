@@ -11,6 +11,8 @@ namespace Yang.Dialogue
         public virtual Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, IRunnerToken token) => Task.FromResult(-1);
 
         public virtual Task OnObject(IReadOnlyList<Object> target, IRunnerToken token) => Task.CompletedTask;
+
+        public virtual Task OnStop(string reason, IRunnerToken token) => Task.CompletedTask;
     }
 
     public interface IDialogueView
@@ -20,5 +22,7 @@ namespace Yang.Dialogue
         public Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerText> texts, string message, IRunnerToken token);
 
         public Task OnObject(IReadOnlyList<Object> target, IRunnerToken token);
+
+        public Task OnStop(string reason, IRunnerToken token);
     }
 }

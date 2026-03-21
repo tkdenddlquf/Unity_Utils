@@ -21,18 +21,6 @@ namespace Yang.Dialogue
         private readonly Dictionary<string, RunnerTask> tasks = new();
 
         public event System.Action EndCallback;
-        public event System.Action<string, System.Action> StopCallback
-        {
-            add
-            {
-                if (runnerNode != null) runnerNode.StopCallback += value;
-            }
-
-            remove
-            {
-                if (runnerNode != null) runnerNode.StopCallback -= value;
-            }
-        }
 
         private void Awake() => Init();
 

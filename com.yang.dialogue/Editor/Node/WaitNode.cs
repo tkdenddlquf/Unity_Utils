@@ -15,7 +15,11 @@ namespace Yang.Dialogue.Editor
     /// </summary>
     public class WaitNode : BaseNode
     {
-        private readonly List<string> events = new();
+        public enum WaitType
+        {
+            Notify,
+            Seconds,
+        }
 
         public WaitNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
@@ -55,7 +59,7 @@ namespace Yang.Dialogue.Editor
             {
                 EnumField typeField = GetTypeField(eResult);
                 FloatField secondsField = GetSecondsField(optionData[1].TryGetFloat(out float fResult) ? fResult : 0);
-                PopupField<string> eventField = GetEventField(window.SO.Events, optionData[1].ToString());
+                TextField eventField = GetReasonField(optionData[1].ToString());
 
                 extensionContainer.Add(typeField);
                 extensionContainer.Add(secondsField);
@@ -72,13 +76,13 @@ namespace Yang.Dialogue.Editor
                 case WaitType.Notify:
                     extensionContainer[1].style.display = DisplayStyle.None;
 
-                    PopupField<string> eventField = extensionContainer[2] as PopupField<string>;
+                    TextField reasonField = extensionContainer[2] as TextField;
 
-                    string currentEvent = eventField.value;
+                    string currentReason = reasonField.value;
 
-                    eventField.SetValueWithoutNotify("");
-                    eventField.value = currentEvent;
-                    eventField.style.display = DisplayStyle.Flex;
+                    reasonField.SetValueWithoutNotify("");
+                    reasonField.value = currentReason;
+                    reasonField.style.display = DisplayStyle.Flex;
                     break;
 
                 case WaitType.Seconds:
@@ -123,13 +127,9 @@ namespace Yang.Dialogue.Editor
             return field;
         }
 
-        private PopupField<string> GetEventField(IEventMarker marker, string data)
+        private TextField GetReasonField(string data)
         {
-            KeyConverter.GetKeys(marker, events);
-
-            int index = events.IndexOf(data);
-
-            PopupField<string> field = new("Event", events, index);
+            TextField field = new("Reason") { value = data };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;

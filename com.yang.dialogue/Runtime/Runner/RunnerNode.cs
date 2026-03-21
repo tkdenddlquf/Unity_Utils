@@ -5,8 +5,6 @@ namespace Yang.Dialogue
 {
     public class RunnerNode
     {
-        public event System.Action<string, System.Action> StopCallback;
-
         private readonly List<RunnerText> runnerDatas = new();
         private readonly List<UnityEngine.Object> runnerObjects = new();
 
@@ -174,24 +172,10 @@ namespace Yang.Dialogue
 
                         IReadOnlyList<GenericData> datas = nodeData.OptionDatas[0].data;
 
-                        if (datas[0].TryGetEnum(out WaitType type))
+                        if (datas[1].TryGetFloat(out float second)) await token.Delay(second);
+                        else
                         {
-                            switch (type)
-                            {
-                                case WaitType.Notify:
-                                    bool isWait = true;
-
-                                    foreach (IDialogueView view in views) StopCallback?.Invoke(datas[1].ToString(), () => isWait = false);
-
-                                    runnerEvent.OnEvent(datas[1].ToString());
-
-                                    while (isWait && !token.IsStop) await Task.Yield();
-                                    break;
-
-                                case WaitType.Seconds:
-                                    if (datas[1].TryGetFloat(out float second)) await token.Delay(second);
-                                    break;
-                            }
+                            foreach (IDialogueView view in views) await view.OnStop(datas[1].ToString(), token);
                         }
 
                         if (CheckNext(token, 0)) return true;
@@ -220,7 +204,10 @@ namespace Yang.Dialogue
                     break;
             }
 
-            if (token.IsStop) StopCallback?.Invoke("", null);
+            if (token.IsStop)
+            {
+                foreach (IDialogueView view in views) await view.OnStop("", token);
+            }
 
             return false;
         }
