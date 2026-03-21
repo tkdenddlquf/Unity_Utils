@@ -20,8 +20,6 @@ namespace Yang.Dialogue
 
         private readonly Dictionary<string, RunnerTask> tasks = new();
 
-        public event System.Action EndCallback;
-
         private void Awake() => Init();
 
         private void Init()
@@ -83,12 +81,7 @@ namespace Yang.Dialogue
             while (await runnerNode.NextNode(views ?? Views, token)) tasks[key] = new(token);
 
             if (token.IsStop) tasks[key] = new() { currentNode = token.PointNode };
-            else
-            {
-                EndCallback?.Invoke();
-
-                tasks.Remove(key);
-            }
+            else tasks.Remove(key);
 
             token.Dispose();
         }

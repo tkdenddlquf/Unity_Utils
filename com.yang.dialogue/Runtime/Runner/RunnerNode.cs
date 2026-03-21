@@ -175,7 +175,7 @@ namespace Yang.Dialogue
                         if (datas[1].TryGetFloat(out float second)) await token.Delay(second);
                         else
                         {
-                            foreach (IDialogueView view in views) await view.OnStop(datas[1].ToString(), token);
+                            foreach (IDialogueView view in views) await view.OnMessage(datas[1].ToString(), token);
                         }
 
                         if (CheckNext(token, 0)) return true;
@@ -204,10 +204,7 @@ namespace Yang.Dialogue
                     break;
             }
 
-            if (token.IsStop)
-            {
-                foreach (IDialogueView view in views) await view.OnStop("", token);
-            }
+            foreach (IDialogueView view in views) await view.OnMessage("", token);
 
             return false;
         }
