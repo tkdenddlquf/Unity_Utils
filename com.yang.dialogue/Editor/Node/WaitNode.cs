@@ -137,14 +137,6 @@ namespace Yang.Dialogue.Editor
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
             field.RegisterValueChangedCallback(ChangedCallback);
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    field.value = "";
-                    window.SetUnsaved();
-                }
-            });
 
             return field;
         }

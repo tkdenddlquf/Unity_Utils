@@ -110,7 +110,18 @@ namespace Yang.Dialogue.Editor
             {
                 if (evt.keyCode == KeyCode.Delete)
                 {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Delete Trigger Option");
+
                     field.value = "";
+
+                    int optionIndex = container.parent.IndexOf(container);
+
+                    optionDatas[optionIndex].data[0] = new(GenericData.DataType.String);
+
+                    EditorUtility.SetDirty(so);
+
                     window.SetUnsaved();
                 }
             });

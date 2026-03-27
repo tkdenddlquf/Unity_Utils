@@ -175,7 +175,17 @@ namespace Yang.Dialogue.Editor
             {
                 if (evt.keyCode == KeyCode.Delete)
                 {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Delete Table Option");
+
                     field.value = "";
+
+                    optionData[0] = new(GenericData.DataType.String);
+                    optionData[1] = new(GenericData.DataType.Guid);
+
+                    EditorUtility.SetDirty(so);
+
                     window.SetUnsaved();
                 }
             });
@@ -294,7 +304,17 @@ namespace Yang.Dialogue.Editor
             {
                 if (evt.keyCode == KeyCode.Delete)
                 {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Delete Speaker Entry Option");
+
                     field.value = default;
+
+                    optionData[0] = new(GenericData.DataType.String);
+                    optionData[1] = new(GenericData.DataType.Long);
+
+                    EditorUtility.SetDirty(so);
+
                     window.SetUnsaved();
                 }
             });
@@ -310,9 +330,9 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void AddChoiceEntryField(List<GenericData> datas)
+        private void AddChoiceEntryField(List<GenericData> optionData)
         {
-            int index = textEntries.IndexOf(new EntryData(datas[1].TryGetLong(out long result) ? result : 0, datas[0].ToString()));
+            int index = textEntries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
 
             Port port = CreateOutputPort();
 
@@ -330,7 +350,17 @@ namespace Yang.Dialogue.Editor
             {
                 if (evt.keyCode == KeyCode.Delete)
                 {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Delete Choice Entry Option");
+
                     field.value = default;
+
+                    optionData[0] = new(GenericData.DataType.String);
+                    optionData[1] = new(GenericData.DataType.Long);
+
+                    EditorUtility.SetDirty(so);
+
                     window.SetUnsaved();
                 }
             });
@@ -351,8 +381,8 @@ namespace Yang.Dialogue.Editor
             {
                 field.tooltip = textEntries[index].tooltip;
 
-                datas[0] = new(textEntries[index].key);
-                datas[1] = new(textEntries[index].id);
+                optionData[0] = new(textEntries[index].key);
+                optionData[1] = new(textEntries[index].id);
             }
         }
 

@@ -28,6 +28,7 @@ namespace Yang.Dialogue.Editor
             get => so;
             set
             {
+                SetTables();
                 CheckSave();
 
                 so = value;
@@ -77,8 +78,6 @@ namespace Yang.Dialogue.Editor
             graph.graphViewChanged += OnGraphViewChanged;
 
             graph.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
-
-            SetTables();
 
             SO = SO;
 

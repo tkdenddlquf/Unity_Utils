@@ -237,7 +237,16 @@ namespace Yang.Dialogue.Editor
             {
                 if (evt.keyCode == KeyCode.Delete)
                 {
+                    Undo.RecordObject(so, "Delete Single Port Option");
+
                     field.value = "";
+
+                    int portIndex = port.parent.IndexOf(port);
+
+                    portDatas[portIndex].data[1] = new(GenericData.DataType.String);
+
+                    EditorUtility.SetDirty(so);
+
                     window.SetUnsaved();
                 }
             });
@@ -282,7 +291,7 @@ namespace Yang.Dialogue.Editor
             line.style.marginTop = 7;
             line.style.marginBottom = 7;
             line.style.width = 2;
-            line.style.backgroundColor = UnityEngine.Color.gray;
+            line.style.backgroundColor = Color.gray;
 
             itemContainer.style.flexDirection = FlexDirection.Column;
             itemContainer.style.alignItems = Align.Stretch;
@@ -351,7 +360,19 @@ namespace Yang.Dialogue.Editor
             {
                 if (evt.keyCode == KeyCode.Delete)
                 {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Delete Multi Port Option");
+
                     field.value = "";
+
+                    int portIndex = port.parent.IndexOf(port);
+                    int itemIndex = itemElement.parent.IndexOf(itemElement);
+
+                    portDatas[portIndex].data[itemIndex] = new(GenericData.DataType.String);
+
+                    EditorUtility.SetDirty(so);
+
                     window.SetUnsaved();
                 }
             });

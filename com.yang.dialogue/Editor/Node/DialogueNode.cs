@@ -146,7 +146,17 @@ namespace Yang.Dialogue.Editor
             {
                 if (evt.keyCode == KeyCode.Delete)
                 {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Delete Table Option");
+
                     field.value = "";
+
+                    optionData[0] = new(GenericData.DataType.String);
+                    optionData[1] = new(GenericData.DataType.Guid);
+
+                    EditorUtility.SetDirty(so);
+
                     window.SetUnsaved();
                 }
             });
@@ -201,9 +211,9 @@ namespace Yang.Dialogue.Editor
 
         private void AddEntryField(List<EntryData> entries, bool speaker)
         {
-            List<GenericData> datas = optionDatas[speaker ? 1 : 3].data;
+            List<GenericData> optionData = optionDatas[speaker ? 1 : 3].data;
 
-            int index = entries.IndexOf(new EntryData(datas[1].TryGetLong(out long result) ? result : 0, datas[0].ToString()));
+            int index = entries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
 
             PopupField<EntryData> field = new(speaker ? "Speaker Entry" : "Text Entry", entries, index);
 
@@ -217,7 +227,17 @@ namespace Yang.Dialogue.Editor
             {
                 if (evt.keyCode == KeyCode.Delete)
                 {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Delete Entry Option");
+
                     field.value = default;
+
+                    optionData[0] = new(GenericData.DataType.String);
+                    optionData[1] = new(GenericData.DataType.Long);
+
+                    EditorUtility.SetDirty(so);
+
                     window.SetUnsaved();
                 }
             });
@@ -228,8 +248,8 @@ namespace Yang.Dialogue.Editor
             {
                 field.tooltip = entries[index].tooltip;
 
-                datas[0] = new(entries[index].key);
-                datas[1] = new(entries[index].id);
+                optionData[0] = new(entries[index].key);
+                optionData[1] = new(entries[index].id);
             }
         }
 

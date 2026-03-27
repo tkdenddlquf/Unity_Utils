@@ -90,15 +90,45 @@ namespace Yang.Dialogue.Editor
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
 
-            Button removeButton = new(() => RemoveEventField(container)) { text = "X" };
+            Button upButton = new(() => MoveObjectField(container, -1)) { text = "¡ã" };
+            Button downButton = new(() => MoveObjectField(container, 1)) { text = "¡å" };
+            Button removeButton = new(() => RemoveObjectField(container)) { text = "X" };
 
             container.Add(field);
+            container.Add(upButton);
+            container.Add(downButton);
             container.Add(removeButton);
 
             extensionContainer.Add(container);
         }
 
-        private void RemoveEventField(VisualElement itemElement)
+        private void MoveObjectField(VisualElement itemElement, int direction)
+        {
+            VisualElement container = itemElement.parent;
+
+            if (container == null) return;
+
+            int currentIndex = container.IndexOf(itemElement);
+            int newIndex = currentIndex + direction;
+
+            if (newIndex < 0 || newIndex >= container.childCount) return;
+
+            DialogueSO so = window.SO;
+
+            Undo.RecordObject(so, "Move Option Index");
+
+            (optionDatas[currentIndex], optionDatas[newIndex]) = (optionDatas[newIndex], optionDatas[currentIndex]);
+
+            container.Insert(newIndex, itemElement);
+
+            RefreshPorts();
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
+        private void RemoveObjectField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
 

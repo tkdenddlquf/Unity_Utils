@@ -64,8 +64,8 @@ namespace Yang.Dialogue
 
             if (tasks.TryGetValue(key, out RunnerTask task))
             {
-                if (task.token != null) return;
-                else nextNode = task.currentNode;
+                if (task.token == null) nextNode = task.currentNode;
+                else return;
             }
 
             if (runnerNode.CheckNode(nodeName)) nextNode = nodeName;
