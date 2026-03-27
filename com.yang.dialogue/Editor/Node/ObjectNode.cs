@@ -90,8 +90,8 @@ namespace Yang.Dialogue.Editor
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
 
-            Button upButton = new(() => MoveObjectField(container, -1)) { text = "¡ã" };
-            Button downButton = new(() => MoveObjectField(container, 1)) { text = "¡å" };
+            Button upButton = new(() => MoveObjectField(container, -1)) { text = "â–²" };
+            Button downButton = new(() => MoveObjectField(container, 1)) { text = "â–¼" };
             Button removeButton = new(() => RemoveObjectField(container)) { text = "X" };
 
             container.Add(field);
