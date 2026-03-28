@@ -28,6 +28,8 @@ namespace Yang.UIController
 
         protected readonly Dictionary<T, UIBase<T>> panelDict = new();
 
+        public bool Initialized { get; private set; } = false;
+
         public T CurrentPanel { get; private set; }
 
         protected virtual void Awake() => Init(default);
@@ -46,6 +48,8 @@ namespace Yang.UIController
             }
 
             ChangePanel(type);
+
+            Initialized = true;
         }
 
         public void ChangePanel(T type)

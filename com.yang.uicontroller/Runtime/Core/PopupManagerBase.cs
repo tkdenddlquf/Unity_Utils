@@ -28,6 +28,8 @@ namespace Yang.UIController
 
         public bool IsActive => activeUIs.Count != 0;
 
+        public bool Initialized { get; private set; } = false;
+
         protected readonly Dictionary<T, UIBase<T>> popupDict = new();
 
         protected readonly List<UIBase<T>> activeUIs = new();
@@ -46,6 +48,8 @@ namespace Yang.UIController
 
                 popupDict.Add(popup.UIType, popup);
             }
+
+            Initialized = true;
         }
 
         public bool CheckActive(T type)
