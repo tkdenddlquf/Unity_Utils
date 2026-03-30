@@ -89,6 +89,8 @@ namespace Yang.Dialogue
             {
                 int portIndex = await runnerNode.NextNode(views, token, token);
 
+                if (token.IsStop) break;
+
                 if (token.JumpTarget != "" && runnerNode.CheckNode(token.JumpTarget))
                 {
                     token.TargetNode = token.JumpTarget;
