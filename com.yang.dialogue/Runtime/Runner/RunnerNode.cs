@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Yang.Dialogue
 {
-    public class RunnerNode
+    internal class RunnerNode
     {
         private readonly List<RunnerText> runnerDatas = new();
         private readonly List<UnityEngine.Object> runnerObjects = new();
@@ -27,19 +27,18 @@ namespace Yang.Dialogue
             so.GetDatas(nodes, links);
         }
 
-        public async Task<bool> NextNode(IReadOnlyList<IDialogueView> views, RunnerToken token)
+        public async Task<int> NextNode(IReadOnlyList<IDialogueView> views, IRunnerNodeChecker checker, IRunnerToken token)
         {
-            NodeData nodeData = nodes[token.targetNode];
+            NodeData nodeData = nodes[checker.TargetNode];
 
             switch (nodeData.type)
             {
                 case NodeType.Start:
-                    if (CheckNext(token, 0)) return true;
-                    break;
+                    return 0;
 
                 case NodeType.Dialogue:
                     {
-                        token.PointNode = token.targetNode;
+                        checker.Apply();
 
                         IReadOnlyList<GenericData> speakerTable = nodeData.OptionDatas[0].data;
                         IReadOnlyList<GenericData> speakerEntry = nodeData.OptionDatas[1].data;
@@ -53,16 +52,12 @@ namespace Yang.Dialogue
                         RunnerText text = new(textTable[0].ToString(), textEntry[0].ToString());
 
                         foreach (IDialogueView view in views) await view.OnDialogue(speaker, text, message[0].ToString(), token);
-
-                        if (CheckNext(token, 0)) return true;
                     }
-                    break;
+                    return 0;
 
                 case NodeType.Condition:
                     {
                         IReadOnlyList<DataWrapper> portDatas = nodeData.PortDatas;
-
-                        bool found = false;
 
                         for (int i = 1; i < portDatas.Count; i++)
                         {
@@ -79,12 +74,10 @@ namespace Yang.Dialogue
                                 }
                             }
 
-                            if (allExist && CheckNext(token, i)) return true;
+                            if (allExist) return i;
                         }
-
-                        if (!found && CheckNext(token, 0)) return true;
                     }
-                    break;
+                    return 0;
 
                 case NodeType.Trigger:
                     {
@@ -104,10 +97,8 @@ namespace Yang.Dialogue
                                 else runnerTrigger.UnsetTrigger(value);
                             }
                         }
-
-                        if (CheckNext(token, 0)) return true;
                     }
-                    break;
+                    return 0;
 
                 case NodeType.Event:
                     {
@@ -123,14 +114,12 @@ namespace Yang.Dialogue
 
                             runnerEvent.OnEvent(value);
                         }
-
-                        if (CheckNext(token, 0)) return true;
                     }
-                    break;
+                    return 0;
 
                 case NodeType.Choice:
                     {
-                        token.PointNode = token.targetNode;
+                        checker.Apply();
 
                         runnerDatas.Clear();
 
@@ -156,19 +145,14 @@ namespace Yang.Dialogue
                         {
                             int result = await view.OnChoice(speaker, runnerDatas, message[0].ToString(), token);
 
-                            if (result != -1)
-                            {
-                                if (CheckNext(token, runnerDatas[result].portIndex)) return true;
-
-                                break;
-                            }
+                            return runnerDatas[result].portIndex;
                         }
                     }
                     break;
 
                 case NodeType.Wait:
                     {
-                        token.PointNode = token.targetNode;
+                        checker.Apply();
 
                         IReadOnlyList<GenericData> datas = nodeData.OptionDatas[0].data;
 
@@ -177,14 +161,12 @@ namespace Yang.Dialogue
                         {
                             foreach (IDialogueView view in views) await view.OnMessage(datas[1].ToString(), token);
                         }
-
-                        if (CheckNext(token, 0)) return true;
                     }
-                    break;
+                    return 0;
 
                 case NodeType.Object:
                     {
-                        token.PointNode = token.targetNode;
+                        checker.Apply();
 
                         runnerObjects.Clear();
 
@@ -198,15 +180,11 @@ namespace Yang.Dialogue
                         }
 
                         foreach (IDialogueView view in views) await view.OnObject(runnerObjects, token);
-
-                        if (CheckNext(token, 0)) return true;
                     }
-                    break;
+                    return 0;
             }
 
-            foreach (IDialogueView view in views) await view.OnMessage("", token);
-
-            return false;
+            return -1;
         }
 
         public bool CheckNode(string nodeName)
@@ -216,24 +194,16 @@ namespace Yang.Dialogue
             return true;
         }
 
-        private bool CheckNext(RunnerToken token, int portIndex)
+        public bool TryGetLink(RunnerPort port, out string nodeName)
         {
-            if (token.IsStop) return false;
-
-            if (token.IsChangedTarget && CheckNode(token.targetNode)) return true;
-            else
+            if (links.TryGetValue(port, out RunnerPort targetPort))
             {
-                RunnerPort port = new(token.targetNode, portIndex);
+                nodeName = targetPort.guid;
 
-                if (links.TryGetValue(port, out RunnerPort targetPort))
-                {
-                    token.targetNode = targetPort.guid;
-
-                    return true;
-                }
+                return true;
             }
 
-            token.targetNode = token.PointNode;
+            nodeName = "";
 
             return false;
         }

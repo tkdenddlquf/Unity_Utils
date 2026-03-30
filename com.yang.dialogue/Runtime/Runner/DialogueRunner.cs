@@ -18,7 +18,7 @@ namespace Yang.Dialogue
 
         private readonly DialogueWrapper wrapper = new();
 
-        private readonly Dictionary<string, RunnerTask> tasks = new();
+        private readonly Dictionary<string, RunnerToken> tokens = new();
 
         private void Awake() => Init();
 
@@ -37,9 +37,9 @@ namespace Yang.Dialogue
 
             bool isStarted = false;
 
-            foreach (RunnerTask task in tasks.Values)
+            foreach (RunnerToken token in tokens.Values)
             {
-                if (task.token != null)
+                if (!token.IsStop)
                 {
                     isStarted = true;
 
@@ -51,7 +51,7 @@ namespace Yang.Dialogue
 
             this.so = so;
 
-            tasks.Clear();
+            tokens.Clear();
 
             runnerNode.SetDatas(so);
         }
@@ -60,54 +60,83 @@ namespace Yang.Dialogue
         {
             if (so == null) return;
 
-            string nextNode = "";
+            string nextNode;
 
-            if (tasks.TryGetValue(key, out RunnerTask task))
+            if (tokens.TryGetValue(key, out RunnerToken token))
             {
-                if (task.token == null) nextNode = task.currentNode;
+                if (token.IsStop)
+                {
+                    if (runnerNode.CheckNode(nodeName)) nextNode = nodeName;
+                    else nextNode = token.TargetNode == "" ? so.StartGuid : token.TargetNode;
+
+                    token.Restart(nextNode);
+                }
                 else return;
             }
+            else
+            {
+                if (runnerNode.CheckNode(nodeName)) nextNode = nodeName;
+                else nextNode = so.StartGuid;
 
-            if (runnerNode.CheckNode(nodeName)) nextNode = nodeName;
-            else if (nextNode == "") nextNode = so.StartGuid;
+                token = new(nextNode);
 
-            tasks.Remove(key);
+                tokens.Add(key, token);
+            }
 
-            RunnerTask newTask = new(nextNode);
-            RunnerToken token = newTask.token;
+            views ??= Views;
 
-            tasks.Add(key, newTask);
+            while (true)
+            {
+                int portIndex = await runnerNode.NextNode(views, token, token);
 
-            while (await runnerNode.NextNode(views ?? Views, token)) tasks[key] = new(token);
+                if (portIndex == -1)
+                {
+                    foreach (IDialogueView view in views) await view.OnMessage("", token);
 
-            if (token.IsStop) tasks[key] = new() { currentNode = token.PointNode };
-            else tasks.Remove(key);
+                    break;
+                }
+                else
+                {
+                    if (!token.IsChangedTarget || !runnerNode.CheckNode(token.TargetNode))
+                    {
+                        RunnerPort port = new(token.TargetNode, portIndex);
 
-            token.Dispose();
+                        if (runnerNode.TryGetLink(port, out string result)) token.TargetNode = result;
+                        else token.TargetNode = token.PointNode;
+                    }
+                }
+            }
+
+            if (!token.IsStop)
+            {
+                tokens.Remove(key);
+
+                token.Dispose();
+            }
         }
 
         public bool IsStarted(string key)
         {
-            if (tasks.TryGetValue(key, out RunnerTask task)) return task.token != null;
+            if (tokens.TryGetValue(key, out RunnerToken token)) return !token.IsStop;
 
             return false;
         }
 
         public void StopDialogue(string key)
         {
-            if (tasks.TryGetValue(key, out RunnerTask task)) task.token?.Stop();
+            if (tokens.TryGetValue(key, out RunnerToken token)) token.Stop();
         }
 
         public void JumpNode(string key, string nodeName)
         {
-            if (tasks.TryGetValue(key, out RunnerTask task)) task.token?.SetTarget(nodeName);
+            if (tokens.TryGetValue(key, out RunnerToken token)) token.SetTarget(nodeName);
         }
 
         public DialogueWrapper Save()
         {
             if (so == null) return null;
 
-            wrapper.SetDatas(tasks, runnerTrigger.Triggers);
+            wrapper.SetDatas(tokens, runnerTrigger.Triggers);
 
             return wrapper;
         }
@@ -118,9 +147,9 @@ namespace Yang.Dialogue
 
             for (int i = 0; i < wrapper.Keys.Count; i++)
             {
-                RunnerTask task = new() { currentNode = wrapper.Names[i] };
+                RunnerToken token = new(wrapper.Names[i]);
 
-                tasks.Add(wrapper.Keys[i], task);
+                tokens.Add(wrapper.Keys[i], token);
             }
 
             runnerTrigger.SetDatas(wrapper.Triggers);

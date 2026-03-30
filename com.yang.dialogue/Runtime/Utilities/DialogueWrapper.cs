@@ -15,7 +15,7 @@ namespace Yang.Dialogue
         [SerializeField] private List<string> triggers = new();
         public IReadOnlyList<string> Triggers => triggers;
 
-        public void SetDatas(IReadOnlyDictionary<string, RunnerTask> tasks, IReadOnlyCollection<string> triggers)
+        internal void SetDatas(IReadOnlyDictionary<string, RunnerToken> tasks, IReadOnlyCollection<string> triggers)
         {
             keys.Clear();
             names.Clear();
@@ -25,7 +25,7 @@ namespace Yang.Dialogue
             foreach (var task in tasks)
             {
                 keys.Add(task.Key);
-                names.Add(task.Value.currentNode);
+                names.Add(task.Value.PointNode);
             }
 
             foreach (string trigger in triggers) this.triggers.Add(trigger);
