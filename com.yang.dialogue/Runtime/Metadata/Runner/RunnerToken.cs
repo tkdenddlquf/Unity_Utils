@@ -6,7 +6,12 @@ namespace Yang.Dialogue
 {
     internal class RunnerToken : IRunnerNodeChecker, IRunnerToken
     {
-        public RunnerToken(string targetNode) => TargetNode = targetNode;
+        public RunnerToken(string targetNode)
+        {
+            PointNode = targetNode;
+            TargetNode = targetNode;
+            JumpTarget = "";
+        }
 
         private CancellationTokenSource cts = new();
 
