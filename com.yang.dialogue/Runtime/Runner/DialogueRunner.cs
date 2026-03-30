@@ -89,20 +89,16 @@ namespace Yang.Dialogue
             {
                 int portIndex = await runnerNode.NextNode(views, token, token);
 
-                if (portIndex == -1)
+                if (!token.IsChangedTarget || !runnerNode.CheckNode(token.TargetNode))
                 {
-                    foreach (IDialogueView view in views) await view.OnMessage("", token);
+                    RunnerPort port = new(token.TargetNode, portIndex);
 
-                    break;
-                }
-                else
-                {
-                    if (!token.IsChangedTarget || !runnerNode.CheckNode(token.TargetNode))
+                    if (runnerNode.TryGetLink(port, out string result)) token.TargetNode = result;
+                    else
                     {
-                        RunnerPort port = new(token.TargetNode, portIndex);
+                        foreach (IDialogueView view in views) await view.OnMessage("", token);
 
-                        if (runnerNode.TryGetLink(port, out string result)) token.TargetNode = result;
-                        else token.TargetNode = token.PointNode;
+                        break;
                     }
                 }
             }
