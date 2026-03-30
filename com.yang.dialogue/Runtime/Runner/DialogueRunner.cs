@@ -89,7 +89,12 @@ namespace Yang.Dialogue
             {
                 int portIndex = await runnerNode.NextNode(views, token, token);
 
-                if (!token.IsChangedTarget || !runnerNode.CheckNode(token.TargetNode))
+                if (token.JumpTarget != "" && runnerNode.CheckNode(token.JumpTarget))
+                {
+                    token.TargetNode = token.JumpTarget;
+                    token.JumpTarget = "";
+                }
+                else
                 {
                     RunnerPort port = new(token.TargetNode, portIndex);
 
@@ -125,7 +130,7 @@ namespace Yang.Dialogue
 
         public void JumpNode(string key, string nodeName)
         {
-            if (tokens.TryGetValue(key, out RunnerToken token)) token.SetTarget(nodeName);
+            if (tokens.TryGetValue(key, out RunnerToken token)) token.JumpTarget = nodeName;
         }
 
         public DialogueWrapper Save()

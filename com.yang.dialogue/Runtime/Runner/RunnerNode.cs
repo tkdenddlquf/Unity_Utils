@@ -38,7 +38,7 @@ namespace Yang.Dialogue
 
                 case NodeType.Dialogue:
                     {
-                        checker.Apply();
+                        checker.PointSave();
 
                         IReadOnlyList<GenericData> speakerTable = nodeData.OptionDatas[0].data;
                         IReadOnlyList<GenericData> speakerEntry = nodeData.OptionDatas[1].data;
@@ -119,7 +119,7 @@ namespace Yang.Dialogue
 
                 case NodeType.Choice:
                     {
-                        checker.Apply();
+                        checker.PointSave();
 
                         runnerDatas.Clear();
 
@@ -152,7 +152,7 @@ namespace Yang.Dialogue
 
                 case NodeType.Wait:
                     {
-                        checker.Apply();
+                        checker.PointSave();
 
                         IReadOnlyList<GenericData> datas = nodeData.OptionDatas[0].data;
 
@@ -166,7 +166,7 @@ namespace Yang.Dialogue
 
                 case NodeType.Object:
                     {
-                        checker.Apply();
+                        checker.PointSave();
 
                         runnerObjects.Clear();
 

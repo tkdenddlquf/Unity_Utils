@@ -6,50 +6,53 @@ namespace Yang.Dialogue
 {
     internal class RunnerToken : IRunnerNodeChecker, IRunnerToken
     {
-        public RunnerToken(string targetNode)
-        {
-            TargetNode = targetNode;
-            PointNode = targetNode;
-        }
+        public RunnerToken(string targetNode) => TargetNode = targetNode;
 
         private CancellationTokenSource cts = new();
 
-        public bool IsStop => cts.IsCancellationRequested;
-
-        public string TargetNode { get; set; }
+        public bool IsStop => cts == null || cts.IsCancellationRequested;
 
         public string PointNode { get; private set; }
 
-        public bool IsChangedTarget { get; private set; }
+        public string TargetNode { get; set; }
+
+        public string JumpTarget { get; set; }
 
         public void Restart(string targetNode)
         {
-            cts?.Dispose();
+            if (!IsStop) return;
 
+            cts?.Dispose();
             cts = new();
 
             TargetNode = targetNode;
-            PointNode = targetNode;
         }
 
-        public void Stop() => cts.Cancel();
-
-        public void Dispose() => cts.Dispose();
-
-        public void SetTarget(string nodeName)
+        public void Stop()
         {
-            IsChangedTarget = true;
-            TargetNode = nodeName;
+            if (IsStop) return;
+
+            cts.Cancel();
+        }
+
+        public void Dispose()
+        {
+            if (IsStop) return;
+
+            cts.Dispose();
+            cts = null;
         }
 
         public async Task Delay(float second)
         {
+            if (IsStop) return;
+
             TimeSpan delay = TimeSpan.FromSeconds(second);
 
             await Task.Delay(delay, cts.Token);
         }
 
-        public void Apply() => PointNode = TargetNode;
+        public void PointSave() => PointNode = TargetNode;
     }
 
     public interface IRunnerToken
@@ -65,8 +68,8 @@ namespace Yang.Dialogue
     {
         public string TargetNode { get; }
 
-        public void SetTarget(string nodeName);
+        public string JumpTarget { get; set; }
 
-        public void Apply();
+        public void PointSave();
     }
 }
