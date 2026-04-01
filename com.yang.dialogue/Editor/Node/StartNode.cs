@@ -9,7 +9,14 @@ namespace Yang.Dialogue.Editor
 
         public override void SetPorts()
         {
+            SetDefault();
+
             CreateOutputPort();
+        }
+
+        private void SetDefault()
+        {
+            if (portDatas.Count == 0) portDatas.Add(new());
         }
     }
 }
