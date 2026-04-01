@@ -35,12 +35,8 @@ namespace Yang.Dialogue.Editor
 
             DropdownMenu menu = evt.menu;
 
-            window.AddCopyMenu(menu);
-            window.AddPasteMenu(menu);
-            window.AddRemoveMenu(menu);
-
-            menu.AppendSeparator();
             menu.AppendAction("Add Object", _ => CreateEvent());
+            menu.AppendSeparator();
         }
 
         private void SetDefault()

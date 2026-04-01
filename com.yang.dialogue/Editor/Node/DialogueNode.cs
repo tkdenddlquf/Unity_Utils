@@ -53,17 +53,6 @@ namespace Yang.Dialogue.Editor
             SetOptions();
         }
 
-        public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
-        {
-            if (evt.target != this) return;
-
-            DropdownMenu menu = evt.menu;
-
-            window.AddCopyMenu(menu);
-            window.AddPasteMenu(menu);
-            window.AddRemoveMenu(menu);
-        }
-
         private void SetDefault()
         {
             if (portDatas.Count == 0)

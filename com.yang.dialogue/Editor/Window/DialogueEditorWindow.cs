@@ -212,12 +212,6 @@ namespace Yang.Dialogue.Editor
         }
 
         #region View
-        public void AddCopyMenu(DropdownMenu menu) => graph.AddCopyMenu(menu);
-
-        public void AddPasteMenu(DropdownMenu menu) => graph.AddPasteMenu(menu);
-
-        public void AddRemoveMenu(DropdownMenu menu) => graph.AddRemoveMenu(menu);
-
         public void RemoveEdge(Port port)
         {
             IEnumerator<Edge> enumerator = port.connections.GetEnumerator();

@@ -36,12 +36,8 @@ namespace Yang.Dialogue.Editor
 
             DropdownMenu menu = evt.menu;
 
-            window.AddCopyMenu(menu);
-            window.AddPasteMenu(menu);
-            window.AddRemoveMenu(menu);
-
-            menu.AppendSeparator();
             menu.AppendAction("Add Trigger", _ => CreateTrigger());
+            menu.AppendSeparator();
         }
 
         private void SetDefault()

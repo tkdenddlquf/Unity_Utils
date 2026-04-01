@@ -33,16 +33,16 @@ namespace Yang.Dialogue.Editor
 
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
+            DropdownMenu menu = evt.menu;
+
+            menu.AppendAction("Copy", MenuActionCopy, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+            menu.AppendAction("Paste", MenuActionPaste, jsonCopyData == "" ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+            menu.AppendAction("Remove", MenuActionRemove, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+
             if (evt.target is Node) return;
 
             Vector2 mousePos = evt.localMousePosition;
             Vector2 nodePos = contentViewContainer.WorldToLocal(mousePos);
-
-            DropdownMenu menu = evt.menu;
-
-            AddCopyMenu(menu);
-            AddPasteMenu(menu);
-            AddRemoveMenu(menu);
 
             menu.AppendSeparator();
             menu.AppendAction("Add Dialogue", _ => AddNode(NodeType.Dialogue, nodePos));
@@ -138,13 +138,7 @@ namespace Yang.Dialogue.Editor
         }
         #endregion
 
-        #region Copy Paste
-        public void AddCopyMenu(DropdownMenu menu) => menu.AppendAction("Copy", MenuActionCopy, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
-
-        public void AddPasteMenu(DropdownMenu menu) => menu.AppendAction("Paste", MenuActionPaste, jsonCopyData == "" ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
-
-        public void AddRemoveMenu(DropdownMenu menu) => menu.AppendAction("Remove", MenuActionRemove, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
-
+        #region Action
         private string SerializeNodes(IEnumerable<GraphElement> elements)
         {
             DialogueSO so = window.SO;

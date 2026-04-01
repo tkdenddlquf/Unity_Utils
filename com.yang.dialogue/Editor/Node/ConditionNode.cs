@@ -47,13 +47,9 @@ namespace Yang.Dialogue.Editor
 
             DropdownMenu menu = evt.menu;
 
-            window.AddCopyMenu(menu);
-            window.AddPasteMenu(menu);
-            window.AddRemoveMenu(menu);
-
-            menu.AppendSeparator();
             menu.AppendAction("Add Single Port", _ => CreatePort(PortType.Single));
             menu.AppendAction("Add Multi Port", _ => CreatePort(PortType.Multi));
+            menu.AppendSeparator();
         }
 
         private void SetDefault()
