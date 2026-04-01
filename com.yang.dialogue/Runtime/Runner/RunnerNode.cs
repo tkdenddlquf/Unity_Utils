@@ -5,16 +5,16 @@ namespace Yang.Dialogue
 {
     internal class RunnerNode
     {
+        private RunnerEvent runnerEvent;
+        private RunnerTrigger runnerTrigger;
+
         private readonly List<RunnerText> runnerDatas = new();
         private readonly List<UnityEngine.Object> runnerObjects = new();
-
-        private readonly RunnerEvent runnerEvent;
-        private readonly RunnerTrigger runnerTrigger;
 
         private readonly Dictionary<string, NodeData> nodes = new();
         private readonly Dictionary<RunnerPort, RunnerPort> links = new();
 
-        public RunnerNode(RunnerEvent runnerEvent, RunnerTrigger runnerTrigger)
+        public void Init(RunnerEvent runnerEvent, RunnerTrigger runnerTrigger)
         {
             this.runnerEvent = runnerEvent;
             this.runnerTrigger = runnerTrigger;

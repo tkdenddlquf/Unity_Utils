@@ -33,7 +33,14 @@ namespace Yang.Dialogue.Editor
         {
             if (evt.target != this) return;
 
-            evt.menu.AppendAction("Add Object", _ => CreateEvent());
+            DropdownMenu menu = evt.menu;
+
+            window.AddCopyMenu(menu);
+            window.AddPasteMenu(menu);
+            window.AddRemoveMenu(menu);
+
+            menu.AppendSeparator();
+            menu.AppendAction("Add Object", _ => CreateEvent());
         }
 
         private void SetDefault()

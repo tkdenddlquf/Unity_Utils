@@ -6,8 +6,6 @@ namespace Yang.Dialogue
     [System.Serializable, CreateAssetMenu(fileName = "NewDialogue", menuName = "Dialogue/Node")]
     public class DialogueSO : ScriptableObject
     {
-        public string key;
-
         [SerializeField] private NodeData startNode;
         public string StartGuid => startNode.guid;
 
@@ -19,6 +17,11 @@ namespace Yang.Dialogue
 
         [SerializeField] private List<NodeData> nodes = new();
         [SerializeField] private List<LinkData> links = new();
+
+#if UNITY_EDITOR
+        public Vector3 position = Vector3.zero;
+        public Vector3 scale = Vector3.one;
+#endif
 
         public void GetDatas(Dictionary<string, NodeData> nodes, Dictionary<RunnerPort, RunnerPort> links)
         {

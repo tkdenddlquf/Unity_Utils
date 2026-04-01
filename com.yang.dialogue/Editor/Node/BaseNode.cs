@@ -72,24 +72,34 @@ namespace Yang.Dialogue.Editor
             {
                 int portIndex = port.parent.IndexOf(port);
 
-                LinkData link = window.GetLink(GUID, portIndex);
+                List<LinkData> links = window.Links;
 
-                Undo.RecordObject(so, "Remove Port");
+                for (int i = 0; i < links.Count; i++)
+                {
+                    LinkData link = links[i];
 
-                window.RemoveEdge(port);
+                    if (link.nodeGuid == GUID && link.outPortIndex == portIndex)
+                    {
+                        Undo.RecordObject(so, "Remove Port");
 
-                portDatas.RemoveAt(portIndex);
+                        window.RemoveEdge(port);
 
-                window.Links.Remove(link);
+                        portDatas.RemoveAt(portIndex);
 
-                outputContainer.Remove(port);
+                        window.Links.Remove(link);
 
-                RefreshPorts();
-                RefreshExpandedState();
+                        outputContainer.Remove(port);
 
-                EditorUtility.SetDirty(so);
+                        RefreshPorts();
+                        RefreshExpandedState();
 
-                window.SetUnsaved();
+                        EditorUtility.SetDirty(so);
+
+                        window.SetUnsaved();
+
+                        break;
+                    }
+                }
             }
         }
 
@@ -97,9 +107,21 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
 
-            if (window.ContainsNode(evt.newValue)) idField.SetValueWithoutNotify(GUID);
+            if (evt.newValue == so.StartGuid) idField.SetValueWithoutNotify(GUID);
             else
             {
+                List<NodeData> nodes = window.Nodes;
+
+                for (int i = 0; i < nodes.Count; i++)
+                {
+                    if (nodes[i].guid == evt.newValue)
+                    {
+                        idField.SetValueWithoutNotify(GUID);
+
+                        return;
+                    }
+                }
+
                 NodeData data = window.GetNode(GUID);
 
                 Undo.RecordObject(so, "Change GUID");

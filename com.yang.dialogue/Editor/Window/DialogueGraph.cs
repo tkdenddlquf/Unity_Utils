@@ -10,6 +10,8 @@ namespace Yang.Dialogue.Editor
     {
         private readonly DialogueEditorWindow window;
 
+        private string jsonCopyData = "";
+
         public DialogueGraph(DialogueEditorWindow window)
         {
             this.window = window;
@@ -38,6 +40,11 @@ namespace Yang.Dialogue.Editor
 
             DropdownMenu menu = evt.menu;
 
+            AddCopyMenu(menu);
+            AddPasteMenu(menu);
+            AddRemoveMenu(menu);
+
+            menu.AppendSeparator();
             menu.AppendAction("Add Dialogue", _ => AddNode(NodeType.Dialogue, nodePos));
             menu.AppendAction("Add Choice", _ => AddNode(NodeType.Choice, nodePos));
             menu.AppendSeparator();
@@ -132,36 +139,52 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Copy Paste
+        public void AddCopyMenu(DropdownMenu menu) => menu.AppendAction("Copy", MenuActionCopy, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+
+        public void AddPasteMenu(DropdownMenu menu) => menu.AppendAction("Paste", MenuActionPaste, jsonCopyData == "" ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+
+        public void AddRemoveMenu(DropdownMenu menu) => menu.AppendAction("Remove", MenuActionRemove, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+
         private string SerializeNodes(IEnumerable<GraphElement> elements)
         {
-            List<BaseNode> nodes = new();
-
-            foreach (GraphElement element in elements)
-            {
-                if (element is BaseNode node) nodes.Add(node);
-            }
+            DialogueSO so = window.SO;
 
             CopyData data = new();
 
-            DialogueSO so = window.SO;
-
-            foreach (BaseNode node in nodes)
+            foreach (GraphElement element in elements)
             {
-                NodeData nodeData = window.GetNode(node.GUID);
+                if (element is BaseNode node)
+                {
+                    NodeData nodeData = window.GetNode(node.GUID);
 
-                if (nodeData.guid == so.StartGuid) continue;
+                    if (nodeData.guid == so.StartGuid) continue;
 
-                data.nodes.Add(nodeData);
+                    data.nodes.Add(nodeData);
+                }
             }
 
-            return JsonUtility.ToJson(data);
+            if (data.nodes.Count == 0) jsonCopyData = "";
+            else jsonCopyData = JsonUtility.ToJson(data);
+
+            return jsonCopyData;
         }
 
         private void UnserializeNode(string operationName, string data)
         {
+            if (data == "") return;
+
             CopyData copyData = JsonUtility.FromJson<CopyData>(data);
 
             ClearSelection();
+
+            Vector2 nodeCenterPos = Vector2.zero;
+
+            foreach (NodeData nodeData in copyData.nodes) nodeCenterPos += nodeData.position;
+
+            nodeCenterPos /= copyData.nodes.Count;
+
+            Vector2 newCenterPos = contentViewContainer.WorldToLocal(layout.size * 0.5f);
+            Vector2 addedPos = newCenterPos - nodeCenterPos;
 
             DialogueSO so = window.SO;
 
@@ -170,6 +193,8 @@ namespace Yang.Dialogue.Editor
             foreach (NodeData nodeData in copyData.nodes)
             {
                 NodeData newNodeData = new(nodeData);
+
+                newNodeData.position += addedPos;
 
                 window.Nodes.Add(newNodeData);
 
@@ -180,9 +205,52 @@ namespace Yang.Dialogue.Editor
             }
 
             EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
         }
 
         private bool CheckSerialize(string data) => !string.IsNullOrEmpty(data);
+
+        private void MenuActionCopy(DropdownMenuAction menuAction)
+        {
+            if (selection.Count == 0)
+            {
+                jsonCopyData = "";
+
+                return;
+            }
+
+            DialogueSO so = window.SO;
+
+            CopyData data = new();
+
+            foreach (ISelectable element in selection)
+            {
+                if (element is BaseNode node)
+                {
+                    NodeData nodeData = window.GetNode(node.GUID);
+
+                    if (nodeData.guid == so.StartGuid) continue;
+
+                    data.nodes.Add(nodeData);
+                }
+            }
+
+            if (data.nodes.Count == 0) jsonCopyData = "";
+            else jsonCopyData = JsonUtility.ToJson(data);
+        }
+
+        private void MenuActionPaste(DropdownMenuAction menuAction) => UnserializeNode("", jsonCopyData);
+
+        private void MenuActionRemove(DropdownMenuAction menuAction)
+        {
+            window.RemoveNode(selection);
+
+            for (int i = selection.Count - 1; i >= 0; i--)
+            {
+                if (selection[i] is BaseNode node) RemoveElement(node);
+            }
+        }
 
         [System.Serializable]
         private class CopyData

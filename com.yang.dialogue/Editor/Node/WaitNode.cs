@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEditor;
-using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
@@ -34,6 +33,17 @@ namespace Yang.Dialogue.Editor
             CreateOutputPort();
 
             SetOptions();
+        }
+
+        public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
+        {
+            if (evt.target != this) return;
+
+            DropdownMenu menu = evt.menu;
+
+            window.AddCopyMenu(menu);
+            window.AddPasteMenu(menu);
+            window.AddRemoveMenu(menu);
         }
 
         private void SetDefault()

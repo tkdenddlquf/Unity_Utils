@@ -55,7 +55,14 @@ namespace Yang.Dialogue.Editor
         {
             if (evt.target != this) return;
 
-            evt.menu.AppendAction("Add Choice Port", _ => CreateChoiceEntry());
+            DropdownMenu menu = evt.menu;
+
+            window.AddCopyMenu(menu);
+            window.AddPasteMenu(menu);
+            window.AddRemoveMenu(menu);
+
+            menu.AppendSeparator();
+            menu.AppendAction("Add Choice Port", _ => CreateChoiceEntry());
         }
 
         private void SetDefault()

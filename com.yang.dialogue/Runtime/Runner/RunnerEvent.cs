@@ -1,7 +1,6 @@
 using System.Collections.Generic;
-using UnityEngine;
 
-public class RunnerEvent
+internal class RunnerEvent
 {
     private readonly Dictionary<string, System.Action<bool>> callbacks = new();
 

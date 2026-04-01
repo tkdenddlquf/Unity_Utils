@@ -12,7 +12,7 @@ namespace Yang.Dialogue
         private readonly List<IDialogueView> views = new();
         public List<IDialogueView> Views => views;
 
-        private RunnerNode runnerNode;
+        private readonly RunnerNode runnerNode = new();
         private readonly RunnerEvent runnerEvent = new();
         private readonly RunnerTrigger runnerTrigger = new();
 
@@ -24,7 +24,7 @@ namespace Yang.Dialogue
 
         private void Init()
         {
-            runnerNode = new(runnerEvent, runnerTrigger);
+            runnerNode.Init(runnerEvent, runnerTrigger);
 
             views.InsertRange(0, viewBases);
 

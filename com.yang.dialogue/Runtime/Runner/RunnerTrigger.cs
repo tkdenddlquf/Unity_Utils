@@ -1,7 +1,6 @@
 using System.Collections.Generic;
-using UnityEngine;
 
-public class RunnerTrigger
+internal class RunnerTrigger
 {
     private readonly HashSet<string> triggers = new();
     public IReadOnlyCollection<string> Triggers => triggers;
