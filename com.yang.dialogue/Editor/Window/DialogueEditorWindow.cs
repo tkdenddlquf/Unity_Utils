@@ -309,7 +309,7 @@ namespace Yang.Dialogue.Editor
                                 if (fromData.PortDatas.Count > link.outPortIndex)
                                 {
                                     Port fromPort = fromNode.outputContainer[link.outPortIndex] as Port;
-                                    Port toPort = fromNode.inputContainer[0] as Port;
+                                    Port toPort = toNode.inputContainer[0] as Port;
 
                                     Edge edge = fromPort.ConnectTo(toPort);
 
