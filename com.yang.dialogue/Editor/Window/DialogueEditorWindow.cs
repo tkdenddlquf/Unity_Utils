@@ -310,6 +310,8 @@ namespace Yang.Dialogue.Editor
                                     graph.AddElement(edge);
                                 }
                                 else Links.Remove(link);
+
+                                break;
                             }
                         }
                     }
