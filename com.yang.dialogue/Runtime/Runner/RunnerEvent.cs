@@ -1,33 +1,36 @@
 using System.Collections.Generic;
 
-internal class RunnerEvent
+namespace Yang.Dialogue
 {
-    private readonly Dictionary<string, System.Action<bool>> callbacks = new();
-
-    public void OnEvent(string id)
+    internal class RunnerEvent
     {
-        if (callbacks.TryGetValue(id, out System.Action<bool> callback)) callback?.Invoke(true);
-    }
+        private readonly Dictionary<string, System.Action> callbacks = new();
 
-    public void RegisterCallback(string id, System.Action<bool> callback)
-    {
-        if (callbacks.ContainsKey(id))
+        public void OnEvent(string id)
         {
-            callbacks[id] -= callback;
-            callbacks[id] += callback;
-        }
-        else callbacks.Add(id, callback);
-    }
-
-    public bool UnregisterCallback(string id, System.Action<bool> callback)
-    {
-        if (callbacks.ContainsKey(id))
-        {
-            callbacks[id] -= callback;
-
-            return true;
+            if (callbacks.TryGetValue(id, out System.Action callback)) callback?.Invoke();
         }
 
-        return false;
+        public void RegisterCallback(string id, System.Action callback)
+        {
+            if (callbacks.ContainsKey(id))
+            {
+                callbacks[id] -= callback;
+                callbacks[id] += callback;
+            }
+            else callbacks.Add(id, callback);
+        }
+
+        public bool UnregisterCallback(string id, System.Action callback)
+        {
+            if (callbacks.ContainsKey(id))
+            {
+                callbacks[id] -= callback;
+
+                return true;
+            }
+
+            return false;
+        }
     }
 }

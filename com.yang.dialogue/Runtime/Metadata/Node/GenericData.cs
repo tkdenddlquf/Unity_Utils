@@ -299,6 +299,24 @@ namespace Yang.Dialogue
             return false;
         }
 
+        public readonly int GetInt() => type == DataType.Int ? intValue : 0;
+
+        public readonly float GetFloat() => type == DataType.Float ? floatValue : 0;
+
+        public readonly long GetLong() => type == DataType.Long ? longValue : 0;
+
+        public readonly bool GetBool() => type == DataType.Bool && (intValue == 1);
+
+        public readonly Color32 GetColor() => type == DataType.Color ? colorValue : default;
+
+        public readonly Guid GetGuid() => type == DataType.Guid && Guid.TryParse(stringValue, out Guid value) ? value : default;
+
+        public readonly T GetEnum<T>() where T : struct, Enum => type == DataType.Enum ? (T)Enum.ToObject(typeof(T), intValue) : default;
+
+        public readonly UnityEngine.Object GetObject() => type == DataType.Object ? objectValue : default;
+
+        public readonly string GetString() => type == DataType.String ? stringValue : default;
+
         public override string ToString()
         {
             return type switch

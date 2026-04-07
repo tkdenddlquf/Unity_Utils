@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 namespace Yang.Dialogue.Editor
 {
     /// <summary>
-    /// Port Data (0 : Text Entries)
+    /// Port Data (Common : Text Entries)
     /// 0 : Key - string
     /// 1 : ID - long
     /// 
@@ -166,7 +166,7 @@ namespace Yang.Dialogue.Editor
 
             int index = GetTableIndex(optionData[0].ToString(), optionData[1].TryGetGuid(out System.Guid guid) ? guid : default);
 
-            PopupField<string> field = new(speaker ? "Speaker Table" : "Entry Table", tables, index);
+            PopupField<string> field = new(speaker ? "Speaker Table" : "Text Table", tables, index);
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;

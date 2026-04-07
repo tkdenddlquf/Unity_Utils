@@ -12,15 +12,15 @@ namespace Yang.Dialogue
         [SerializeField] private List<string> names = new();
         public IReadOnlyList<string> Names => names;
 
-        [SerializeField] private List<string> triggers = new();
-        public IReadOnlyList<string> Triggers => triggers;
+        [SerializeField] private List<RunnerValue> values = new();
+        public IReadOnlyList<RunnerValue> Values => values;
 
-        internal void SetDatas(IReadOnlyDictionary<string, RunnerToken> tasks, IReadOnlyCollection<string> triggers)
+        internal void SetDatas(IReadOnlyDictionary<string, RunnerToken> tasks, IReadOnlyCollection<RunnerValue> values)
         {
             keys.Clear();
             names.Clear();
 
-            this.triggers.Clear();
+            this.values.Clear();
 
             foreach (var task in tasks)
             {
@@ -28,7 +28,7 @@ namespace Yang.Dialogue
                 names.Add(task.Value.PointNode);
             }
 
-            foreach (string trigger in triggers) this.triggers.Add(trigger);
+            foreach (RunnerValue value in values) this.values.Add(value);
         }
     }
 }

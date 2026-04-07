@@ -139,7 +139,7 @@ namespace Yang.Dialogue
         {
             if (so == null) return null;
 
-            wrapper.SetDatas(tokens, runnerTrigger.Triggers);
+            wrapper.SetDatas(tokens, runnerTrigger.Values);
 
             return wrapper;
         }
@@ -155,25 +155,35 @@ namespace Yang.Dialogue
                 tokens.Add(wrapper.Keys[i], token);
             }
 
-            runnerTrigger.SetDatas(wrapper.Triggers);
+            runnerTrigger.SetDatas(wrapper.Values);
         }
 
         #region Event
-        public void EventRegisterCallback(string id, System.Action<bool> callback) => runnerEvent.RegisterCallback(id, callback);
+        public void EventRegisterCallback(string id, System.Action callback) => runnerEvent.RegisterCallback(id, callback);
 
-        public void EventUnregisterCallback(string id, System.Action<bool> callback) => runnerEvent.UnregisterCallback(id, callback);
+        public void EventUnregisterCallback(string id, System.Action callback) => runnerEvent.UnregisterCallback(id, callback);
         #endregion
 
         #region Trigger
-        public bool IsTrigger(string trigger) => runnerTrigger.IsTrigger(trigger);
+        public bool ContainsKey(string key) => runnerTrigger.ContainsKey(key);
 
-        public void SetTrigger(string trigger) => runnerTrigger.SetTrigger(trigger);
+        public bool RemoveValue(string key) => runnerTrigger.RemoveValue(key);
 
-        public bool UnsetTrigger(string trigger) => runnerTrigger.UnsetTrigger(trigger);
+        public void SetValue(string key, float value) => runnerTrigger.SetValue(key, value);
 
-        public void TriggerRegisterCallback(string id, System.Action<bool> callback) => runnerTrigger.RegisterCallback(id, callback);
+        public void SetValue(string key, bool value) => runnerTrigger.SetValue(key, value);
 
-        public void TriggerUnregisterCallback(string id, System.Action<bool> callback) => runnerTrigger.UnregisterCallback(id, callback);
+        public float GetFloatValue(string key) => runnerTrigger.GetFloatValue(key);
+
+        public bool GetBoolValue(string key) => runnerTrigger.GetBoolValue(key);
+
+        public void TriggerRegisterCallback(System.Action<string> callback) => runnerTrigger.OnAnyValueChanged += callback;
+
+        public void TriggerUnregisterCallback(System.Action<string> callback) => runnerTrigger.OnAnyValueChanged -= callback;
+
+        public void TriggerRegisterCallback(string key, System.Action callback) => runnerTrigger.RegisterCallback(key, callback);
+
+        public void TriggerUnregisterCallback(string key, System.Action callback) => runnerTrigger.UnregisterCallback(key, callback);
         #endregion
     }
 }

@@ -8,8 +8,8 @@ namespace Yang.Dialogue
         private RunnerEvent runnerEvent;
         private RunnerTrigger runnerTrigger;
 
-        private readonly List<RunnerText> runnerDatas = new();
-        private readonly List<UnityEngine.Object> runnerObjects = new();
+        private readonly List<RunnerChoiceText> choiceDatas = new();
+        private readonly List<UnityEngine.Object> objectDatas = new();
 
         private readonly Dictionary<string, NodeData> nodes = new();
         private readonly Dictionary<RunnerPort, RunnerPort> links = new();
@@ -64,14 +64,59 @@ namespace Yang.Dialogue
                             bool allExist = true;
                             IReadOnlyList<GenericData> datas = portDatas[i].data;
 
-                            for (int j = 0; j < datas.Count; j++)
+                            for (int j = 0; j < datas.Count; j += 3)
                             {
-                                if (!runnerTrigger.IsTrigger(datas[j].ToString()))
-                                {
-                                    allExist = false;
+                                string key = datas[j].ToString();
 
-                                    break;
+                                switch (datas[j + 1].Type)
+                                {
+                                    case GenericData.DataType.Float:
+                                        {
+                                            float value = runnerTrigger.GetFloatValue(key);
+                                            float checkValue = datas[j + 1].GetFloat();
+
+                                            RunnerValue.CheckType type = datas[j + 2].GetEnum<RunnerValue.CheckType>();
+
+                                            switch (type)
+                                            {
+                                                case RunnerValue.CheckType.Less:
+                                                    if (checkValue >= value) allExist = false;
+                                                    break;
+
+                                                case RunnerValue.CheckType.Equal:
+                                                    if (checkValue != value) allExist = false;
+                                                    break;
+
+                                                case RunnerValue.CheckType.LessEqual:
+                                                    if (checkValue > value) allExist = false;
+                                                    break;
+
+                                                case RunnerValue.CheckType.Greater:
+                                                    if (checkValue <= value) allExist = false;
+                                                    break;
+
+                                                case RunnerValue.CheckType.NotEqual:
+                                                    if (checkValue == value) allExist = false;
+                                                    break;
+
+                                                case RunnerValue.CheckType.GreaterEqual:
+                                                    if (checkValue < value) allExist = false;
+                                                    break;
+                                            }
+                                        }
+                                        break;
+
+                                    case GenericData.DataType.Bool:
+                                        {
+                                            bool value = runnerTrigger.GetBoolValue(key);
+                                            bool checkValue = datas[j + 1].GetBool();
+
+                                            if (value != checkValue) allExist = false;
+                                        }
+                                        break;
                                 }
+
+                                if (!allExist) break;
                             }
 
                             if (allExist) return i;
@@ -87,14 +132,40 @@ namespace Yang.Dialogue
                         {
                             IReadOnlyList<GenericData> datas = optionDatas[i].data;
 
-                            string value = datas[0].ToString();
+                            string key = datas[0].ToString();
 
-                            if (value == "") continue;
+                            if (key == "") continue;
 
-                            if (datas[1].TryGetBool(out bool isTrigger))
+                            switch (datas[1].Type)
                             {
-                                if (isTrigger) runnerTrigger.SetTrigger(value);
-                                else runnerTrigger.UnsetTrigger(value);
+                                case GenericData.DataType.Float:
+                                    switch (datas[2].GetEnum<RunnerValue.SetterType>())
+                                    {
+                                        case RunnerValue.SetterType.Plus:
+                                            {
+                                                float value = runnerTrigger.GetFloatValue(key);
+
+                                                runnerTrigger.SetValue(key, value + datas[1].GetFloat());
+                                            }
+                                            break;
+
+                                        case RunnerValue.SetterType.Minus:
+                                            {
+                                                float value = runnerTrigger.GetFloatValue(key);
+
+                                                runnerTrigger.SetValue(key, value - datas[1].GetFloat());
+                                            }
+                                            break;
+
+                                        case RunnerValue.SetterType.Set:
+                                            runnerTrigger.SetValue(key, datas[1].GetFloat());
+                                            break;
+                                    }
+                                    break;
+
+                                case GenericData.DataType.Bool:
+                                    runnerTrigger.SetValue(key, datas[1].GetBool());
+                                    break;
                             }
                         }
                     }
@@ -121,7 +192,7 @@ namespace Yang.Dialogue
                     {
                         checker.PointSave();
 
-                        runnerDatas.Clear();
+                        choiceDatas.Clear();
 
                         IReadOnlyList<DataWrapper> textEntries = nodeData.PortDatas;
 
@@ -134,21 +205,26 @@ namespace Yang.Dialogue
 
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
 
+                        string entryTable = textTable[0].ToString();
+
                         for (int i = 0; i < textEntries.Count; i++)
                         {
-                            RunnerText data = new(i, textTable[0].ToString(), textEntries[i].data[0].ToString());
+                            RunnerChoiceText data = new(i, entryTable, textEntries[i].data[0].ToString());
 
-                            runnerDatas.Add(data);
+                            choiceDatas.Add(data);
                         }
+
+                        int index = 0;
 
                         foreach (IDialogueView view in views)
                         {
-                            int result = await view.OnChoice(speaker, runnerDatas, message[0].ToString(), token);
+                            int result = await view.OnChoice(speaker, choiceDatas, message[0].ToString(), token);
 
-                            return runnerDatas[result].portIndex;
+                            if (result != -1) index = result;
                         }
+
+                        return choiceDatas[index].portIndex;
                     }
-                    break;
 
                 case NodeType.Wait:
                     {
@@ -168,7 +244,7 @@ namespace Yang.Dialogue
                     {
                         checker.PointSave();
 
-                        runnerObjects.Clear();
+                        objectDatas.Clear();
 
                         IReadOnlyList<DataWrapper> optionDatas = nodeData.OptionDatas;
 
@@ -176,10 +252,10 @@ namespace Yang.Dialogue
                         {
                             IReadOnlyList<GenericData> datas = optionDatas[i].data;
 
-                            if (datas[0].TryGetObject(out UnityEngine.Object value)) runnerObjects.Add(value);
+                            if (datas[0].TryGetObject(out UnityEngine.Object value)) objectDatas.Add(value);
                         }
 
-                        foreach (IDialogueView view in views) await view.OnObject(runnerObjects, token);
+                        foreach (IDialogueView view in views) await view.OnObject(objectDatas, token);
                     }
                     return 0;
             }

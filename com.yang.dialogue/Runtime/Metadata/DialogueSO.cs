@@ -23,7 +23,7 @@ namespace Yang.Dialogue
         public Vector3 scale = Vector3.one;
 #endif
 
-        public void GetDatas(Dictionary<string, NodeData> nodes, Dictionary<RunnerPort, RunnerPort> links)
+        internal void GetDatas(Dictionary<string, NodeData> nodes, Dictionary<RunnerPort, RunnerPort> links)
         {
             nodes.Clear();
             links.Clear();

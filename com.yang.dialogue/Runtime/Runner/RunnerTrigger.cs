@@ -1,54 +1,90 @@
 using System.Collections.Generic;
 
-internal class RunnerTrigger
+namespace Yang.Dialogue
 {
-    private readonly HashSet<string> triggers = new();
-    public IReadOnlyCollection<string> Triggers => triggers;
-
-    private readonly Dictionary<string, System.Action<bool>> callbacks = new();
-
-    public void SetDatas(IReadOnlyList<string> triggers)
+    internal class RunnerTrigger
     {
-        this.triggers.Clear();
+        public event System.Action<string> OnAnyValueChanged;
 
-        foreach (string trigger in triggers) this.triggers.Add(trigger);
-    }
+        private readonly Dictionary<string, RunnerValue> values = new();
+        private readonly Dictionary<string, System.Action> callbacks = new();
 
-    public bool IsTrigger(string trigger) => triggers.Contains(trigger);
+        public IReadOnlyCollection<RunnerValue> Values => values.Values;
 
-    public void SetTrigger(string trigger)
-    {
-        triggers.Add(trigger);
-
-        if (callbacks.TryGetValue(trigger, out System.Action<bool> callback)) callback?.Invoke(true);
-    }
-
-    public bool UnsetTrigger(string trigger)
-    {
-        if (callbacks.TryGetValue(trigger, out System.Action<bool> callback)) callback?.Invoke(false);
-
-        return triggers.Remove(trigger);
-    }
-
-    public void RegisterCallback(string trigger, System.Action<bool> callback)
-    {
-        if (callbacks.ContainsKey(trigger))
+        public void SetDatas(IReadOnlyList<RunnerValue> values)
         {
-            callbacks[trigger] -= callback;
-            callbacks[trigger] += callback;
-        }
-        else callbacks.Add(trigger, callback);
-    }
+            this.values.Clear();
 
-    public bool UnregisterCallback(string trigger, System.Action<bool> callback)
-    {
-        if (callbacks.ContainsKey(trigger))
-        {
-            callbacks[trigger] -= callback;
-
-            return true;
+            foreach (RunnerValue value in values) this.values.Add(value.Key, value);
         }
 
-        return false;
+        public bool ContainsKey(string key) => values.ContainsKey(key);
+
+        public bool RemoveValue(string key)
+        {
+            if (callbacks.TryGetValue(key, out System.Action callback)) callback?.Invoke();
+
+            OnAnyValueChanged?.Invoke(key);
+
+            return values.Remove(key);
+        }
+
+        #region Get Set
+        public float GetFloatValue(string key)
+        {
+            if (values.TryGetValue(key, out RunnerValue value)) return value.GetFloatValue();
+
+            return 0;
+        }
+
+        public bool GetBoolValue(string key)
+        {
+            if (values.TryGetValue(key, out RunnerValue value)) return value.GetBoolValue();
+
+            return false;
+        }
+
+        public void SetValue(string key, float value)
+        {
+            values[key] = new(key, value);
+
+            if (callbacks.TryGetValue(key, out System.Action callback)) callback?.Invoke();
+
+            OnAnyValueChanged?.Invoke(key);
+        }
+
+        public void SetValue(string key, bool value)
+        {
+            values[key] = new(key, value);
+
+            if (callbacks.TryGetValue(key, out System.Action callback)) callback?.Invoke();
+
+            OnAnyValueChanged?.Invoke(key);
+        }
+        #endregion
+
+        #region Callback
+        public void RegisterCallback(string key, System.Action callback)
+        {
+            if (callbacks.ContainsKey(key))
+            {
+                callbacks[key] -= callback;
+                callbacks[key] += callback;
+            }
+            else callbacks.Add(key, callback);
+        }
+
+        public bool UnregisterCallback(string key, System.Action callback)
+        {
+            if (callbacks.ContainsKey(key))
+            {
+                callbacks[key] -= callback;
+
+                return true;
+            }
+
+            return false;
+        }
+        #endregion
     }
 }

@@ -8,9 +8,14 @@ namespace Yang.Dialogue.Editor
     /// <summary>
     /// Port Data (Unused)
     /// 
-    /// Option Data (Common)
+    /// Option Data (Float)
     /// 0 : Key - string
-    /// 1 : Check - bool
+    /// 1 : Value - float, bool
+    /// 2 : SetterType - enum
+    /// 
+    /// Option Data (Bool)
+    /// 0 : Key - string
+    /// 1 : Value - float, bool
     /// </summary>
     public class TriggerNode : BaseNode
     {
@@ -18,6 +23,7 @@ namespace Yang.Dialogue.Editor
 
         public TriggerNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
+
         }
 
         public override void SetPorts()
@@ -36,7 +42,8 @@ namespace Yang.Dialogue.Editor
 
             DropdownMenu menu = evt.menu;
 
-            menu.AppendAction("Add Trigger", _ => CreateTrigger());
+            menu.AppendAction("Add Float Trigger", _ => CreateFloatField());
+            menu.AppendAction("Add Bool Trigger", _ => CreateBoolField());
             menu.AppendSeparator();
         }
 
@@ -46,7 +53,7 @@ namespace Yang.Dialogue.Editor
             {
                 DataWrapper optionData = new(
                     new(GenericData.DataType.String),
-                    new(true)
+                    new(GenericData.DataType.Bool)
                 );
 
                 optionDatas.Add(optionData);
@@ -65,98 +72,16 @@ namespace Yang.Dialogue.Editor
 
                 string key = optionData[0].ToString();
 
-                if (optionData[1].TryGetBool(out bool result)) AddTriggerField(key, result);
-            }
-        }
-
-        private void CreateTrigger()
-        {
-            DialogueSO so = window.SO;
-
-            Undo.RecordObject(so, "Create Trigger");
-
-            DataWrapper optionData = new(
-                new(GenericData.DataType.String),
-                new(true)
-            );
-
-            AddTriggerField("", true);
-
-            optionDatas.Add(optionData);
-
-            EditorUtility.SetDirty(so);
-
-            window.SetUnsaved();
-        }
-
-        private void AddTriggerField(string key, bool check)
-        {
-            VisualElement container = new();
-
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Center;
-
-            Toggle toggle = new() { value = check };
-
-            toggle.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
-
-            KeyConverter.GetKeys(window.SO.Conditions, conditions);
-
-            int index = conditions.IndexOf(key);
-
-            PopupField<string> field = new(conditions, index);
-
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
+                switch (optionData[1].Type)
                 {
-                    DialogueSO so = window.SO;
+                    case GenericData.DataType.Float:
+                        AddFloatField(key, optionData[1].GetFloat(), optionData[2].GetEnum<RunnerValue.SetterType>());
+                        break;
 
-                    Undo.RecordObject(so, "Delete Trigger Option");
-
-                    field.value = "";
-
-                    int optionIndex = container.parent.IndexOf(container);
-
-                    optionDatas[optionIndex].data[0] = new(GenericData.DataType.String);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
+                    case GenericData.DataType.Bool:
+                        AddBoolField(key, optionData[1].GetBool());
+                        break;
                 }
-            });
-
-            Button removeButton = new(() => RemoveTriggerField(container)) { text = "X" };
-
-            container.Add(toggle);
-            container.Add(field);
-            container.Add(removeButton);
-
-            extensionContainer.Add(container);
-        }
-
-        private void RemoveTriggerField(VisualElement itemElement)
-        {
-            DialogueSO so = window.SO;
-
-            VisualElement container = itemElement.parent;
-
-            if (container.childCount > 1)
-            {
-                int optionIndex = container.IndexOf(itemElement);
-
-                Undo.RecordObject(so, "Remove Trigger");
-
-                optionDatas.RemoveAt(optionIndex);
-
-                container.Remove(itemElement);
-
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
             }
         }
 
@@ -177,6 +102,239 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        #region Float
+        private void CreateFloatField()
+        {
+            DialogueSO so = window.SO;
+
+            Undo.RecordObject(so, "Create Float Trigger");
+
+            DataWrapper optionData = new(
+                new(GenericData.DataType.String),
+                new(GenericData.DataType.Float),
+                new(GenericData.DataType.Enum)
+            );
+
+            AddFloatField("", 0, RunnerValue.SetterType.Plus);
+
+            optionDatas.Add(optionData);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
+        private void AddFloatField(string key, float value, RunnerValue.SetterType type)
+        {
+            VisualElement container = new();
+
+            container.style.flexDirection = FlexDirection.Row;
+            container.style.alignItems = Align.Center;
+
+            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+
+            int index = conditions.IndexOf(key);
+
+            PopupField<string> field = new("Float Trigger", conditions, index);
+
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
+
+            field.style.minWidth = ITEM_MIN_WIDTH;
+            field.style.flexGrow = 1;
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete)
+                {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Delete Float Trigger Option");
+
+                    field.value = "";
+
+                    int optionIndex = container.parent.IndexOf(container);
+
+                    optionDatas[optionIndex].data[0] = new(GenericData.DataType.String);
+
+                    EditorUtility.SetDirty(so);
+
+                    window.SetUnsaved();
+                }
+            });
+
+            FloatField floatField = new() { value = value };
+
+            floatField.style.minWidth = 60;
+            floatField.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+
+            EnumField typeField = new(type);
+
+            typeField.style.minWidth = 70;
+            typeField.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+
+            Button removeButton = new(() => RemoveFloatField(container)) { text = "X" };
+
+            container.Add(field);
+            container.Add(floatField);
+            container.Add(typeField);
+            container.Add(removeButton);
+
+            extensionContainer.Add(container);
+        }
+
+        private void RemoveFloatField(VisualElement itemElement)
+        {
+            DialogueSO so = window.SO;
+
+            VisualElement container = itemElement.parent;
+
+            if (container.childCount > 1)
+            {
+                int optionIndex = container.IndexOf(itemElement);
+
+                Undo.RecordObject(so, "Remove Float Trigger");
+
+                optionDatas.RemoveAt(optionIndex);
+
+                container.Remove(itemElement);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedCallback(ChangeEvent<float> evt, VisualElement itemElement)
+        {
+            DialogueSO so = window.SO;
+
+            VisualElement container = itemElement.parent;
+
+            int optionIndex = container.IndexOf(itemElement);
+
+            Undo.RecordObject(so, "Change Float Trigger Option");
+
+            optionDatas[optionIndex].data[1] = new(evt.newValue);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
+        private void ChangedCallback(ChangeEvent<System.Enum> evt, VisualElement itemElement)
+        {
+            DialogueSO so = window.SO;
+
+            VisualElement container = itemElement.parent;
+
+            int optionIndex = container.IndexOf(itemElement);
+
+            Undo.RecordObject(so, "Change Trigger Option");
+
+            optionDatas[optionIndex].data[2] = new(evt.newValue);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+        #endregion
+
+        #region Bool
+        private void CreateBoolField()
+        {
+            DialogueSO so = window.SO;
+
+            Undo.RecordObject(so, "Create Bool Trigger");
+
+            DataWrapper optionData = new(
+                new(GenericData.DataType.String),
+                new(GenericData.DataType.Bool)
+            );
+
+            AddBoolField("", false);
+
+            optionDatas.Add(optionData);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
+        private void AddBoolField(string key, bool value)
+        {
+            VisualElement container = new();
+
+            container.style.flexDirection = FlexDirection.Row;
+            container.style.alignItems = Align.Center;
+
+            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+
+            int index = conditions.IndexOf(key);
+
+            PopupField<string> field = new("Bool Trigger", conditions, index);
+
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
+
+            field.style.minWidth = ITEM_MIN_WIDTH;
+            field.style.flexGrow = 1;
+            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Delete)
+                {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Delete Bool Trigger Option");
+
+                    field.value = "";
+
+                    int optionIndex = container.parent.IndexOf(container);
+
+                    optionDatas[optionIndex].data[0] = new(GenericData.DataType.String);
+
+                    EditorUtility.SetDirty(so);
+
+                    window.SetUnsaved();
+                }
+            });
+
+            Toggle toggle = new() { value = value };
+
+            toggle.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+
+            Button removeButton = new(() => RemoveBoolField(container)) { text = "X" };
+
+            container.Add(field);
+            container.Add(toggle);
+            container.Add(removeButton);
+
+            extensionContainer.Add(container);
+        }
+
+        private void RemoveBoolField(VisualElement itemElement)
+        {
+            DialogueSO so = window.SO;
+
+            VisualElement container = itemElement.parent;
+
+            if (container.childCount > 1)
+            {
+                int optionIndex = container.IndexOf(itemElement);
+
+                Undo.RecordObject(so, "Remove Bool Trigger");
+
+                optionDatas.RemoveAt(optionIndex);
+
+                container.Remove(itemElement);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
         private void ChangedCallback(ChangeEvent<bool> evt, VisualElement itemElement)
         {
             DialogueSO so = window.SO;
@@ -185,7 +343,7 @@ namespace Yang.Dialogue.Editor
 
             int optionIndex = container.IndexOf(itemElement);
 
-            Undo.RecordObject(so, "Change Trigger Check Option");
+            Undo.RecordObject(so, "Change Bool Trigger Option");
 
             optionDatas[optionIndex].data[1] = new(evt.newValue);
 
@@ -193,5 +351,6 @@ namespace Yang.Dialogue.Editor
 
             window.SetUnsaved();
         }
+        #endregion
     }
 }

@@ -2,7 +2,7 @@ using System;
 
 namespace Yang.Dialogue
 {
-    public readonly struct RunnerPort : IEquatable<RunnerPort>
+    internal readonly struct RunnerPort : IEquatable<RunnerPort>
     {
         public readonly string guid;
         public readonly int portIndex;
