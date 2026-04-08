@@ -17,8 +17,6 @@ namespace Yang.Dialogue.Editor
         private readonly System.Reflection.FieldInfo portDataField;
         private readonly System.Reflection.FieldInfo optionDataField;
 
-        private readonly TextField idField;
-
         public string GUID { get; private set; }
 
         protected BaseNode(DialogueEditorWindow window, string guid)
@@ -35,12 +33,66 @@ namespace Yang.Dialogue.Editor
 
             GUID = guid;
 
-            idField = GetGUIDField();
-
-            contentContainer[0].Insert(1, idField);
+            AddGUIDField();
         }
 
         public abstract void SetPorts();
+
+        protected T FindParent<T>(VisualElement element) where T : VisualElement
+        {
+            VisualElement current = element.parent;
+
+            while (current != null)
+            {
+                if (current is T target) return target;
+
+                current = current.parent;
+            }
+
+            return null;
+        }
+
+        protected T FindParent<T>(VisualElement element, string name) where T : VisualElement
+        {
+            VisualElement current = element.parent;
+
+            while (current != null)
+            {
+                if (current.name == name && current is T target) return target;
+
+                current = current.parent;
+            }
+
+            return null;
+        }
+
+        protected T FindParentInCurrent<T>(VisualElement element) where T : VisualElement
+        {
+            VisualElement current = element;
+
+            while (current != null)
+            {
+                if (current is T target) return target;
+
+                current = current.parent;
+            }
+
+            return null;
+        }
+
+        protected T FindParentInCurrent<T>(VisualElement element, string name) where T : VisualElement
+        {
+            VisualElement current = element;
+
+            while (current != null)
+            {
+                if (current.name == name && current is T target) return target;
+
+                current = current.parent;
+            }
+
+            return null;
+        }
 
         protected Port CreateInputPort()
         {
@@ -74,63 +126,23 @@ namespace Yang.Dialogue.Editor
 
                 List<LinkData> links = window.Links;
 
+                Undo.RecordObject(so, "Remove Port");
+
                 for (int i = 0; i < links.Count; i++)
                 {
                     LinkData link = links[i];
 
-                    if (link.nodeGuid == GUID && link.outPortIndex == portIndex)
-                    {
-                        Undo.RecordObject(so, "Remove Port");
-
-                        window.RemoveEdge(port);
-
-                        portDatas.RemoveAt(portIndex);
-
-                        window.Links.Remove(link);
-
-                        outputContainer.Remove(port);
-
-                        RefreshPorts();
-                        RefreshExpandedState();
-
-                        EditorUtility.SetDirty(so);
-
-                        window.SetUnsaved();
-
-                        break;
-                    }
-                }
-            }
-        }
-
-        private void ChangedCallback(ChangeEvent<string> evt)
-        {
-            DialogueSO so = window.SO;
-
-            if (evt.newValue == so.StartGuid) idField.SetValueWithoutNotify(GUID);
-            else
-            {
-                List<NodeData> nodes = window.Nodes;
-
-                for (int i = 0; i < nodes.Count; i++)
-                {
-                    if (nodes[i].guid == evt.newValue)
-                    {
-                        idField.SetValueWithoutNotify(GUID);
-
-                        return;
-                    }
+                    if (link.nodeGuid == GUID && link.outPortIndex == portIndex) window.Links.Remove(link);
                 }
 
-                NodeData data = window.GetNode(GUID);
+                window.RemoveEdge(port);
 
-                Undo.RecordObject(so, "Change GUID");
+                portDatas.RemoveAt(portIndex);
 
-                data.guid = evt.newValue;
+                outputContainer.Remove(port);
 
-                window.SetNode(GUID, data);
-
-                GUID = data.guid;
+                RefreshPorts();
+                RefreshExpandedState();
 
                 EditorUtility.SetDirty(so);
 
@@ -138,7 +150,45 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private TextField GetGUIDField()
+        private void ChangedCallback(ChangeEvent<string> evt)
+        {
+            if (evt.target is TextField field)
+            {
+                DialogueSO so = window.SO;
+
+                if (evt.newValue == so.StartGuid) field.SetValueWithoutNotify(GUID);
+                else
+                {
+                    List<NodeData> nodes = window.Nodes;
+
+                    for (int i = 0; i < nodes.Count; i++)
+                    {
+                        if (nodes[i].guid == evt.newValue)
+                        {
+                            field.SetValueWithoutNotify(GUID);
+
+                            return;
+                        }
+                    }
+
+                    NodeData data = window.GetNode(GUID);
+
+                    Undo.RecordObject(so, "Change GUID");
+
+                    data.guid = evt.newValue;
+
+                    window.SetNode(GUID, data);
+
+                    GUID = data.guid;
+
+                    EditorUtility.SetDirty(so);
+
+                    window.SetUnsaved();
+                }
+            }
+        }
+
+        private void AddGUIDField()
         {
             TextField field = new("ID") { value = GUID };
 
@@ -147,9 +197,9 @@ namespace Yang.Dialogue.Editor
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt));
+            field.RegisterValueChangedCallback(ChangedCallback);
 
-            return field;
+            contentContainer[0].Insert(1, field);
         }
     }
 }

@@ -12,6 +12,10 @@ namespace Yang.Dialogue.Editor
     /// Port Data (Common : Text Entries)
     /// 0 : Key - string
     /// 1 : ID - long
+    /// 2 : Hide - bool
+    /// N : Condition - string
+    /// N + 1 : Value - float, bool
+    /// N + 2 : CheckType - enum
     /// 
     /// Option Data (0 : Speaker Table)
     /// 0 : Name - string
@@ -33,6 +37,8 @@ namespace Yang.Dialogue.Editor
         private readonly List<string> tables;
         private readonly List<EntryData> speakerEntries = new();
         private readonly List<EntryData> textEntries = new();
+
+        private readonly List<string> conditions = new();
 
         private readonly IReadOnlyList<LocalizationTableCollection> collections;
 
@@ -57,7 +63,7 @@ namespace Yang.Dialogue.Editor
 
             DropdownMenu menu = evt.menu;
 
-            menu.AppendAction("Add Choice Port", _ => CreateChoiceEntry());
+            menu.AppendAction("Add Choice Port", _ => CreateTextEntry());
             menu.AppendSeparator();
         }
 
@@ -82,7 +88,8 @@ namespace Yang.Dialogue.Editor
 
                 DataWrapper textEntry = new(
                     new(GenericData.DataType.String),
-                    new(GenericData.DataType.Long)
+                    new(GenericData.DataType.Long),
+                    new(GenericData.DataType.Bool)
                 );
 
                 DataWrapper message = new(new GenericData(GenericData.DataType.String));
@@ -99,15 +106,47 @@ namespace Yang.Dialogue.Editor
 
         private void SetOptions()
         {
-            AddTableField(speakerEntries, true);
+            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+
+            AddTableField(true);
 
             AddSpeakerEntryField();
 
-            AddTableField(textEntries, false);
+            AddTableField(false);
 
             AddMessageField();
 
-            for (int i = 0; i < portDatas.Count; i++) AddChoiceEntryField(portDatas[i].data);
+            for (int i = 0; i < portDatas.Count; i++)
+            {
+                IReadOnlyList<GenericData> portOptions = portDatas[i].data;
+
+                VisualElement itemContainer = AddTextEntryField(portDatas[i].data);
+
+                for (int j = 3; j < portOptions.Count; j += 3)
+                {
+                    string key = portOptions[j].ToString();
+
+                    switch (portOptions[j + 1].Type)
+                    {
+                        case GenericData.DataType.Float:
+                            {
+                                float value = portOptions[j + 1].GetFloat();
+                                ValueCheckType type = portOptions[j + 2].GetEnum<ValueCheckType>();
+
+                                itemContainer.Add(GetConditionFloatField(key, value, type));
+                            }
+                            break;
+
+                        case GenericData.DataType.Bool:
+                            {
+                                bool value = portOptions[j + 1].GetBool();
+
+                                itemContainer.Add(GetConditionBoolField(key, value));
+                            }
+                            break;
+                    }
+                }
+            }
         }
 
         private void MovePort(Port port, int direction)
@@ -119,7 +158,7 @@ namespace Yang.Dialogue.Editor
             int currentIndex = container.IndexOf(port);
             int newIndex = currentIndex + direction;
 
-            if (newIndex < 1 || newIndex >= container.childCount) return;
+            if (newIndex < 0 || newIndex >= container.childCount) return;
 
             DialogueSO so = window.SO;
 
@@ -137,67 +176,29 @@ namespace Yang.Dialogue.Editor
         }
 
         #region Table
-        private void ChangedCallback(ChangeEvent<string> evt, List<EntryData> entries, bool speaker)
-        {
-            int index = tables.IndexOf(evt.newValue);
-
-            if (index != -1)
-            {
-                DialogueSO so = window.SO;
-
-                SetEntries(collections[index], entries);
-
-                Undo.RecordObject(so, speaker ? "Change Speaker Table" : "Change Text Table");
-
-                List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
-
-                optionData[0] = new(collections[index].TableCollectionName);
-                optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
-
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
-            }
-        }
-
-        private void AddTableField(List<EntryData> entries, bool speaker)
+        private void AddTableField(bool speaker)
         {
             List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
             int index = GetTableIndex(optionData[0].ToString(), optionData[1].TryGetGuid(out System.Guid guid) ? guid : default);
 
-            PopupField<string> field = new(speaker ? "Speaker Table" : "Text Table", tables, index);
+            string name = speaker ? "Speaker Table" : "Text Table";
+
+            PopupField<string> field = new(name, tables, index) { name = name };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, entries, speaker));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    DialogueSO so = window.SO;
-
-                    Undo.RecordObject(so, "Delete Table Option");
-
-                    field.value = "";
-
-                    optionData[0] = new(GenericData.DataType.String);
-                    optionData[1] = new(GenericData.DataType.Guid);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
-            });
+            field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(OnTableKeyDownEvent);
 
             extensionContainer.Add(field);
 
             if (index != -1)
             {
-                SetEntries(collections[index], entries);
+                SetEntries(collections[index], speaker ? speakerEntries : textEntries);
 
                 optionData[0] = new(collections[index].TableCollectionName);
                 optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
@@ -215,112 +216,76 @@ namespace Yang.Dialogue.Editor
 
             return -1;
         }
+
+        private void OnTableKeyDownEvent(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.Delete)
+            {
+                PopupField<string> field = FindParentInCurrent<PopupField<string>>(evt.target as VisualElement);
+
+                if (field == null) return;
+
+                DialogueSO so = window.SO;
+
+                List<GenericData> optionData = optionDatas[field.name == "Speaker Table" ? 0 : 2].data;
+
+                Undo.RecordObject(so, "Delete Table Option");
+
+                field.value = "";
+
+                optionData[0] = new(GenericData.DataType.String);
+                optionData[1] = new(GenericData.DataType.Guid);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedCallback(ChangeEvent<string> evt)
+        {
+            int index = tables.IndexOf(evt.newValue);
+
+            if (index != -1)
+            {
+                DialogueSO so = window.SO;
+
+                VisualElement target = evt.target as VisualElement;
+                bool speaker = target.name == "Speaker Table";
+
+                SetEntries(collections[index], speaker ? speakerEntries : textEntries);
+
+                Undo.RecordObject(so, speaker ? "Change Speaker Table" : "Change Text Table");
+
+                List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
+
+                optionData[0] = new(collections[index].TableCollectionName);
+                optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
         #endregion
 
         #region Entry
-        private void CreateChoiceEntry()
-        {
-            DialogueSO so = window.SO;
-
-            Undo.RecordObject(so, "Create Choice Entry");
-
-            DataWrapper portOption = new(
-                new(GenericData.DataType.String),
-                new(GenericData.DataType.Long)
-            );
-
-            AddChoiceEntryField(portOption.data);
-
-            portDatas.Add(portOption);
-
-            RefreshExpandedState();
-            RefreshPorts();
-
-            EditorUtility.SetDirty(so);
-
-            window.SetUnsaved();
-        }
-
-        private void ChangedCallback(ChangeEvent<EntryData> evt)
-        {
-            int index = speakerEntries.IndexOf(evt.newValue);
-
-            if (index != -1)
-            {
-                DialogueSO so = window.SO;
-
-                List<GenericData> optionData = optionDatas[1].data;
-
-                Undo.RecordObject(so, "Change Speaker Entry");
-
-                optionData[0] = new(speakerEntries[index].key);
-                optionData[1] = new(speakerEntries[index].id);
-
-                if (index != -1 && evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = speakerEntries[index].tooltip;
-
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
-            }
-        }
-
-        private void ChangedCallback(ChangeEvent<EntryData> evt, Port port)
-        {
-            int index = textEntries.IndexOf(evt.newValue);
-
-            if (index != -1)
-            {
-                DialogueSO so = window.SO;
-
-                int portIndex = port.parent.IndexOf(port);
-
-                Undo.RecordObject(so, "Change Port Option");
-
-                List<GenericData> portData = portDatas[portIndex].data;
-
-                portData[0] = new(textEntries[index].key);
-                portData[1] = new(textEntries[index].id);
-
-                if (index != -1 && evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = textEntries[index].tooltip;
-
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
-            }
-        }
-
         private void AddSpeakerEntryField()
         {
             List<GenericData> optionData = optionDatas[1].data;
 
             int index = speakerEntries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
 
-            PopupField<EntryData> field = new("Speaker Entry", speakerEntries, index);
+            string name = "Speaker Entry";
+            PopupField<EntryData> field = new(name, speakerEntries, index) { name = name };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(ChangedCallback);
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    DialogueSO so = window.SO;
-
-                    Undo.RecordObject(so, "Delete Speaker Entry Option");
-
-                    field.value = default;
-
-                    optionData[0] = new(GenericData.DataType.String);
-                    optionData[1] = new(GenericData.DataType.Long);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
-            });
+            field.RegisterValueChangedCallback(ChangedSpeakerCallback);
+            field.RegisterCallback<KeyDownEvent>(OnEntryKeyDownEvent);
 
             extensionContainer.Add(field);
 
@@ -330,62 +295,6 @@ namespace Yang.Dialogue.Editor
 
                 optionData[0] = new(speakerEntries[index].key);
                 optionData[1] = new(speakerEntries[index].id);
-            }
-        }
-
-        private void AddChoiceEntryField(List<GenericData> optionData)
-        {
-            int index = textEntries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
-
-            Port port = CreateOutputPort();
-
-            VisualElement portElement = new();
-
-            portElement.style.flexDirection = FlexDirection.Row;
-            portElement.style.alignItems = Align.Center;
-
-            PopupField<EntryData> field = new(textEntries, index);
-
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    DialogueSO so = window.SO;
-
-                    Undo.RecordObject(so, "Delete Choice Entry Option");
-
-                    field.value = default;
-
-                    optionData[0] = new(GenericData.DataType.String);
-                    optionData[1] = new(GenericData.DataType.Long);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
-            });
-
-            Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
-            Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
-            Button removeButton = new(() => RemovePort(port)) { text = "X" };
-
-            portElement.Add(field);
-            portElement.Add(upButton);
-            portElement.Add(downButton);
-            portElement.Add(removeButton);
-
-            port.Q<Label>("type").style.display = DisplayStyle.None;
-            port.Add(portElement);
-
-            if (index != -1)
-            {
-                field.tooltip = textEntries[index].tooltip;
-
-                optionData[0] = new(textEntries[index].key);
-                optionData[1] = new(textEntries[index].id);
             }
         }
 
@@ -411,6 +320,481 @@ namespace Yang.Dialogue.Editor
                     entries.Add(data);
                 }
             }
+        }
+
+        private void OnEntryKeyDownEvent(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.Delete)
+            {
+                VisualElement target = evt.target as VisualElement;
+                PopupField<EntryData> field = FindParentInCurrent<PopupField<EntryData>>(target);
+
+                if (field == null) return;
+
+                DialogueSO so = window.SO;
+
+                List<GenericData> optionData;
+
+                if (field.name == "Speaker Entry") optionData = optionDatas[1].data;
+                else
+                {
+                    Port port = FindParent<Port>(target);
+
+                    int index = port.parent.IndexOf(port);
+
+                    optionData = portDatas[index].data;
+                }
+
+                Undo.RecordObject(so, "Delete Entry Option");
+
+                field.value = default;
+
+                optionData[0] = new(GenericData.DataType.String);
+                optionData[1] = new(GenericData.DataType.Long);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedSpeakerCallback(ChangeEvent<EntryData> evt)
+        {
+            int index = speakerEntries.IndexOf(evt.newValue);
+
+            if (index != -1)
+            {
+                DialogueSO so = window.SO;
+
+                List<GenericData> optionData = optionDatas[1].data;
+
+                Undo.RecordObject(so, "Change Speaker Entry");
+
+                optionData[0] = new(speakerEntries[index].key);
+                optionData[1] = new(speakerEntries[index].id);
+
+                if (evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = speakerEntries[index].tooltip;
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+        #endregion
+
+        #region Text Entry
+        private void CreateTextEntry()
+        {
+            DialogueSO so = window.SO;
+
+            Undo.RecordObject(so, "Create Choice Entry");
+
+            DataWrapper portOption = new(
+                new(GenericData.DataType.String),
+                new(GenericData.DataType.Long),
+                new(GenericData.DataType.Bool)
+            );
+
+            AddTextEntryField(portOption.data);
+
+            portDatas.Add(portOption);
+
+            RefreshExpandedState();
+            RefreshPorts();
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
+        private VisualElement AddTextEntryField(List<GenericData> optionData)
+        {
+            int index = textEntries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
+
+            Port port = CreateOutputPort();
+
+            VisualElement portElement = new();
+
+            VisualElement groupContainer = new();
+
+            VisualElement entryContainer = new();
+            VisualElement itemContainer = new();
+            VisualElement buttonContainer = new();
+
+            VisualElement line = new();
+
+            portElement.style.flexGrow = 1;
+            portElement.style.flexDirection = FlexDirection.Row;
+            portElement.style.alignItems = Align.Stretch;
+
+            groupContainer.style.flexGrow = 1;
+            groupContainer.style.flexDirection = FlexDirection.Column;
+            groupContainer.style.alignItems = Align.Stretch;
+
+            line.style.marginTop = 7;
+            line.style.marginBottom = 7;
+            line.style.width = 2;
+            line.style.backgroundColor = Color.gray;
+
+            entryContainer.style.flexDirection = FlexDirection.Row;
+            entryContainer.style.alignItems = Align.Stretch;
+
+            itemContainer.style.flexDirection = FlexDirection.Column;
+            itemContainer.style.alignItems = Align.Stretch;
+
+            buttonContainer.style.flexDirection = FlexDirection.Row;
+            buttonContainer.style.alignItems = Align.FlexEnd;
+            buttonContainer.style.alignSelf = Align.FlexEnd;
+
+            PopupField<EntryData> field = new("Text Entry", textEntries, index);
+
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
+
+            field.style.minWidth = ITEM_MIN_WIDTH;
+            field.style.flexGrow = 1;
+            field.RegisterValueChangedCallback(ChangedTextCallback);
+            field.RegisterCallback<KeyDownEvent>(OnEntryKeyDownEvent);
+
+            Toggle hide = new() { value = optionData[2].GetBool() };
+
+            hide.RegisterValueChangedCallback(ChangedTextCallback);
+
+            Button createFloatButton = new(() => CreateConditionFloatField(itemContainer)) { text = "F" };
+            Button createBoolButton = new(() => CreateConditionBoolField(itemContainer)) { text = "B" };
+            Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
+            Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
+            Button removeButton = new(() => RemovePort(port)) { text = "X" };
+
+            entryContainer.Add(field);
+            entryContainer.Add(hide);
+
+            buttonContainer.Add(createFloatButton);
+            buttonContainer.Add(createBoolButton);
+            buttonContainer.Add(upButton);
+            buttonContainer.Add(downButton);
+            buttonContainer.Add(removeButton);
+
+            groupContainer.Add(entryContainer);
+            groupContainer.Add(itemContainer);
+            groupContainer.Add(buttonContainer);
+
+            portElement.Add(groupContainer);
+            portElement.Add(line);
+
+            port.style.height = StyleKeyword.Auto;
+            port.Q<Label>("type").style.display = DisplayStyle.None;
+            port.Add(portElement);
+
+            if (index != -1)
+            {
+                field.tooltip = textEntries[index].tooltip;
+
+                optionData[0] = new(textEntries[index].key);
+                optionData[1] = new(textEntries[index].id);
+            }
+
+            return itemContainer;
+        }
+
+        private void RemoveConditionField(VisualElement itemElement)
+        {
+            DialogueSO so = window.SO;
+
+            VisualElement itemContainer = itemElement.parent;
+
+            Port port = FindParent<Port>(itemContainer);
+
+            int portIndex = port.parent.IndexOf(port);
+            int itemIndex = itemContainer.IndexOf(itemElement);
+
+            if (itemIndex != -1)
+            {
+                Undo.RecordObject(so, "Remove Condition Field");
+
+                itemContainer.Remove(itemElement);
+
+                List<GenericData> portData = portDatas[portIndex].data;
+
+                portData.RemoveRange(3 + itemIndex * 3, 3);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void OnKeyDownEvent(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.Delete)
+            {
+                PopupField<string> field = FindParentInCurrent<PopupField<string>>(evt.target as VisualElement);
+
+                if (field == null) return;
+
+                DialogueSO so = window.SO;
+
+                VisualElement itemElement = FindParent<VisualElement>(field, "Item Element");
+                Port port = FindParent<Port>(itemElement);
+
+                Undo.RecordObject(so, "Delete Condition Option");
+
+                field.value = "";
+
+                int portIndex = port.parent.IndexOf(port);
+                int itemIndex = 3 + itemElement.parent.IndexOf(itemElement);
+
+                portDatas[portIndex].data[itemIndex] = new(GenericData.DataType.String);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedTextCallback(ChangeEvent<bool> evt)
+        {
+            DialogueSO so = window.SO;
+
+            Port port = FindParent<Port>(evt.target as VisualElement);
+
+            int portIndex = port.parent.IndexOf(port);
+
+            Undo.RecordObject(so, "Change Text Entry");
+
+            portDatas[portIndex].data[2] = new(evt.newValue);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
+        private void ChangedTextCallback(ChangeEvent<EntryData> evt)
+        {
+            int index = textEntries.IndexOf(evt.newValue);
+
+            if (index != -1)
+            {
+                DialogueSO so = window.SO;
+
+                Port port = FindParent<Port>(evt.target as VisualElement);
+
+                int portIndex = port.parent.IndexOf(port);
+
+                Undo.RecordObject(so, "Change Text Entry");
+
+                List<GenericData> portData = portDatas[portIndex].data;
+
+                portData[0] = new(textEntries[index].key);
+                portData[1] = new(textEntries[index].id);
+
+                if (evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = textEntries[index].tooltip;
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedConditionCallback(ChangeEvent<string> evt)
+        {
+            DialogueSO so = window.SO;
+
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            Port port = FindParent<Port>(itemElement);
+
+            int portIndex = port.parent.IndexOf(port);
+            int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3;
+
+            Undo.RecordObject(so, "Change Condition Option");
+
+            portDatas[portIndex].data[itemIndex] = new(evt.newValue);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+        #endregion
+
+        #region Float
+        private void CreateConditionFloatField(VisualElement itemContainer)
+        {
+            Port port = FindParent<Port>(itemContainer);
+
+            DialogueSO so = window.SO;
+
+            int portIndex = port.parent.IndexOf(port);
+
+            List<GenericData> portData = portDatas[portIndex].data;
+
+            Undo.RecordObject(so, "Add Condition Float Field");
+
+            itemContainer.Add(GetConditionFloatField("", 0, ValueCheckType.Less));
+
+            portData.Add(new(GenericData.DataType.String));
+            portData.Add(new(GenericData.DataType.Float));
+            portData.Add(new(GenericData.DataType.Enum));
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
+        private VisualElement GetConditionFloatField(string key, float value, ValueCheckType type)
+        {
+            VisualElement itemElement = new() { name = "Item Element" };
+
+            itemElement.style.flexDirection = FlexDirection.Row;
+            itemElement.style.alignItems = Align.Center;
+
+            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+
+            int index = conditions.IndexOf(key);
+
+            PopupField<string> field = new("Float Condition", conditions, index);
+
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
+
+            field.style.minWidth = ITEM_MIN_WIDTH;
+            field.style.flexGrow = 1;
+            field.RegisterValueChangedCallback(ChangedConditionCallback);
+            field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
+
+            FloatField floatField = new() { value = value };
+
+            floatField.style.minWidth = 60;
+            floatField.RegisterValueChangedCallback(ChangedCallback);
+
+            EnumField typeField = new(type);
+
+            typeField.style.minWidth = 70;
+            typeField.RegisterValueChangedCallback(ChangedCallback);
+
+            Button remove = new(() => RemoveConditionField(itemElement)) { text = "-" };
+
+            itemElement.Add(field);
+            itemElement.Add(floatField);
+            itemElement.Add(typeField);
+            itemElement.Add(remove);
+
+            return itemElement;
+        }
+
+        private void ChangedCallback(ChangeEvent<float> evt)
+        {
+            DialogueSO so = window.SO;
+
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            Port port = FindParent<Port>(itemElement);
+
+            int portIndex = port.parent.IndexOf(port);
+            int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3 + 1;
+
+            Undo.RecordObject(so, "Change Condition Float Option");
+
+            portDatas[portIndex].data[itemIndex] = new(evt.newValue);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
+        private void ChangedCallback(ChangeEvent<System.Enum> evt)
+        {
+            DialogueSO so = window.SO;
+
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            Port port = FindParent<Port>(itemElement);
+
+            int portIndex = port.parent.IndexOf(port);
+            int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3 + 2;
+
+            Undo.RecordObject(so, "Change Condition Type Option");
+
+            portDatas[portIndex].data[itemIndex] = new(evt.newValue);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+        #endregion
+
+        #region Bool
+        private void CreateConditionBoolField(VisualElement itemContainer)
+        {
+            Port port = FindParent<Port>(itemContainer);
+
+            DialogueSO so = window.SO;
+
+            int portIndex = port.parent.IndexOf(port);
+
+            List<GenericData> portData = portDatas[portIndex].data;
+
+            Undo.RecordObject(so, "Add Condition Bool Field");
+
+            itemContainer.Add(GetConditionBoolField("", false));
+
+            portData.Add(new(GenericData.DataType.String));
+            portData.Add(new(GenericData.DataType.Bool));
+            portData.Add(new(GenericData.DataType.Enum));
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
+        private VisualElement GetConditionBoolField(string key, bool value)
+        {
+            VisualElement itemElement = new() { name = "Item Element" };
+
+            itemElement.style.flexDirection = FlexDirection.Row;
+            itemElement.style.alignItems = Align.Center;
+
+            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+
+            int index = conditions.IndexOf(key);
+
+            PopupField<string> field = new("Bool Condition", conditions, index);
+
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
+
+            field.style.minWidth = ITEM_MIN_WIDTH;
+            field.style.flexGrow = 1;
+            field.RegisterValueChangedCallback(ChangedConditionCallback);
+            field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
+
+            Toggle toggle = new() { value = value };
+
+            toggle.RegisterValueChangedCallback(ChangedCallback);
+
+            Button remove = new(() => RemoveConditionField(itemElement)) { text = "-" };
+
+            itemElement.Add(field);
+            itemElement.Add(toggle);
+            itemElement.Add(remove);
+
+            return itemElement;
+        }
+
+        private void ChangedCallback(ChangeEvent<bool> evt)
+        {
+            DialogueSO so = window.SO;
+
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            Port port = FindParent<Port>(itemElement);
+
+            int portIndex = port.parent.IndexOf(port);
+            int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3 + 1;
+
+            Undo.RecordObject(so, "Change Condition Bool Option");
+
+            portDatas[portIndex].data[itemIndex] = new(evt.newValue);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
         }
         #endregion
 

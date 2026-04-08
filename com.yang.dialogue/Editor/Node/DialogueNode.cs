@@ -93,73 +93,33 @@ namespace Yang.Dialogue.Editor
 
         private void SetOptions()
         {
-            AddTableField(speakerEntries, true);
-            AddEntryField(speakerEntries, true);
+            AddTableField(true);
+            AddEntryField(true);
 
-            AddTableField(textEntries, false);
-            AddEntryField(textEntries, false);
+            AddTableField(false);
+            AddEntryField(false);
 
             AddMessageField();
         }
 
         #region Table
-        private void ChangedCallback(ChangeEvent<string> evt, List<EntryData> entries, bool speaker)
+        private void AddTableField(bool speaker)
         {
-            int index = tables.IndexOf(evt.newValue);
-
-            if (index != -1)
-            {
-                DialogueSO so = window.SO;
-
-                SetEntries(collections[index], entries);
-
-                Undo.RecordObject(so, speaker ? "Change Speaker Table" : "Change Text Table");
-
-                List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
-
-                optionData[0] = new(collections[index].TableCollectionName);
-                optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
-
-                EditorUtility.SetDirty(so);
-
-                window.SetUnsaved();
-            }
-        }
-
-        private void AddTableField(List<EntryData> entries, bool speaker)
-        {
-            DialogueSO so = window.SO;
-
+            List<EntryData> entries = speaker ? speakerEntries : textEntries;
             List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
             int index = GetTableIndex(optionData[0].ToString(), optionData[1].TryGetGuid(out System.Guid guid) ? guid : default);
 
-            PopupField<string> field = new(speaker ? "Speaker Table" : "Text Table", tables, index);
+            string name = speaker ? "Speaker Table" : "Text Table";
+            PopupField<string> field = new(name, tables, index) { name = name };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, entries, speaker));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    DialogueSO so = window.SO;
-
-                    Undo.RecordObject(so, "Delete Table Option");
-
-                    field.value = "";
-
-                    optionData[0] = new(GenericData.DataType.String);
-                    optionData[1] = new(GenericData.DataType.Guid);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
-            });
+            field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(OnTableKeyDownEvent);
 
             extensionContainer.Add(field);
 
@@ -183,25 +143,25 @@ namespace Yang.Dialogue.Editor
 
             return -1;
         }
-        #endregion
 
-        #region Entry
-        private void ChangedCallback(ChangeEvent<EntryData> evt, List<EntryData> entries, bool speaker)
+        private void OnTableKeyDownEvent(KeyDownEvent evt)
         {
-            int index = entries.IndexOf(evt.newValue);
-
-            if (index != -1)
+            if (evt.keyCode == KeyCode.Delete)
             {
+                PopupField<string> field = FindParentInCurrent<PopupField<string>>(evt.target as VisualElement);
+
+                if (field == null) return;
+
                 DialogueSO so = window.SO;
 
-                List<GenericData> optionData = optionDatas[speaker ? 1 : 3].data;
+                List<GenericData> optionData = optionDatas[field.name == "Speaker Table" ? 0 : 2].data;
 
-                Undo.RecordObject(so, "Change Speaker Entry");
+                Undo.RecordObject(so, "Delete Table Option");
 
-                optionData[0] = new(entries[index].key);
-                optionData[1] = new(entries[index].id);
+                field.value = "";
 
-                if (index != -1 && evt.target is PopupField<EntryData> dropdown) dropdown.tooltip = entries[index].tooltip;
+                optionData[0] = new(GenericData.DataType.String);
+                optionData[1] = new(GenericData.DataType.Guid);
 
                 EditorUtility.SetDirty(so);
 
@@ -209,38 +169,51 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void AddEntryField(List<EntryData> entries, bool speaker)
+        private void ChangedCallback(ChangeEvent<string> evt)
         {
+            int index = tables.IndexOf(evt.newValue);
+
+            if (index != -1)
+            {
+                DialogueSO so = window.SO;
+
+                VisualElement target = evt.target as VisualElement;
+                bool speaker = target.name == "Speaker Table";
+
+                SetEntries(collections[index], speaker ? speakerEntries : textEntries);
+
+                Undo.RecordObject(so, speaker ? "Change Speaker Table" : "Change Text Table");
+
+                List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
+
+                optionData[0] = new(collections[index].TableCollectionName);
+                optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+        #endregion
+
+        #region Entry
+        private void AddEntryField(bool speaker)
+        {
+            List<EntryData> entries = speaker ? speakerEntries : textEntries;
             List<GenericData> optionData = optionDatas[speaker ? 1 : 3].data;
 
             int index = entries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
 
-            PopupField<EntryData> field = new(speaker ? "Speaker Entry" : "Text Entry", entries, index);
+            string name = speaker ? "Speaker Entry" : "Text Entry";
+            PopupField<EntryData> field = new(name, entries, index) { name = name };
 
             field.labelElement.style.minWidth = StyleKeyword.Auto;
             field.labelElement.style.width = StyleKeyword.Auto;
 
             field[1].style.minWidth = ITEM_MIN_WIDTH;
 
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, entries, speaker));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    DialogueSO so = window.SO;
-
-                    Undo.RecordObject(so, "Delete Entry Option");
-
-                    field.value = default;
-
-                    optionData[0] = new(GenericData.DataType.String);
-                    optionData[1] = new(GenericData.DataType.Long);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
-            });
+            field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(OnEntryKeyDownEvent);
 
             extensionContainer.Add(field);
 
@@ -273,6 +246,60 @@ namespace Yang.Dialogue.Editor
                     EntryData data = new(current.Id, current.Key, tooltip);
 
                     entries.Add(data);
+                }
+            }
+        }
+
+        private void OnEntryKeyDownEvent(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.Delete)
+            {
+                PopupField<EntryData> field = FindParentInCurrent<PopupField<EntryData>>(evt.target as VisualElement);
+
+                if (field == null) return;
+
+                DialogueSO so = window.SO;
+
+                List<GenericData> optionData = optionDatas[field.name == "Speaker Entry" ? 1 : 3].data;
+
+                Undo.RecordObject(so, "Delete Entry Option");
+
+                field.value = default;
+
+                optionData[0] = new(GenericData.DataType.String);
+                optionData[1] = new(GenericData.DataType.Long);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedCallback(ChangeEvent<EntryData> evt)
+        {
+            if (evt.target is PopupField<EntryData> target)
+            {
+                bool speaker = target.name == "Speaker Entry";
+
+                List<EntryData> entries = speaker ? speakerEntries : textEntries;
+                List<GenericData> optionData = optionDatas[speaker ? 1 : 3].data;
+
+                int index = entries.IndexOf(evt.newValue);
+
+                if (index != -1)
+                {
+                    DialogueSO so = window.SO;
+
+                    Undo.RecordObject(so, "Change Speaker Entry");
+
+                    optionData[0] = new(entries[index].key);
+                    optionData[1] = new(entries[index].id);
+
+                    target.tooltip = entries[index].tooltip;
+
+                    EditorUtility.SetDirty(so);
+
+                    window.SetUnsaved();
                 }
             }
         }

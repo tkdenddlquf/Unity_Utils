@@ -82,7 +82,7 @@ namespace Yang.Dialogue.Editor
 
         private void AddEventField(Object target)
         {
-            VisualElement container = new();
+            VisualElement container = new() { name = "Item Element" };
 
             container.style.flexDirection = FlexDirection.Row;
             container.style.alignItems = Align.Center;
@@ -91,7 +91,7 @@ namespace Yang.Dialogue.Editor
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+            field.RegisterValueChangedCallback(ChangedCallback);
 
             Button upButton = new(() => MoveObjectField(container, -1)) { text = "▲" };
             Button downButton = new(() => MoveObjectField(container, 1)) { text = "▼" };
@@ -153,13 +153,13 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<Object> evt, VisualElement itemElement)
+        private void ChangedCallback(ChangeEvent<Object> evt)
         {
             DialogueSO so = window.SO;
 
-            VisualElement container = itemElement.parent;
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
 
-            int optionIndex = container.IndexOf(itemElement);
+            int optionIndex = itemElement.parent.IndexOf(itemElement);
 
             Undo.RecordObject(so, "Change Object Option");
 

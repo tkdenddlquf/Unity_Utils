@@ -75,34 +75,9 @@ namespace Yang.Dialogue
                                             float value = runnerTrigger.GetFloatValue(key);
                                             float checkValue = datas[j + 1].GetFloat();
 
-                                            RunnerValue.CheckType type = datas[j + 2].GetEnum<RunnerValue.CheckType>();
+                                            ValueCheckType type = datas[j + 2].GetEnum<ValueCheckType>();
 
-                                            switch (type)
-                                            {
-                                                case RunnerValue.CheckType.Less:
-                                                    if (checkValue >= value) allExist = false;
-                                                    break;
-
-                                                case RunnerValue.CheckType.Equal:
-                                                    if (checkValue != value) allExist = false;
-                                                    break;
-
-                                                case RunnerValue.CheckType.LessEqual:
-                                                    if (checkValue > value) allExist = false;
-                                                    break;
-
-                                                case RunnerValue.CheckType.Greater:
-                                                    if (checkValue <= value) allExist = false;
-                                                    break;
-
-                                                case RunnerValue.CheckType.NotEqual:
-                                                    if (checkValue == value) allExist = false;
-                                                    break;
-
-                                                case RunnerValue.CheckType.GreaterEqual:
-                                                    if (checkValue < value) allExist = false;
-                                                    break;
-                                            }
+                                            if (!CheckValue(value, checkValue, type)) allExist = false;
                                         }
                                         break;
 
@@ -139,9 +114,9 @@ namespace Yang.Dialogue
                             switch (datas[1].Type)
                             {
                                 case GenericData.DataType.Float:
-                                    switch (datas[2].GetEnum<RunnerValue.SetterType>())
+                                    switch (datas[2].GetEnum<ValueSetterType>())
                                     {
-                                        case RunnerValue.SetterType.Plus:
+                                        case ValueSetterType.Plus:
                                             {
                                                 float value = runnerTrigger.GetFloatValue(key);
 
@@ -149,7 +124,7 @@ namespace Yang.Dialogue
                                             }
                                             break;
 
-                                        case RunnerValue.SetterType.Minus:
+                                        case ValueSetterType.Minus:
                                             {
                                                 float value = runnerTrigger.GetFloatValue(key);
 
@@ -157,7 +132,7 @@ namespace Yang.Dialogue
                                             }
                                             break;
 
-                                        case RunnerValue.SetterType.Set:
+                                        case ValueSetterType.Set:
                                             runnerTrigger.SetValue(key, datas[1].GetFloat());
                                             break;
                                     }
@@ -205,11 +180,63 @@ namespace Yang.Dialogue
 
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
 
-                        string entryTable = textTable[0].ToString();
+                        string textTableKey = textTable[0].ToString();
 
                         for (int i = 0; i < textEntries.Count; i++)
                         {
-                            RunnerChoiceText data = new(i, entryTable, textEntries[i].data[0].ToString());
+                            IReadOnlyList<GenericData> textEntry = textEntries[i].data;
+
+                            bool hide = textEntry[2].GetBool();
+
+                            if (hide) continue;
+
+                            bool isValid = true;
+
+                            string textEntryKey = textEntry[0].ToString();
+
+                            int conditionCount = (textEntry.Count - 3) / 3;
+
+                            RunnerCondition[] conditions = new RunnerCondition[conditionCount];
+
+                            for (int j = 0; j < conditionCount; j++)
+                            {
+                                int dataIndex = 3 + (j * 3);
+
+                                string key = textEntry[dataIndex].ToString();
+
+                                switch (textEntry[dataIndex + 1].Type)
+                                {
+                                    case GenericData.DataType.Float:
+                                        {
+                                            float value = runnerTrigger.GetFloatValue(key);
+                                            float checkValue = textEntry[dataIndex + 1].GetFloat();
+
+                                            ValueCheckType type = textEntry[dataIndex + 2].GetEnum<ValueCheckType>();
+
+                                            bool check = CheckValue(value, checkValue, type);
+
+                                            if (!check) isValid = false;
+
+                                            conditions[j] = new(key, check, checkValue, type);
+                                        }
+                                        break;
+
+                                    case GenericData.DataType.Bool:
+                                        {
+                                            bool value = runnerTrigger.GetBoolValue(key);
+                                            bool checkValue = textEntry[dataIndex + 1].GetBool();
+
+                                            bool check = value != checkValue;
+
+                                            if (!check) isValid = false;
+
+                                            conditions[j] = new(key, check, checkValue);
+                                        }
+                                        break;
+                                }
+                            }
+
+                            RunnerChoiceText data = new(i, textTableKey, textEntryKey, isValid, conditions);
 
                             choiceDatas.Add(data);
                         }
@@ -282,6 +309,38 @@ namespace Yang.Dialogue
             nodeName = "";
 
             return false;
+        }
+
+        private bool CheckValue(float value, float checkValue, ValueCheckType type)
+        {
+            switch (type)
+            {
+                case ValueCheckType.Less:
+                    if (checkValue >= value) return false;
+                    break;
+
+                case ValueCheckType.Equal:
+                    if (checkValue != value) return false;
+                    break;
+
+                case ValueCheckType.LessEqual:
+                    if (checkValue > value) return false;
+                    break;
+
+                case ValueCheckType.Greater:
+                    if (checkValue <= value) return false;
+                    break;
+
+                case ValueCheckType.NotEqual:
+                    if (checkValue == value) return false;
+                    break;
+
+                case ValueCheckType.GreaterEqual:
+                    if (checkValue < value) return false;
+                    break;
+            }
+
+            return true;
         }
     }
 }

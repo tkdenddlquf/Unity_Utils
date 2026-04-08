@@ -6,69 +6,42 @@ namespace Yang.Dialogue
     [Serializable]
     public struct RunnerValue
     {
-        private enum ValueType : byte
-        {
-            Float,
-            Bool,
-        }
-
-        public enum SetterType : byte
-        {
-            Plus,
-            Minus,
-            Set,
-        }
-
-        public enum CheckType : byte
-        {
-            Less,
-            Equal,
-            LessEqual,
-            Greater,
-            NotEqual,
-            GreaterEqual,
-        }
-
         [SerializeField] private string key;
         public readonly string Key => key;
 
         [SerializeField] private ValueType type;
+        public readonly ValueType Type => type;
 
-        [SerializeField] private float floatValue;
-        [SerializeField] private bool boolValue;
+        [SerializeField] private float value;
 
         public RunnerValue(string key, float value)
         {
-            this = default;
-
             this.key = key;
 
             type = ValueType.Float;
 
-            floatValue = value;
+            this.value = value;
         }
 
         public RunnerValue(string key, bool value)
         {
-            this = default;
-
             this.key = key;
 
             type = ValueType.Bool;
 
-            boolValue = value;
+            this.value = value ? 1 : 0;
         }
 
         public readonly float GetFloatValue()
         {
-            if (type == ValueType.Float) return floatValue;
+            if (type == ValueType.Float) return value;
 
             return 0;
         }
 
         public readonly bool GetBoolValue()
         {
-            if (type == ValueType.Bool) return boolValue;
+            if (type == ValueType.Bool) return value == 1;
 
             return false;
         }

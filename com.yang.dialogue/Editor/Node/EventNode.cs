@@ -85,7 +85,7 @@ namespace Yang.Dialogue.Editor
 
         private void AddEventField(string key)
         {
-            VisualElement container = new();
+            VisualElement container = new() { name = "Item Element" };
 
             container.style.flexDirection = FlexDirection.Row;
             container.style.alignItems = Align.Center;
@@ -98,15 +98,8 @@ namespace Yang.Dialogue.Editor
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    field.value = "";
-                    window.SetUnsaved();
-                }
-            });
+            field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
             Button removeButton = new(() => RemoveEventField(container)) { text = "X" };
 
@@ -138,13 +131,27 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<string> evt, VisualElement itemElement)
+        private void OnKeyDownEvent(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.Delete)
+            {
+                PopupField<string> field = FindParentInCurrent<PopupField<string>>(evt.target as VisualElement);
+
+                if (field == null) return;
+
+                field.value = "";
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
 
-            VisualElement container = itemElement.parent;
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
 
-            int optionIndex = container.IndexOf(itemElement);
+            int optionIndex = itemElement.parent.IndexOf(itemElement);
 
             Undo.RecordObject(so, "Change Event Option");
 

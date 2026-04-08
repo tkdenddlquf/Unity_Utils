@@ -75,7 +75,7 @@ namespace Yang.Dialogue.Editor
                 switch (optionData[1].Type)
                 {
                     case GenericData.DataType.Float:
-                        AddFloatField(key, optionData[1].GetFloat(), optionData[2].GetEnum<RunnerValue.SetterType>());
+                        AddFloatField(key, optionData[1].GetFloat(), optionData[2].GetEnum<ValueSetterType>());
                         break;
 
                     case GenericData.DataType.Bool:
@@ -85,13 +85,39 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<string> evt, VisualElement itemElement)
+        private void OnKeyDownEvent(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.Delete)
+            {
+                PopupField<string> field = FindParentInCurrent<PopupField<string>>(evt.target as VisualElement);
+
+                if (field == null) return;
+
+                DialogueSO so = window.SO;
+
+                VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+
+                Undo.RecordObject(so, "Delete Trigger Option");
+
+                field.value = "";
+
+                int optionIndex = itemElement.parent.IndexOf(itemElement);
+
+                optionDatas[optionIndex].data[0] = new(GenericData.DataType.String);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
 
-            VisualElement container = itemElement.parent;
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
 
-            int optionIndex = container.IndexOf(itemElement);
+            int optionIndex = itemElement.parent.IndexOf(itemElement);
 
             Undo.RecordObject(so, "Change Trigger Option");
 
@@ -115,7 +141,7 @@ namespace Yang.Dialogue.Editor
                 new(GenericData.DataType.Enum)
             );
 
-            AddFloatField("", 0, RunnerValue.SetterType.Plus);
+            AddFloatField("", 0, ValueSetterType.Plus);
 
             optionDatas.Add(optionData);
 
@@ -124,9 +150,9 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void AddFloatField(string key, float value, RunnerValue.SetterType type)
+        private void AddFloatField(string key, float value, ValueSetterType type)
         {
-            VisualElement container = new();
+            VisualElement container = new() { name = "Item Element" };
 
             container.style.flexDirection = FlexDirection.Row;
             container.style.alignItems = Align.Center;
@@ -142,36 +168,18 @@ namespace Yang.Dialogue.Editor
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    DialogueSO so = window.SO;
-
-                    Undo.RecordObject(so, "Delete Float Trigger Option");
-
-                    field.value = "";
-
-                    int optionIndex = container.parent.IndexOf(container);
-
-                    optionDatas[optionIndex].data[0] = new(GenericData.DataType.String);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
-            });
+            field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
             FloatField floatField = new() { value = value };
 
             floatField.style.minWidth = 60;
-            floatField.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+            floatField.RegisterValueChangedCallback(ChangedCallback);
 
             EnumField typeField = new(type);
 
             typeField.style.minWidth = 70;
-            typeField.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+            typeField.RegisterValueChangedCallback(ChangedCallback);
 
             Button removeButton = new(() => RemoveFloatField(container)) { text = "X" };
 
@@ -205,13 +213,13 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<float> evt, VisualElement itemElement)
+        private void ChangedCallback(ChangeEvent<float> evt)
         {
             DialogueSO so = window.SO;
 
-            VisualElement container = itemElement.parent;
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
 
-            int optionIndex = container.IndexOf(itemElement);
+            int optionIndex = itemElement.parent.IndexOf(itemElement);
 
             Undo.RecordObject(so, "Change Float Trigger Option");
 
@@ -222,13 +230,13 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void ChangedCallback(ChangeEvent<System.Enum> evt, VisualElement itemElement)
+        private void ChangedCallback(ChangeEvent<System.Enum> evt)
         {
             DialogueSO so = window.SO;
 
-            VisualElement container = itemElement.parent;
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
 
-            int optionIndex = container.IndexOf(itemElement);
+            int optionIndex = itemElement.parent.IndexOf(itemElement);
 
             Undo.RecordObject(so, "Change Trigger Option");
 
@@ -263,7 +271,7 @@ namespace Yang.Dialogue.Editor
 
         private void AddBoolField(string key, bool value)
         {
-            VisualElement container = new();
+            VisualElement container = new() { name = "Item Element" };
 
             container.style.flexDirection = FlexDirection.Row;
             container.style.alignItems = Align.Center;
@@ -279,30 +287,12 @@ namespace Yang.Dialogue.Editor
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    DialogueSO so = window.SO;
-
-                    Undo.RecordObject(so, "Delete Bool Trigger Option");
-
-                    field.value = "";
-
-                    int optionIndex = container.parent.IndexOf(container);
-
-                    optionDatas[optionIndex].data[0] = new(GenericData.DataType.String);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
-            });
+            field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
             Toggle toggle = new() { value = value };
 
-            toggle.RegisterValueChangedCallback(evt => ChangedCallback(evt, container));
+            toggle.RegisterValueChangedCallback(ChangedCallback);
 
             Button removeButton = new(() => RemoveBoolField(container)) { text = "X" };
 
@@ -335,13 +325,13 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<bool> evt, VisualElement itemElement)
+        private void ChangedCallback(ChangeEvent<bool> evt)
         {
             DialogueSO so = window.SO;
 
-            VisualElement container = itemElement.parent;
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
 
-            int optionIndex = container.IndexOf(itemElement);
+            int optionIndex = itemElement.parent.IndexOf(itemElement);
 
             Undo.RecordObject(so, "Change Bool Trigger Option");
 

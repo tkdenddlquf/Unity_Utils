@@ -71,9 +71,9 @@ namespace Yang.Dialogue.Editor
                         case GenericData.DataType.Float:
                             {
                                 float value = portOptions[j + 1].GetFloat();
-                                RunnerValue.CheckType type = portOptions[j + 2].GetEnum<RunnerValue.CheckType>();
+                                ValueCheckType type = portOptions[j + 2].GetEnum<ValueCheckType>();
 
-                                AddConditionFloatField(itemContainer, key, value, type);
+                                itemContainer.Add(GetConditionFloatField(key, value, type));
                             }
                             break;
 
@@ -81,7 +81,7 @@ namespace Yang.Dialogue.Editor
                             {
                                 bool value = portOptions[j + 1].GetBool();
 
-                                AddConditionBoolField(itemContainer, key, value);
+                                itemContainer.Add(GetConditionBoolField(key, value));
                             }
                             break;
                     }
@@ -160,7 +160,6 @@ namespace Yang.Dialogue.Editor
         {
             Port port = CreateOutputPort();
 
-            DialogueSO so = window.SO;
             VisualElement portElement = new();
 
             VisualElement groupContainer = new();
@@ -215,11 +214,13 @@ namespace Yang.Dialogue.Editor
             return itemContainer;
         }
 
-        private void RemoveConditionField(Port port, VisualElement itemElement)
+        private void RemoveConditionField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
 
             VisualElement itemContainer = itemElement.parent;
+
+            Port port = FindParent<Port>(itemContainer);
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemContainer.IndexOf(itemElement);
@@ -240,9 +241,40 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void ChangedCallback(ChangeEvent<string> evt, Port port, VisualElement itemElement)
+        private void OnKeyDownEvent(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.Delete)
+            {
+                PopupField<string> field = FindParentInCurrent<PopupField<string>>(evt.target as VisualElement);
+
+                if (field == null) return;
+
+                DialogueSO so = window.SO;
+
+                VisualElement itemElement = FindParent<VisualElement>(field, "Item Element");
+                Port port = FindParent<Port>(itemElement);
+
+                Undo.RecordObject(so, "Delete Condition Option");
+
+                field.value = "";
+
+                int portIndex = port.parent.IndexOf(port);
+                int itemIndex = itemElement.parent.IndexOf(itemElement);
+
+                portDatas[portIndex].data[itemIndex] = new(GenericData.DataType.String);
+
+                EditorUtility.SetDirty(so);
+
+                window.SetUnsaved();
+            }
+        }
+
+        private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
+
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            Port port = FindParent<Port>(itemElement);
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement) * 3;
@@ -260,7 +292,7 @@ namespace Yang.Dialogue.Editor
         #region Float
         private void CreateConditionFloatField(VisualElement itemContainer)
         {
-            Port port = itemContainer.parent.parent.parent as Port;
+            Port port = FindParent<Port>(itemContainer);
 
             DialogueSO so = window.SO;
 
@@ -270,7 +302,7 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Add Condition Float Field");
 
-            AddConditionFloatField(itemContainer, "", 0, RunnerValue.CheckType.Less);
+            itemContainer.Add(GetConditionFloatField("", 0, ValueCheckType.Less));
 
             portData.Add(new(GenericData.DataType.String));
             portData.Add(new(GenericData.DataType.Float));
@@ -281,11 +313,9 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void AddConditionFloatField(VisualElement itemContainer, string key, float value, RunnerValue.CheckType type)
+        private VisualElement GetConditionFloatField(string key, float value, ValueCheckType type)
         {
-            Port port = itemContainer.parent.parent.parent as Port;
-
-            VisualElement itemElement = new();
+            VisualElement itemElement = new() { name = "Item Element" };
 
             itemElement.style.flexDirection = FlexDirection.Row;
             itemElement.style.alignItems = Align.Center;
@@ -301,51 +331,35 @@ namespace Yang.Dialogue.Editor
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port, itemElement));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    DialogueSO so = window.SO;
-
-                    Undo.RecordObject(so, "Delete Condition Float Option");
-
-                    field.value = "";
-
-                    int portIndex = port.parent.IndexOf(port);
-                    int itemIndex = itemElement.parent.IndexOf(itemElement);
-
-                    portDatas[portIndex].data[itemIndex] = new(GenericData.DataType.String);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
-            });
+            field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
             FloatField floatField = new() { value = value };
 
             floatField.style.minWidth = 60;
-            floatField.RegisterValueChangedCallback(evt => ChangedCallback(evt, port, itemElement));
+            floatField.RegisterValueChangedCallback(ChangedCallback);
 
             EnumField typeField = new(type);
 
             typeField.style.minWidth = 70;
-            typeField.RegisterValueChangedCallback(evt => ChangedCallback(evt, port, itemElement));
+            typeField.RegisterValueChangedCallback(ChangedCallback);
 
-            Button remove = new(() => RemoveConditionField(port, itemElement)) { text = "-" };
+            Button remove = new(() => RemoveConditionField(itemElement)) { text = "-" };
 
             itemElement.Add(field);
             itemElement.Add(floatField);
             itemElement.Add(typeField);
             itemElement.Add(remove);
 
-            itemContainer.Add(itemElement);
+            return itemElement;
         }
 
-        private void ChangedCallback(ChangeEvent<float> evt, Port port, VisualElement itemElement)
+        private void ChangedCallback(ChangeEvent<float> evt)
         {
             DialogueSO so = window.SO;
+
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            Port port = FindParent<Port>(itemElement);
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement) * 3 + 1;
@@ -359,9 +373,12 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void ChangedCallback(ChangeEvent<System.Enum> evt, Port port, VisualElement itemElement)
+        private void ChangedCallback(ChangeEvent<System.Enum> evt)
         {
             DialogueSO so = window.SO;
+
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            Port port = FindParent<Port>(itemElement);
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement) * 3 + 2;
@@ -379,7 +396,7 @@ namespace Yang.Dialogue.Editor
         #region Bool
         private void CreateConditionBoolField(VisualElement itemContainer)
         {
-            Port port = itemContainer.parent.parent.parent as Port;
+            Port port = FindParent<Port>(itemContainer);
 
             DialogueSO so = window.SO;
 
@@ -389,7 +406,7 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Add Condition Bool Field");
 
-            AddConditionBoolField(itemContainer, "", false);
+            itemContainer.Add(GetConditionBoolField("", false));
 
             portData.Add(new(GenericData.DataType.String));
             portData.Add(new(GenericData.DataType.Bool));
@@ -400,11 +417,9 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void AddConditionBoolField(VisualElement itemContainer, string key, bool value)
+        private VisualElement GetConditionBoolField(string key, bool value)
         {
-            Port port = itemContainer.parent.parent.parent as Port;
-
-            VisualElement itemElement = new();
+            VisualElement itemElement = new() { name = "Item Element" };
 
             itemElement.style.flexDirection = FlexDirection.Row;
             itemElement.style.alignItems = Align.Center;
@@ -420,44 +435,28 @@ namespace Yang.Dialogue.Editor
 
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
-            field.RegisterValueChangedCallback(evt => ChangedCallback(evt, port, itemElement));
-            field.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Delete)
-                {
-                    DialogueSO so = window.SO;
-
-                    Undo.RecordObject(so, "Delete Condition Bool Option");
-
-                    field.value = "";
-
-                    int portIndex = port.parent.IndexOf(port);
-                    int itemIndex = itemElement.parent.IndexOf(itemElement);
-
-                    portDatas[portIndex].data[itemIndex] = new(GenericData.DataType.String);
-
-                    EditorUtility.SetDirty(so);
-
-                    window.SetUnsaved();
-                }
-            });
+            field.RegisterValueChangedCallback(ChangedCallback);
+            field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
             Toggle toggle = new() { value = value };
 
-            toggle.RegisterValueChangedCallback(evt => ChangedCallback(evt, port, itemElement));
+            toggle.RegisterValueChangedCallback(ChangedCallback);
 
-            Button remove = new(() => RemoveConditionField(port, itemElement)) { text = "-" };
+            Button remove = new(() => RemoveConditionField(itemElement)) { text = "-" };
 
             itemElement.Add(field);
             itemElement.Add(toggle);
             itemElement.Add(remove);
 
-            itemContainer.Add(itemElement);
+            return itemElement;
         }
 
-        private void ChangedCallback(ChangeEvent<bool> evt, Port port, VisualElement itemElement)
+        private void ChangedCallback(ChangeEvent<bool> evt)
         {
             DialogueSO so = window.SO;
+
+            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            Port port = FindParent<Port>(itemElement);
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement) * 3 + 1;
