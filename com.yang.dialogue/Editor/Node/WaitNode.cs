@@ -70,12 +70,13 @@ namespace Yang.Dialogue.Editor
 
         private void SetDisplaySeconds(WaitType waitType)
         {
+            TextField reasonField = extensionContainer.Q<TextField>();
+            FloatField secondsField = extensionContainer.Q<FloatField>();
+
             switch (waitType)
             {
                 case WaitType.Notify:
-                    extensionContainer[1].style.display = DisplayStyle.None;
-
-                    TextField reasonField = extensionContainer[2] as TextField;
+                    secondsField.style.display = DisplayStyle.None;
 
                     string currentReason = reasonField.value;
 
@@ -85,9 +86,7 @@ namespace Yang.Dialogue.Editor
                     break;
 
                 case WaitType.Seconds:
-                    extensionContainer[2].style.display = DisplayStyle.None;
-
-                    FloatField secondsField = extensionContainer[1] as FloatField;
+                    reasonField.style.display = DisplayStyle.None;
 
                     float currentSeconds = secondsField.value;
 

@@ -108,7 +108,7 @@ namespace Yang.Dialogue.Editor
             List<EntryData> entries = speaker ? speakerEntries : textEntries;
             List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
-            int index = GetTableIndex(optionData[0].ToString(), optionData[1].TryGetGuid(out System.Guid guid) ? guid : default);
+            int index = GetTableIndex(optionData[0].ToString(), optionData[1].GetGuid());
 
             string name = speaker ? "Speaker Table" : "Text Table";
             PopupField<string> field = new(name, tables, index) { name = name };
@@ -202,7 +202,7 @@ namespace Yang.Dialogue.Editor
             List<EntryData> entries = speaker ? speakerEntries : textEntries;
             List<GenericData> optionData = optionDatas[speaker ? 1 : 3].data;
 
-            int index = entries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
+            int index = entries.IndexOf(new EntryData(optionData[1].GetLong(), optionData[0].ToString()));
 
             string name = speaker ? "Speaker Entry" : "Text Entry";
             PopupField<EntryData> field = new(name, entries, index) { name = name };

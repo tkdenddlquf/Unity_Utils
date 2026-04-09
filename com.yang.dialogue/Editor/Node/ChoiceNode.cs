@@ -122,6 +122,11 @@ namespace Yang.Dialogue.Editor
 
                 VisualElement itemContainer = AddTextEntryField(portDatas[i].data);
 
+                Toggle hide = FindParent<Port>(itemContainer).Q<Toggle>("Hide");
+
+                if (portOptions.Count > 3) hide.style.display = DisplayStyle.Flex;
+                else hide.style.display = DisplayStyle.None;
+
                 for (int j = 3; j < portOptions.Count; j += 3)
                 {
                     string key = portOptions[j].ToString();
@@ -180,7 +185,7 @@ namespace Yang.Dialogue.Editor
         {
             List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
-            int index = GetTableIndex(optionData[0].ToString(), optionData[1].TryGetGuid(out System.Guid guid) ? guid : default);
+            int index = GetTableIndex(optionData[0].ToString(), optionData[1].GetGuid());
 
             string name = speaker ? "Speaker Table" : "Text Table";
 
@@ -274,7 +279,7 @@ namespace Yang.Dialogue.Editor
         {
             List<GenericData> optionData = optionDatas[1].data;
 
-            int index = speakerEntries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
+            int index = speakerEntries.IndexOf(new EntryData(optionData[1].GetLong(), optionData[0].ToString()));
 
             string name = "Speaker Entry";
             PopupField<EntryData> field = new(name, speakerEntries, index) { name = name };
@@ -409,7 +414,7 @@ namespace Yang.Dialogue.Editor
 
         private VisualElement AddTextEntryField(List<GenericData> optionData)
         {
-            int index = textEntries.IndexOf(new EntryData(optionData[1].TryGetLong(out long result) ? result : 0, optionData[0].ToString()));
+            int index = textEntries.IndexOf(new EntryData(optionData[1].GetLong(), optionData[0].ToString()));
 
             Port port = CreateOutputPort();
 
@@ -456,7 +461,12 @@ namespace Yang.Dialogue.Editor
             field.RegisterValueChangedCallback(ChangedTextCallback);
             field.RegisterCallback<KeyDownEvent>(OnEntryKeyDownEvent);
 
-            Toggle hide = new() { value = optionData[2].GetBool() };
+            Toggle hide = new()
+            {
+                name = "Hide",
+                value = optionData[2].GetBool(),
+                tooltip = "Only passes the option if conditions are met."
+            };
 
             hide.RegisterValueChangedCallback(ChangedTextCallback);
 
@@ -517,6 +527,13 @@ namespace Yang.Dialogue.Editor
                 List<GenericData> portData = portDatas[portIndex].data;
 
                 portData.RemoveRange(3 + itemIndex * 3, 3);
+
+                if (itemContainer.childCount == 0)
+                {
+                    Toggle hide = port.Q<Toggle>("Hide");
+
+                    hide.style.display = DisplayStyle.None;
+                }
 
                 EditorUtility.SetDirty(so);
 
@@ -635,6 +652,10 @@ namespace Yang.Dialogue.Editor
             portData.Add(new(GenericData.DataType.Float));
             portData.Add(new(GenericData.DataType.Enum));
 
+            Toggle hide = port.Q<Toggle>("Hide");
+
+            hide.style.display = DisplayStyle.Flex;
+
             EditorUtility.SetDirty(so);
 
             window.SetUnsaved();
@@ -738,6 +759,10 @@ namespace Yang.Dialogue.Editor
             portData.Add(new(GenericData.DataType.String));
             portData.Add(new(GenericData.DataType.Bool));
             portData.Add(new(GenericData.DataType.Enum));
+
+            Toggle hide = port.Q<Toggle>("Hide");
+
+            hide.style.display = DisplayStyle.Flex;
 
             EditorUtility.SetDirty(so);
 
