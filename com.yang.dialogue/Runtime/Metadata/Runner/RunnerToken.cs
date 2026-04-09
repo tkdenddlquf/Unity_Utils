@@ -17,6 +17,8 @@ namespace Yang.Dialogue
 
         public bool IsStop => cts == null || cts.IsCancellationRequested;
 
+        public event Action OnStopCallback;
+
         public string PointNode { get; private set; }
 
         public string TargetNode { get; set; }
@@ -38,13 +40,13 @@ namespace Yang.Dialogue
             if (IsStop) return;
 
             cts.Cancel();
+
+            OnStopCallback?.Invoke();
         }
 
         public void Dispose()
         {
-            if (IsStop) return;
-
-            cts.Dispose();
+            cts?.Dispose();
             cts = null;
         }
 
@@ -63,6 +65,8 @@ namespace Yang.Dialogue
     public interface IRunnerToken
     {
         public bool IsStop { get; }
+
+        public event Action OnStopCallback;
 
         public void Stop();
 
