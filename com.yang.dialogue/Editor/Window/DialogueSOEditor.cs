@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -9,8 +9,8 @@ namespace Yang.Dialogue.Editor
     [CustomEditor(typeof(DialogueSO))]
     public class DialogueSOEditor : UnityEditor.Editor
     {
-        PopupField<string> eventPopup;
-        PopupField<string> conditionPopup;
+        private PopupField<string> eventPopup;
+        private PopupField<string> conditionPopup;
 
         public override VisualElement CreateInspectorGUI()
         {
@@ -23,8 +23,15 @@ namespace Yang.Dialogue.Editor
 
             Button button = new(Open) { text = "Edit" };
 
+            root.Bind(serializedObject);
+
             root.Add(eventPopup);
             root.Add(conditionPopup);
+
+            root.Add(GetHeader("Override Settings"));
+            root.Add(GetField("speakerTable"));
+            root.Add(GetField("textTable"));
+
             root.Add(button);
 
             serializedObject.ApplyModifiedProperties();
@@ -37,6 +44,18 @@ namespace Yang.Dialogue.Editor
             DialogueEditorWindow window = DialogueEditorWindow.Open();
 
             window.SO = target as DialogueSO;
+        }
+
+        private Label GetHeader(string text)
+        {
+            Label header = new(text);
+
+            header.style.unityFontStyleAndWeight = UnityEngine.FontStyle.Bold;
+            header.style.fontSize = 14;
+            header.style.marginTop = 6;
+            header.style.marginBottom = 4;
+
+            return header;
         }
 
         private PopupField<string> GetMarkerPopup<T>(string propName)
@@ -106,6 +125,13 @@ namespace Yang.Dialogue.Editor
             string[] split = prop.managedReferenceFullTypename.Split(' ');
 
             return Type.GetType($"{split[1]}, {split[0]}");
+        }
+
+        private PropertyField GetField(string propName)
+        {
+            SerializedProperty prop = serializedObject.FindProperty(propName);
+
+            return new(prop);
         }
     }
 }

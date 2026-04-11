@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEditor.Localization;
 using UnityEngine;
+using UnityEngine.Localization;
 using UnityEngine.Localization.Tables;
 using UnityEngine.UIElements;
 
@@ -71,19 +72,51 @@ namespace Yang.Dialogue.Editor
         {
             if (portDatas.Count == 0)
             {
-                DataWrapper speakerTable = new(
-                    new(GenericData.DataType.String),
-                    new(GenericData.DataType.Guid)
-                );
+                DialogueSO so = window.SO;
+
+                LocalizedStringTable speakerOverride = so.SpeakerTable;
+                LocalizedStringTable textOverride = so.TextTable;
+
+                DataWrapper speakerTable;
+                DataWrapper textTable;
+
+                if (speakerOverride == null || speakerOverride.IsEmpty)
+                {
+                    speakerTable = new(
+                        new(GenericData.DataType.String),
+                        new(GenericData.DataType.Guid)
+                    );
+                }
+                else
+                {
+                    TableReference reference = speakerOverride.TableReference;
+
+                    speakerTable = new(
+                        new(reference.TableCollectionName),
+                        new(reference.TableCollectionNameGuid)
+                    );
+                }
+
+                if (textOverride == null || textOverride.IsEmpty)
+                {
+                    textTable = new(
+                        new(GenericData.DataType.String),
+                        new(GenericData.DataType.Guid)
+                    );
+                }
+                else
+                {
+                    TableReference reference = textOverride.TableReference;
+
+                    textTable = new(
+                        new(reference.TableCollectionName),
+                        new(reference.TableCollectionNameGuid)
+                    );
+                }
 
                 DataWrapper speakerEntry = new(
                     new(GenericData.DataType.String),
                     new(GenericData.DataType.Long)
-                );
-
-                DataWrapper textTable = new(
-                    new(GenericData.DataType.String),
-                    new(GenericData.DataType.Guid)
                 );
 
                 DataWrapper textEntry = new(
@@ -541,7 +574,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void OnKeyDownEvent(KeyDownEvent evt)
+        private void OnConditionKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
             {
@@ -680,7 +713,7 @@ namespace Yang.Dialogue.Editor
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(ChangedConditionCallback);
-            field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
+            field.RegisterCallback<KeyDownEvent>(OnConditionKeyDownEvent);
 
             FloatField floatField = new() { value = value };
 
@@ -788,7 +821,7 @@ namespace Yang.Dialogue.Editor
             field.style.minWidth = ITEM_MIN_WIDTH;
             field.style.flexGrow = 1;
             field.RegisterValueChangedCallback(ChangedConditionCallback);
-            field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
+            field.RegisterCallback<KeyDownEvent>(OnConditionKeyDownEvent);
 
             Toggle toggle = new() { value = value };
 

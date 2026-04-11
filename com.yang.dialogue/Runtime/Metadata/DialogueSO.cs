@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Localization;
 
 namespace Yang.Dialogue
 {
@@ -14,6 +15,12 @@ namespace Yang.Dialogue
 
         [SerializeReference] private IConditionMarker conditions;
         public IConditionMarker Conditions => conditions;
+
+        [SerializeField] private LocalizedStringTable speakerTable;
+        public LocalizedStringTable SpeakerTable => speakerTable;
+
+        [SerializeField] private LocalizedStringTable textTable;
+        public LocalizedStringTable TextTable => textTable;
 
         [SerializeField] private List<NodeData> nodes = new();
         [SerializeField] private List<LinkData> links = new();
