@@ -54,7 +54,6 @@ namespace Yang.Dialogue.Editor
             optionDatas = (List<DataWrapper>)optionDataField.GetValue(data);
 
             GUID = guid;
-            expanded = data.isExpended;
 
             AddGUIDField();
         }

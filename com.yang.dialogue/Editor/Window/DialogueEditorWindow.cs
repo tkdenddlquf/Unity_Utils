@@ -304,6 +304,11 @@ namespace Yang.Dialogue.Editor
                         }
                     }
                 }
+
+                foreach (Node node in graph.nodes)
+                {
+                    if (node is BaseNode baseNode) node.expanded = GetNode(baseNode.GUID).isExpended;
+                }
             }
 
             graph.ClearSelection();
