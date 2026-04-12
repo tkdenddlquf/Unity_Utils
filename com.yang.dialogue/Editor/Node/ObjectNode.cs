@@ -157,7 +157,7 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
 
-            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            VisualElement itemElement = evt.target.FindParent<VisualElement>("Item Element");
 
             int optionIndex = itemElement.parent.IndexOf(itemElement);
 

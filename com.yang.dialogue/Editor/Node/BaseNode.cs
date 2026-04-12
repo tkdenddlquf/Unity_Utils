@@ -19,6 +19,28 @@ namespace Yang.Dialogue.Editor
 
         public string GUID { get; private set; }
 
+        public override bool expanded
+        {
+            get => base.expanded;
+            set
+            {
+                base.expanded = value;
+
+                NodeData data = window.GetNode(GUID);
+
+                if (data.isExpended != value)
+                {
+                    data.isExpended = value;
+
+                    window.SetNode(GUID, data);
+
+                    EditorUtility.SetDirty(window.SO);
+
+                    window.SetUnsaved();
+                }
+            }
+        }
+
         protected BaseNode(DialogueEditorWindow window, string guid)
         {
             this.window = window;
@@ -32,67 +54,12 @@ namespace Yang.Dialogue.Editor
             optionDatas = (List<DataWrapper>)optionDataField.GetValue(data);
 
             GUID = guid;
+            expanded = data.isExpended;
 
             AddGUIDField();
         }
 
         public abstract void SetPorts();
-
-        protected T FindParent<T>(VisualElement element) where T : VisualElement
-        {
-            VisualElement current = element.parent;
-
-            while (current != null)
-            {
-                if (current is T target) return target;
-
-                current = current.parent;
-            }
-
-            return null;
-        }
-
-        protected T FindParent<T>(VisualElement element, string name) where T : VisualElement
-        {
-            VisualElement current = element.parent;
-
-            while (current != null)
-            {
-                if (current.name == name && current is T target) return target;
-
-                current = current.parent;
-            }
-
-            return null;
-        }
-
-        protected T FindParentInCurrent<T>(VisualElement element) where T : VisualElement
-        {
-            VisualElement current = element;
-
-            while (current != null)
-            {
-                if (current is T target) return target;
-
-                current = current.parent;
-            }
-
-            return null;
-        }
-
-        protected T FindParentInCurrent<T>(VisualElement element, string name) where T : VisualElement
-        {
-            VisualElement current = element;
-
-            while (current != null)
-            {
-                if (current.name == name && current is T target) return target;
-
-                current = current.parent;
-            }
-
-            return null;
-        }
 
         protected Port CreateInputPort()
         {

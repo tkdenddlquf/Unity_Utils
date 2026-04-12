@@ -38,6 +38,8 @@ namespace Yang.Dialogue.Editor
 
         private readonly IReadOnlyList<LocalizationTableCollection> collections;
 
+        private readonly VisualElement textsElement = new();
+
         public DialogueNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
             tables = window.Tables;
@@ -50,6 +52,11 @@ namespace Yang.Dialogue.Editor
 
             CreateInputPort();
             CreateOutputPort();
+
+            contentContainer[0].Insert(2, textsElement);
+
+            AddTextField("Speaker", "Speaker Text");
+            AddTextField("Text", "Text Text");
 
             SetOptions();
         }
@@ -135,6 +142,23 @@ namespace Yang.Dialogue.Editor
             AddMessageField();
         }
 
+        private void AddTextField(string title, string name)
+        {
+            TextField field = new(title)
+            {
+                name = name,
+                isReadOnly = true,
+            };
+
+            field.labelElement.style.minWidth = StyleKeyword.Auto;
+            field.labelElement.style.width = StyleKeyword.Auto;
+
+            field.style.whiteSpace = WhiteSpace.Normal;
+            field.style.minWidth = StyleKeyword.Auto;
+
+            textsElement.Add(field);
+        }
+
         #region Table
         private void AddTableField(bool speaker)
         {
@@ -158,7 +182,7 @@ namespace Yang.Dialogue.Editor
 
             if (index != -1)
             {
-                SetEntries(collections[index], entries);
+                collections[index].SetEntries(entries);
 
                 optionData[0] = new(collections[index].TableCollectionName);
                 optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
@@ -181,20 +205,48 @@ namespace Yang.Dialogue.Editor
         {
             if (evt.keyCode == KeyCode.Delete)
             {
-                PopupField<string> field = FindParentInCurrent<PopupField<string>>(evt.target as VisualElement);
+                PopupField<string> tableField = evt.target.FindParentInCurrent<PopupField<string>>();
 
-                if (field == null) return;
+                if (tableField == null) return;
 
                 DialogueSO so = window.SO;
 
-                List<GenericData> optionData = optionDatas[field.name == "Speaker Table" ? 0 : 2].data;
+                bool speaker = tableField.name == "Speaker Table";
+
+                PopupField<EntryData> entryField = extensionContainer.Q<PopupField<EntryData>>(speaker ? "Speaker Entry" : "Text Entry");
+
+                if (entryField == null) return;
+
+                List<GenericData> tableOptionData = optionDatas[speaker ? 0 : 2].data;
+                List<GenericData> entryOptionData = optionDatas[speaker ? 1 : 3].data;
 
                 Undo.RecordObject(so, "Delete Table Option");
 
-                field.value = "";
+                tableField.value = "";
+                entryField.value = default;
 
-                optionData[0] = new(GenericData.DataType.String);
-                optionData[1] = new(GenericData.DataType.Guid);
+                tableOptionData[0] = new(GenericData.DataType.String);
+                tableOptionData[1] = new(GenericData.DataType.Guid);
+
+                entryOptionData[0] = new(GenericData.DataType.String);
+                entryOptionData[1] = new(GenericData.DataType.Long);
+
+                if (speaker)
+                {
+                    TextField textField = textsElement.Q<TextField>("Speaker Text");
+
+                    if (textField != null) textField.value = "";
+
+                    speakerEntries.Clear();
+                }
+                else
+                {
+                    TextField textField = textsElement.Q<TextField>("Text Text");
+
+                    if (textField != null) textField.value = "";
+
+                    textEntries.Clear();
+                }
 
                 EditorUtility.SetDirty(so);
 
@@ -213,9 +265,9 @@ namespace Yang.Dialogue.Editor
                 VisualElement target = evt.target as VisualElement;
                 bool speaker = target.name == "Speaker Table";
 
-                SetEntries(collections[index], speaker ? speakerEntries : textEntries);
+                collections[index].SetEntries(speaker ? speakerEntries : textEntries);
 
-                Undo.RecordObject(so, speaker ? "Change Speaker Table" : "Change Text Table");
+                Undo.RecordObject(so, "Change Table");
 
                 List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
@@ -252,33 +304,22 @@ namespace Yang.Dialogue.Editor
 
             if (index != -1)
             {
-                field.tooltip = entries[index].tooltip;
+                EntryData entryData = entries[index];
 
-                optionData[0] = new(entries[index].key);
-                optionData[1] = new(entries[index].id);
-            }
-        }
+                optionData[0] = new(entryData.key);
+                optionData[1] = new(entryData.id);
 
-        private void SetEntries(LocalizationTableCollection collection, List<EntryData> entries)
-        {
-            entries.Clear();
-
-            if (collection != null)
-            {
-                foreach (SharedTableData.SharedTableEntry current in collection.SharedData.Entries)
+                if (speaker)
                 {
-                    string tooltip = "";
+                    TextField textField = textsElement.Q<TextField>("Speaker Text");
 
-                    if (collection.GetTable(Application.systemLanguage) is StringTable stringTable)
-                    {
-                        StringTableEntry entry = stringTable.GetEntry(current.Key);
+                    if (textField != null) textField.value = entryData.GetText(window.Language);
+                }
+                else
+                {
+                    TextField textField = textsElement.Q<TextField>("Text Text");
 
-                        if (entry != null) tooltip = entry.Value;
-                    }
-
-                    EntryData data = new(current.Id, current.Key, tooltip);
-
-                    entries.Add(data);
+                    if (textField != null) textField.value = entryData.GetText(window.Language);
                 }
             }
         }
@@ -287,13 +328,14 @@ namespace Yang.Dialogue.Editor
         {
             if (evt.keyCode == KeyCode.Delete)
             {
-                PopupField<EntryData> field = FindParentInCurrent<PopupField<EntryData>>(evt.target as VisualElement);
+                PopupField<EntryData> field = evt.target.FindParentInCurrent<PopupField<EntryData>>();
 
                 if (field == null) return;
 
                 DialogueSO so = window.SO;
 
-                List<GenericData> optionData = optionDatas[field.name == "Speaker Entry" ? 1 : 3].data;
+                bool speaker = field.name == "Speaker Entry";
+                List<GenericData> optionData = optionDatas[speaker ? 1 : 3].data;
 
                 Undo.RecordObject(so, "Delete Entry Option");
 
@@ -301,6 +343,19 @@ namespace Yang.Dialogue.Editor
 
                 optionData[0] = new(GenericData.DataType.String);
                 optionData[1] = new(GenericData.DataType.Long);
+
+                if (speaker)
+                {
+                    TextField textField = textsElement.Q<TextField>("Speaker Text");
+
+                    if (textField != null) textField.value = "";
+                }
+                else
+                {
+                    TextField textField = textsElement.Q<TextField>("Text Text");
+
+                    if (textField != null) textField.value = "";
+                }
 
                 EditorUtility.SetDirty(so);
 
@@ -323,12 +378,25 @@ namespace Yang.Dialogue.Editor
                 {
                     DialogueSO so = window.SO;
 
-                    Undo.RecordObject(so, "Change Speaker Entry");
+                    Undo.RecordObject(so, "Change Entry");
 
-                    optionData[0] = new(entries[index].key);
-                    optionData[1] = new(entries[index].id);
+                    EntryData entryData = entries[index];
 
-                    target.tooltip = entries[index].tooltip;
+                    optionData[0] = new(entryData.key);
+                    optionData[1] = new(entryData.id);
+
+                    if (speaker)
+                    {
+                        TextField textField = textsElement.Q<TextField>("Speaker Text");
+
+                        if (textField != null) textField.value = entryData.GetText(window.Language);
+                    }
+                    else
+                    {
+                        TextField textField = textsElement.Q<TextField>("Text Text");
+
+                        if (textField != null) textField.value = entryData.GetText(window.Language);
+                    }
 
                     EditorUtility.SetDirty(so);
 

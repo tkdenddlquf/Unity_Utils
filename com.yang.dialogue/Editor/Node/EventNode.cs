@@ -135,7 +135,7 @@ namespace Yang.Dialogue.Editor
         {
             if (evt.keyCode == KeyCode.Delete)
             {
-                PopupField<string> field = FindParentInCurrent<PopupField<string>>(evt.target as VisualElement);
+                PopupField<string> field = evt.target.FindParentInCurrent<PopupField<string>>();
 
                 if (field == null) return;
 
@@ -149,7 +149,7 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
 
-            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
+            VisualElement itemElement = evt.target.FindParent<VisualElement>("Item Element");
 
             int optionIndex = itemElement.parent.IndexOf(itemElement);
 

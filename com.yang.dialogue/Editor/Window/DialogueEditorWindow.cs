@@ -20,6 +20,8 @@ namespace Yang.Dialogue.Editor
 
         public IReadOnlyList<LocalizationTableCollection> collections;
 
+        public SystemLanguage Language { get; private set; }
+
         public List<string> Tables { get; } = new();
 
         private DialogueSO so;
@@ -28,7 +30,9 @@ namespace Yang.Dialogue.Editor
             get => so;
             set
             {
-                SetTables();
+                collections = LocalizationEditorSettings.GetStringTableCollections();
+                collections.SetTables(Tables);
+
                 CheckSave();
 
                 so = value;
@@ -57,6 +61,8 @@ namespace Yang.Dialogue.Editor
 
         private void OnEnable()
         {
+            Language = Application.systemLanguage;
+
             startField = typeof(DialogueSO).GetField("startNode", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
             nodeField = typeof(DialogueSO).GetField("nodes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -176,24 +182,6 @@ namespace Yang.Dialogue.Editor
             }
 
             return mods;
-        }
-
-        private void SetTables()
-        {
-            collections = LocalizationEditorSettings.GetStringTableCollections();
-
-            Tables.Clear();
-
-            if (collections != null)
-            {
-                foreach (LocalizationTableCollection collection in collections)
-                {
-                    string tableName = collection.TableCollectionName;
-                    string group = collection.Group;
-
-                    Tables.Add(string.IsNullOrEmpty(group) ? tableName : $"{group}/{tableName}");
-                }
-            }
         }
 
         private void OnViewTransformChanged(GraphView graphView)

@@ -220,7 +220,7 @@ namespace Yang.Dialogue.Editor
 
             VisualElement itemContainer = itemElement.parent;
 
-            Port port = FindParent<Port>(itemContainer);
+            Port port = itemContainer.FindParent<Port>();
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemContainer.IndexOf(itemElement);
@@ -245,14 +245,14 @@ namespace Yang.Dialogue.Editor
         {
             if (evt.keyCode == KeyCode.Delete)
             {
-                PopupField<string> field = FindParentInCurrent<PopupField<string>>(evt.target as VisualElement);
+                PopupField<string> field = evt.target.FindParentInCurrent<PopupField<string>>();
 
                 if (field == null) return;
 
                 DialogueSO so = window.SO;
 
-                VisualElement itemElement = FindParent<VisualElement>(field, "Item Element");
-                Port port = FindParent<Port>(itemElement);
+                VisualElement itemElement = field.FindParent<VisualElement>("Item Element");
+                Port port = itemElement.FindParent<Port>();
 
                 Undo.RecordObject(so, "Delete Condition Option");
 
@@ -273,8 +273,8 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
 
-            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
-            Port port = FindParent<Port>(itemElement);
+            VisualElement itemElement = evt.target.FindParent<VisualElement>("Item Element");
+            Port port = itemElement.FindParent<Port>();
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement) * 3;
@@ -292,7 +292,7 @@ namespace Yang.Dialogue.Editor
         #region Float
         private void CreateConditionFloatField(VisualElement itemContainer)
         {
-            Port port = FindParent<Port>(itemContainer);
+            Port port = itemContainer.FindParent<Port>();
 
             DialogueSO so = window.SO;
 
@@ -358,8 +358,8 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
 
-            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
-            Port port = FindParent<Port>(itemElement);
+            VisualElement itemElement = evt.target.FindParent<VisualElement>("Item Element");
+            Port port = itemElement.FindParent<Port>();
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement) * 3 + 1;
@@ -377,8 +377,8 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
 
-            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
-            Port port = FindParent<Port>(itemElement);
+            VisualElement itemElement = evt.target.FindParent<VisualElement>("Item Element");
+            Port port = itemElement.FindParent<Port>();
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement) * 3 + 2;
@@ -396,7 +396,7 @@ namespace Yang.Dialogue.Editor
         #region Bool
         private void CreateConditionBoolField(VisualElement itemContainer)
         {
-            Port port = FindParent<Port>(itemContainer);
+            Port port = itemContainer.FindParent<Port>();
 
             DialogueSO so = window.SO;
 
@@ -455,8 +455,8 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
 
-            VisualElement itemElement = FindParent<VisualElement>(evt.target as VisualElement, "Item Element");
-            Port port = FindParent<Port>(itemElement);
+            VisualElement itemElement = evt.target.FindParent<VisualElement>("Item Element");
+            Port port = itemElement.FindParent<Port>();
 
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemElement.parent.IndexOf(itemElement) * 3 + 1;
