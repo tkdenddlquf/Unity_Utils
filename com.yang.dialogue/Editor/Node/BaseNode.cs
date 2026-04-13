@@ -19,28 +19,6 @@ namespace Yang.Dialogue.Editor
 
         public string GUID { get; private set; }
 
-        public override bool expanded
-        {
-            get => base.expanded;
-            set
-            {
-                base.expanded = value;
-
-                NodeData data = window.GetNode(GUID);
-
-                if (data.isExpended != value)
-                {
-                    data.isExpended = value;
-
-                    window.SetNode(GUID, data);
-
-                    EditorUtility.SetDirty(window.SO);
-
-                    window.SetUnsaved();
-                }
-            }
-        }
-
         protected BaseNode(DialogueEditorWindow window, string guid)
         {
             this.window = window;
@@ -58,7 +36,40 @@ namespace Yang.Dialogue.Editor
             AddGUIDField();
         }
 
+        protected override void ToggleCollapse()
+        {
+            DialogueSO so = window.SO;
+
+            NodeData data = window.GetNode(GUID);
+
+            Undo.RecordObject(so, "Node Expended Change");
+
+            data.expended = !data.expended;
+
+            SetExpendedWithoutNotify(data.expended);
+
+            window.SetNode(GUID, data);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
         public abstract void SetPorts();
+
+        public void SetExpendedWithoutNotify(bool expended)
+        {
+            if (expended)
+            {
+                extensionContainer.style.visibility = StyleKeyword.Null;
+                extensionContainer.RemoveFromClassList("hidden");
+            }
+            else
+            {
+                extensionContainer.style.visibility = Visibility.Hidden;
+                extensionContainer.AddToClassList("hidden");
+            }
+        }
 
         protected Port CreateInputPort()
         {

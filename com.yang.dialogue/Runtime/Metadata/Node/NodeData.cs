@@ -18,7 +18,7 @@ namespace Yang.Dialogue
 #if UNITY_EDITOR
         public Vector2 position;
 
-        public bool isExpended;
+        public bool expended;
 #endif
 
         public NodeData(NodeType type)
@@ -33,7 +33,7 @@ namespace Yang.Dialogue
 #if UNITY_EDITOR
             position = Vector2.zero;
 
-            isExpended = true;
+            expended = true;
 #endif
         }
 
@@ -52,7 +52,7 @@ namespace Yang.Dialogue
 #if UNITY_EDITOR
             position = data.position;
 
-            isExpended = data.isExpended;
+            expended = data.expended;
 #endif
         }
 

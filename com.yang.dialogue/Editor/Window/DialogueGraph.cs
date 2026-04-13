@@ -92,7 +92,7 @@ namespace Yang.Dialogue.Editor
 
             window.Nodes.Add(data);
 
-            BaseNode node = CreateNode(type, data.guid, position);
+            BaseNode node = CreateNode(data);
 
             AddElement(node);
 
@@ -101,18 +101,15 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        public BaseNode CreateNode(NodeType type, string guid, Vector2 position) => CreateNode(ConvertData(type, guid), position);
-
-        public BaseNode CreateNode(BaseNode node, Vector2 position)
+        public BaseNode CreateNode(NodeData data)
         {
-            if (window.SO == null) return null;
+            BaseNode node = ConvertData(data.type, data.guid);
 
-            node.SetPosition(new Rect(position, Vector2.zero));
-
+            node.SetPosition(new(data.position, Vector2.zero));
             node.SetPorts();
+            node.SetExpendedWithoutNotify(data.expended);
 
             node.RefreshExpandedState();
-            node.RefreshPorts();
 
             return node;
         }
@@ -192,7 +189,7 @@ namespace Yang.Dialogue.Editor
 
                 window.Nodes.Add(newNodeData);
 
-                BaseNode node = CreateNode(newNodeData.type, newNodeData.guid, newNodeData.position);
+                BaseNode node = CreateNode(newNodeData);
 
                 AddElement(node);
                 AddToSelection(node);

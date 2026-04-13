@@ -57,18 +57,18 @@ namespace Yang.Dialogue.Editor
             if (optionData[0].TryGetEnum(out WaitType eResult))
             {
                 EnumField typeField = GetTypeField(eResult);
-                FloatField secondsField = GetSecondsField(optionData[1].TryGetFloat(out float fResult) ? fResult : 0);
+                FloatField secondsField = GetSecondsField(optionData[1].GetFloat());
                 TextField eventField = GetReasonField(optionData[1].ToString());
 
                 extensionContainer.Add(typeField);
                 extensionContainer.Add(secondsField);
                 extensionContainer.Add(eventField);
 
-                SetDisplaySeconds(eResult);
+                SetDisplaySeconds(eResult, true);
             }
         }
 
-        private void SetDisplaySeconds(WaitType waitType)
+        private void SetDisplaySeconds(WaitType waitType, bool setElementValue)
         {
             TextField reasonField = extensionContainer.Q<TextField>();
             FloatField secondsField = extensionContainer.Q<FloatField>();
@@ -78,20 +78,40 @@ namespace Yang.Dialogue.Editor
                 case WaitType.Notify:
                     secondsField.style.display = DisplayStyle.None;
 
-                    string currentReason = reasonField.value;
+                    if (setElementValue)
+                    {
+                        string currentReason = reasonField.value;
 
-                    reasonField.SetValueWithoutNotify("");
-                    reasonField.value = currentReason;
+                        reasonField.SetValueWithoutNotify("");
+                        reasonField.value = currentReason;
+                    }
+                    else
+                    {
+                        string value = optionDatas[0].data[1].ToString();
+
+                        reasonField.SetValueWithoutNotify(value);
+                    }
+
                     reasonField.style.display = DisplayStyle.Flex;
                     break;
 
                 case WaitType.Seconds:
                     reasonField.style.display = DisplayStyle.None;
 
-                    float currentSeconds = secondsField.value;
+                    if (setElementValue)
+                    {
+                        float currentSeconds = secondsField.value;
 
-                    secondsField.SetValueWithoutNotify(currentSeconds - 1);
-                    secondsField.value = currentSeconds;
+                        secondsField.SetValueWithoutNotify(currentSeconds - 1);
+                        secondsField.value = currentSeconds;
+                    }
+                    else
+                    {
+                        float value = optionDatas[0].data[1].GetFloat();
+
+                        secondsField.SetValueWithoutNotify(value);
+                    }
+
                     secondsField.style.display = DisplayStyle.Flex;
                     break;
             }
@@ -149,7 +169,7 @@ namespace Yang.Dialogue.Editor
 
             optionDatas[0].data[0] = new(type);
 
-            SetDisplaySeconds(type);
+            SetDisplaySeconds(type, true);
 
             EditorUtility.SetDirty(so);
 

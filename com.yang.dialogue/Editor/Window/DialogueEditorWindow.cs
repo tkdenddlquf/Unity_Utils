@@ -73,8 +73,8 @@ namespace Yang.Dialogue.Editor
 
             rootVisualElement.Add(graph);
 
-            Undo.undoRedoPerformed -= OnUndoRedo;
-            Undo.undoRedoPerformed += OnUndoRedo;
+            Undo.undoRedoPerformed -= ResetView;
+            Undo.undoRedoPerformed += ResetView;
 
             Undo.postprocessModifications -= OnPostprocessModifications;
             Undo.postprocessModifications += OnPostprocessModifications;
@@ -91,15 +91,13 @@ namespace Yang.Dialogue.Editor
             graph.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
             SO = SO;
-
-            ResetView();
         }
 
         private void OnDisable()
         {
             rootVisualElement.Remove(graph);
 
-            Undo.undoRedoPerformed -= OnUndoRedo;
+            Undo.undoRedoPerformed -= ResetView;
 
             Undo.postprocessModifications -= OnPostprocessModifications;
 
@@ -160,8 +158,6 @@ namespace Yang.Dialogue.Editor
             base.DiscardChanges();
         }
 
-        public void OnUndoRedo() => ResetView();
-
         public void SetUnsaved() => hasUnsavedChanges = true;
 
         private UndoPropertyModification[] OnPostprocessModifications(UndoPropertyModification[] mods)
@@ -188,8 +184,10 @@ namespace Yang.Dialogue.Editor
         {
             if (SO == null) return;
 
-            Vector3 position = graph.contentViewContainer.resolvedStyle.translate;
-            Vector3 scale = graph.contentViewContainer.resolvedStyle.scale.value;
+            IResolvedStyle style = graph.contentViewContainer.resolvedStyle;
+
+            Vector3 position = style.translate;
+            Vector3 scale = style.scale.value;
 
             if (SO.position == position && SO.scale == scale) return;
 
@@ -221,15 +219,13 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void CreateNode(NodeType type, string guid, Vector2 position)
+        private void CreateNode(NodeData data)
         {
-            BaseNode node = graph.CreateNode(type, guid, position);
+            BaseNode node = graph.CreateNode(data);
 
-            node.SetPosition(new Rect(position, Vector2.zero));
+            if (data.guid == SO.StartGuid) node.capabilities &= ~Capabilities.Deletable;
 
             graph.AddElement(node);
-
-            if (guid == SO.StartGuid) node.capabilities &= ~Capabilities.Deletable;
         }
 
         private void ResetView()
@@ -250,14 +246,9 @@ namespace Yang.Dialogue.Editor
                     EditorUtility.SetDirty(SO);
                 }
 
-                CreateNode(NodeType.Start, startNode.guid, startNode.position);
+                CreateNode(startNode);
 
-                for (int i = 0; i < Nodes.Count; i++)
-                {
-                    NodeData node = Nodes[i];
-
-                    CreateNode(node.type, node.guid, node.position);
-                }
+                for (int i = 0; i < Nodes.Count; i++) CreateNode(Nodes[i]);
 
                 for (int i = Links.Count - 1; i >= 0; i--)
                 {
@@ -267,7 +258,6 @@ namespace Yang.Dialogue.Editor
                     BaseNode toNode = null;
 
                     NodeData fromData = default;
-                    NodeData toData = default;
 
                     foreach (Node node in graph.nodes)
                     {
@@ -280,11 +270,7 @@ namespace Yang.Dialogue.Editor
                                 fromNode = baseNode;
                                 fromData = data;
                             }
-                            else if (data.guid == link.targetGuid)
-                            {
-                                toNode = baseNode;
-                                toData = data;
-                            }
+                            else if (data.guid == link.targetGuid) toNode = baseNode;
 
                             if (fromNode != null && toNode != null)
                             {
@@ -303,11 +289,6 @@ namespace Yang.Dialogue.Editor
                             }
                         }
                     }
-                }
-
-                foreach (Node node in graph.nodes)
-                {
-                    if (node is BaseNode baseNode) node.expanded = GetNode(baseNode.GUID).isExpended;
                 }
             }
 
@@ -437,10 +418,10 @@ namespace Yang.Dialogue.Editor
             Port outputPort = edge.output;
             Port inputPort = edge.input;
 
-            if (outputPort.node is BaseNode outputView && inputPort.node is BaseNode inputView)
+            if (outputPort.node is BaseNode outputNode && inputPort.node is BaseNode inputNode)
             {
-                NodeData outputData = GetNode(outputView.GUID);
-                NodeData inputData = GetNode(inputView.GUID);
+                NodeData outputData = GetNode(outputNode.GUID);
+                NodeData inputData = GetNode(inputNode.GUID);
 
                 LinkData link = new()
                 {
