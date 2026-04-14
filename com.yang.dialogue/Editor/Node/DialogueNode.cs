@@ -265,14 +265,48 @@ namespace Yang.Dialogue.Editor
                 VisualElement target = evt.target as VisualElement;
                 bool speaker = target.name == "Speaker Table";
 
-                collections[index].SetEntries(speaker ? speakerEntries : textEntries);
+                LocalizationTableCollection collection = collections[index];
+
+                collection.SetEntries(speaker ? speakerEntries : textEntries);
 
                 Undo.RecordObject(so, "Change Table");
 
                 List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
-                optionData[0] = new(collections[index].TableCollectionName);
-                optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
+                if (optionData[0].ToString() != collection.TableCollectionName)
+                {
+                    PopupField<EntryData> entryField = extensionContainer.Q<PopupField<EntryData>>(speaker ? "Speaker Entry" : "Text Entry");
+
+                    if (entryField != null)
+                    {
+                        List<GenericData> entryOptionData = optionDatas[speaker ? 1 : 3].data;
+
+                        entryField.value = default;
+
+                        entryOptionData[0] = new(GenericData.DataType.String);
+                        entryOptionData[1] = new(GenericData.DataType.Long);
+
+                        if (speaker)
+                        {
+                            TextField textField = textsElement.Q<TextField>("Speaker Text");
+
+                            if (textField != null) textField.value = "";
+
+                            speakerEntries.Clear();
+                        }
+                        else
+                        {
+                            TextField textField = textsElement.Q<TextField>("Text Text");
+
+                            if (textField != null) textField.value = "";
+
+                            textEntries.Clear();
+                        }
+                    }
+                }
+
+                optionData[0] = new(collection.TableCollectionName);
+                optionData[1] = new(collection.TableCollectionNameReference.TableCollectionNameGuid);
 
                 EditorUtility.SetDirty(so);
 

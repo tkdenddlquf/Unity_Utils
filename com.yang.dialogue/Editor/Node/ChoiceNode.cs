@@ -301,20 +301,21 @@ namespace Yang.Dialogue.Editor
                 {
                     PopupField<EntryData> entryField = extensionContainer.Q<PopupField<EntryData>>("Speaker Entry");
 
-                    if (entryField == null) return;
+                    if (entryField != null)
+                    {
+                        List<GenericData> entryOptionData = optionDatas[speaker ? 1 : 3].data;
 
-                    List<GenericData> entryOptionData = optionDatas[speaker ? 1 : 3].data;
+                        entryField.value = default;
 
-                    entryField.value = default;
+                        entryOptionData[0] = new(GenericData.DataType.String);
+                        entryOptionData[1] = new(GenericData.DataType.Long);
 
-                    entryOptionData[0] = new(GenericData.DataType.String);
-                    entryOptionData[1] = new(GenericData.DataType.Long);
+                        TextField textField = textsElement.Q<TextField>("Speaker Text");
 
-                    TextField textField = textsElement.Q<TextField>("Speaker Text");
+                        if (textField != null) textField.value = "";
 
-                    if (textField != null) textField.value = "";
-
-                    speakerEntries.Clear();
+                        speakerEntries.Clear();
+                    }
                 }
                 else
                 {
@@ -361,9 +362,51 @@ namespace Yang.Dialogue.Editor
 
                 collection.SetEntries(speaker ? speakerEntries : textEntries);
 
-                Undo.RecordObject(so, speaker ? "Change Speaker Table" : "Change Text Table");
+                Undo.RecordObject(so, "Change Table");
 
                 List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
+
+                if (optionData[0].ToString() != collection.TableCollectionName)
+                {
+                    if (speaker)
+                    {
+                        PopupField<EntryData> entryField = extensionContainer.Q<PopupField<EntryData>>("Speaker Entry");
+
+                        if (entryField != null)
+                        {
+                            List<GenericData> entryOptionData = optionDatas[speaker ? 1 : 3].data;
+
+                            entryField.value = default;
+
+                            entryOptionData[0] = new(GenericData.DataType.String);
+                            entryOptionData[1] = new(GenericData.DataType.Long);
+
+                            TextField textField = textsElement.Q<TextField>("Speaker Text");
+
+                            if (textField != null) textField.value = "";
+
+                            speakerEntries.Clear();
+                        }
+                    }
+                    else
+                    {
+                        for (int i = 0; i < portDatas.Count; i++)
+                        {
+                            List<GenericData> entryOptionData = portDatas[i].data;
+
+                            entryOptionData[0] = new(GenericData.DataType.String);
+                            entryOptionData[1] = new(GenericData.DataType.Long);
+
+                            PopupField<EntryData> entryField = outputContainer[i].Q<PopupField<EntryData>>("Text Entry");
+
+                            if (entryField != null) entryField.value = default;
+
+                            if (textsElement[i + 1] is TextField textField) textField.value = "";
+                        }
+
+                        textEntries.Clear();
+                    }
+                }
 
                 optionData[0] = new(collection.TableCollectionName);
                 optionData[1] = new(collection.TableCollectionNameReference.TableCollectionNameGuid);
