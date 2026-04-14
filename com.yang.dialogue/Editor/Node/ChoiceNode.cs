@@ -541,7 +541,6 @@ namespace Yang.Dialogue.Editor
             portDatas.Add(portOption);
 
             RefreshExpandedState();
-            RefreshPorts();
 
             EditorUtility.SetDirty(so);
 

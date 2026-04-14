@@ -219,15 +219,6 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void CreateNode(NodeData data)
-        {
-            BaseNode node = graph.CreateNode(data);
-
-            if (data.guid == SO.StartGuid) node.capabilities &= ~Capabilities.Deletable;
-
-            graph.AddElement(node);
-        }
-
         private void ResetView()
         {
             if (SO != null)
@@ -246,48 +237,29 @@ namespace Yang.Dialogue.Editor
                     EditorUtility.SetDirty(SO);
                 }
 
-                CreateNode(startNode);
+                graph.CreateNode(startNode);
 
-                for (int i = 0; i < Nodes.Count; i++) CreateNode(Nodes[i]);
+                for (int i = 0; i < Nodes.Count; i++) graph.CreateNode(Nodes[i]);
 
                 for (int i = Links.Count - 1; i >= 0; i--)
                 {
                     LinkData link = Links[i];
 
-                    BaseNode fromNode = null;
-                    BaseNode toNode = null;
+                    BaseNode fromNode = GetLinkedNode(link.nodeGuid, out NodeData fromData);
+                    BaseNode toNode = GetLinkedNode(link.targetGuid, out NodeData toData);
 
-                    NodeData fromData = default;
-
-                    foreach (Node node in graph.nodes)
+                    if (fromNode != null && toNode != null)
                     {
-                        if (node is BaseNode baseNode)
+                        if (fromData.PortDatas.Count > link.outPortIndex)
                         {
-                            NodeData data = GetNode(baseNode.GUID);
+                            Port fromPort = fromNode.outputContainer[link.outPortIndex] as Port;
+                            Port toPort = toNode.inputContainer[0] as Port;
 
-                            if (data.guid == link.nodeGuid)
-                            {
-                                fromNode = baseNode;
-                                fromData = data;
-                            }
-                            else if (data.guid == link.targetGuid) toNode = baseNode;
+                            Edge edge = fromPort.ConnectTo(toPort);
 
-                            if (fromNode != null && toNode != null)
-                            {
-                                if (fromData.PortDatas.Count > link.outPortIndex)
-                                {
-                                    Port fromPort = fromNode.outputContainer[link.outPortIndex] as Port;
-                                    Port toPort = toNode.inputContainer[0] as Port;
-
-                                    Edge edge = fromPort.ConnectTo(toPort);
-
-                                    graph.AddElement(edge);
-                                }
-                                else Links.Remove(link);
-
-                                break;
-                            }
+                            graph.AddElement(edge);
                         }
+                        else Links.Remove(link);
                     }
                 }
             }
@@ -435,6 +407,23 @@ namespace Yang.Dialogue.Editor
             }
 
             return default;
+        }
+
+        private BaseNode GetLinkedNode(string guid, out NodeData data)
+        {
+            foreach (Node node in graph.nodes)
+            {
+                if (node is BaseNode baseNode)
+                {
+                    data = GetNode(baseNode.GUID);
+
+                    if (data.guid == guid) return baseNode;
+                }
+            }
+
+            data = default;
+
+            return null;
         }
         #endregion
     }

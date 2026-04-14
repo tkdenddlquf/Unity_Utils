@@ -57,7 +57,19 @@ namespace Yang.Dialogue.Editor
 
         public abstract void SetPorts();
 
-        public void SetExpendedWithoutNotify(bool expended) => extensionContainer.style.display = expended ? DisplayStyle.Flex : DisplayStyle.None;
+        public void SetExpendedWithoutNotify(bool expended)
+        {
+            if (expended)
+            {
+                extensionContainer.style.visibility = Visibility.Visible;
+                extensionContainer.RemoveFromClassList("hidden");
+            }
+            else
+            {
+                extensionContainer.style.visibility = Visibility.Hidden;
+                extensionContainer.AddToClassList("hidden");
+            }
+        }
 
         protected Port CreateInputPort()
         {
@@ -106,7 +118,6 @@ namespace Yang.Dialogue.Editor
 
                 outputContainer.Remove(port);
 
-                RefreshPorts();
                 RefreshExpandedState();
 
                 EditorUtility.SetDirty(so);

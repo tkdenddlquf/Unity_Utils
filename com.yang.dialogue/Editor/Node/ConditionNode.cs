@@ -149,7 +149,6 @@ namespace Yang.Dialogue.Editor
             portDatas.Add(new() { data = new() });
 
             RefreshExpandedState();
-            RefreshPorts();
 
             EditorUtility.SetDirty(so);
 

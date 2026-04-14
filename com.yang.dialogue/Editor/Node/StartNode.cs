@@ -1,10 +1,12 @@
+using UnityEditor.Experimental.GraphView;
+
 namespace Yang.Dialogue.Editor
 {
     public class StartNode : BaseNode
     {
         public StartNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
-
+            capabilities &= ~Capabilities.Deletable;
         }
 
         public override void SetPorts()

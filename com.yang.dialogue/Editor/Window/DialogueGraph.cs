@@ -92,9 +92,7 @@ namespace Yang.Dialogue.Editor
 
             window.Nodes.Add(data);
 
-            BaseNode node = CreateNode(data);
-
-            AddElement(node);
+            CreateNode(data);
 
             EditorUtility.SetDirty(so);
 
@@ -110,7 +108,8 @@ namespace Yang.Dialogue.Editor
             node.SetExpendedWithoutNotify(data.expended);
 
             node.RefreshExpandedState();
-            node.RefreshPorts();
+
+            AddElement(node);
 
             return node;
         }
@@ -192,7 +191,6 @@ namespace Yang.Dialogue.Editor
 
                 BaseNode node = CreateNode(newNodeData);
 
-                AddElement(node);
                 AddToSelection(node);
             }
 
