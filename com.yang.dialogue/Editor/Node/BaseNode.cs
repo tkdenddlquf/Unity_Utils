@@ -23,6 +23,10 @@ namespace Yang.Dialogue.Editor
         {
             this.window = window;
 
+            System.Reflection.FieldInfo expandedButton = typeof(Node).GetField("m_CollapseButton", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            expandedButton?.SetValue(this, null);
+
             NodeData data = window.GetNode(guid);
 
             portDataField = typeof(NodeData).GetField("portDatas", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
