@@ -110,6 +110,7 @@ namespace Yang.Dialogue.Editor
             node.SetExpendedWithoutNotify(data.expended);
 
             node.RefreshExpandedState();
+            node.RefreshPorts();
 
             return node;
         }

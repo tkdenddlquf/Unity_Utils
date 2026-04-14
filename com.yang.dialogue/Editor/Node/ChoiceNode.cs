@@ -148,9 +148,9 @@ namespace Yang.Dialogue.Editor
             KeyConverter.GetKeys(window.SO.Conditions, conditions);
 
             AddTableField(true);
-            AddTableField(false);
-
             AddSpeakerEntryField();
+
+            AddTableField(false);
 
             AddMessageField();
 

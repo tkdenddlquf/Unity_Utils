@@ -134,9 +134,9 @@ namespace Yang.Dialogue.Editor
         private void SetOptions()
         {
             AddTableField(true);
-            AddTableField(false);
-
             AddEntryField(true);
+
+            AddTableField(false);
             AddEntryField(false);
 
             AddMessageField();
