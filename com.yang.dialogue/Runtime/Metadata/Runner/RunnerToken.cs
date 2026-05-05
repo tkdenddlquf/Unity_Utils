@@ -6,14 +6,7 @@ namespace Yang.Dialogue
 {
     internal class RunnerToken : IRunnerNodeChecker, IRunnerToken
     {
-        public RunnerToken(string targetNode)
-        {
-            PointNode = targetNode;
-            TargetNode = targetNode;
-            JumpTarget = "";
-        }
-
-        private CancellationTokenSource cts = new();
+        private CancellationTokenSource cts;
 
         public Task Task { get; private set; }
 
@@ -26,6 +19,16 @@ namespace Yang.Dialogue
         public string JumpTarget { get; set; }
 
         public event Action OnStopCallback;
+
+        public RunnerToken(string targetNode)
+        {
+            IsStop = true;
+
+            PointNode = targetNode;
+            JumpTarget = "";
+
+            Restart(targetNode);
+        }
 
         public void Restart(string targetNode)
         {

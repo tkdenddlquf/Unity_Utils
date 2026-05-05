@@ -139,18 +139,17 @@ namespace Yang.Dialogue
             return wrapper;
         }
 
-        public void Load(DialogueWrapper wrapper)
+        public IEnumerator<KeyValuePair<string, string>> Load(DialogueWrapper wrapper)
         {
-            if (so == null && wrapper == null) return;
-
-            for (int i = 0; i < wrapper.Keys.Count; i++)
-            {
-                RunnerToken token = new(wrapper.Names[i]);
-
-                tokens.Add(wrapper.Keys[i], token);
-            }
-
             runnerTrigger.SetDatas(wrapper.Values);
+
+            if (so != null && wrapper != null)
+            {
+                IReadOnlyList<string> keys = wrapper.Keys;
+                IReadOnlyList<string> names = wrapper.Names;
+
+                for (int i = 0; i < keys.Count; i++) yield return new(keys[i], names[i]);
+            }
         }
 
         #region Event
