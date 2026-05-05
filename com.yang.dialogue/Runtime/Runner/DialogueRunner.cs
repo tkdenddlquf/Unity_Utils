@@ -110,12 +110,7 @@ namespace Yang.Dialogue
                 }
             }
 
-            if (!token.IsStop)
-            {
-                tokens.Remove(key);
-
-                token.Dispose();
-            }
+            if (!token.IsStop) tokens.Remove(key);
         }
 
         public bool IsStarted(string key)

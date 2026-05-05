@@ -15,9 +15,9 @@ namespace Yang.Dialogue
 
         private CancellationTokenSource cts = new();
 
-        public bool IsStop => cts == null || cts.IsCancellationRequested;
+        public Task Task { get; private set; }
 
-        public event Action OnStopCallback;
+        public bool IsStop { get; private set; }
 
         public string PointNode { get; private set; }
 
@@ -25,12 +25,17 @@ namespace Yang.Dialogue
 
         public string JumpTarget { get; set; }
 
+        public event Action OnStopCallback;
+
         public void Restart(string targetNode)
         {
             if (!IsStop) return;
 
-            cts?.Dispose();
+            IsStop = false;
+
             cts = new();
+
+            Task = Task.Delay(Timeout.Infinite, cts.Token);
 
             TargetNode = targetNode;
         }
@@ -39,15 +44,13 @@ namespace Yang.Dialogue
         {
             if (IsStop) return;
 
+            IsStop = true;
+
             cts.Cancel();
+            cts.Dispose();
+            cts = null;
 
             OnStopCallback?.Invoke();
-        }
-
-        public void Dispose()
-        {
-            cts?.Dispose();
-            cts = null;
         }
 
         public async Task Delay(float second)
@@ -64,6 +67,8 @@ namespace Yang.Dialogue
 
     public interface IRunnerToken
     {
+        public Task Task { get; }
+
         public bool IsStop { get; }
 
         public event Action OnStopCallback;
