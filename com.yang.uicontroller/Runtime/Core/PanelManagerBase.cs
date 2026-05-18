@@ -3,22 +3,22 @@ using UnityEngine;
 
 namespace Yang.UIController
 {
-    public abstract class PanelManagerBase<T> : MonoBehaviour where T : System.Enum
+    public abstract class PanelManagerBase<T, U> : MonoBehaviour where T : MonoBehaviour where U : System.Enum
     {
-        private static PanelManagerBase<T> instance;
-        public static PanelManagerBase<T> Instance
+        private static T instance;
+        public static T Instance
         {
             get
             {
                 if (instance == null)
                 {
-                    instance = FindFirstObjectByType<PanelManagerBase<T>>();
+                    instance = FindFirstObjectByType<T>();
 
                     if (instance == null)
                     {
-                        GameObject obj = new() { name = typeof(PanelManagerBase<T>).Name };
+                        GameObject obj = new() { name = typeof(T).Name };
 
-                        instance = obj.AddComponent<PanelManagerBase<T>>();
+                        instance = obj.AddComponent<T>();
                     }
                 }
 
@@ -26,21 +26,21 @@ namespace Yang.UIController
             }
         }
 
-        protected readonly Dictionary<T, UIBase<T>> panelDict = new();
+        protected readonly Dictionary<U, UIBase<U>> panelDict = new();
 
         public bool Initialized { get; private set; } = false;
 
-        public T CurrentPanel { get; private set; }
+        public U CurrentPanel { get; private set; }
 
         protected virtual void Awake() => Init(default);
 
-        protected void Init(T type)
+        protected void Init(U type)
         {
-            UIBase<T>[] panels = FindObjectsByType<UIBase<T>>(FindObjectsSortMode.None);
+            UIBase<U>[] panels = FindObjectsByType<UIBase<U>>(FindObjectsSortMode.None);
 
             panelDict.Clear();
 
-            foreach (UIBase<T> panel in panels)
+            foreach (UIBase<U> panel in panels)
             {
                 panel.Init();
 
@@ -52,11 +52,11 @@ namespace Yang.UIController
             Initialized = true;
         }
 
-        public void ChangePanel(T type)
+        public void ChangePanel(U type)
         {
-            if (panelDict.TryGetValue(type, out UIBase<T> changePanel))
+            if (panelDict.TryGetValue(type, out UIBase<U> changePanel))
             {
-                UIBase<T> currentPanel = panelDict[CurrentPanel];
+                UIBase<U> currentPanel = panelDict[CurrentPanel];
 
                 if (currentPanel.IsActive) currentPanel.SetActive(false);
 
@@ -68,22 +68,22 @@ namespace Yang.UIController
             }
         }
 
-        public void SetData<U>(T type, U dataMarker) where U : struct, IDataMarker
+        public void SetData<V>(U type, V dataMarker) where V : struct, IDataMarker
         {
-            if (panelDict.TryGetValue(type, out UIBase<T> panel)) panel.SetData(dataMarker);
+            if (panelDict.TryGetValue(type, out UIBase<U> panel)) panel.SetData(dataMarker);
         }
 
-        public void SetData<U>(U dataMarker) where U : struct, IDataMarker => SetData(CurrentPanel, dataMarker);
+        public void SetData<V>(V dataMarker) where V : struct, IDataMarker => SetData(CurrentPanel, dataMarker);
 
-        public bool GetData<U>(T type, string markerID, out U result)
+        public bool GetData<V>(U type, string markerID, out V result)
         {
-            if (panelDict.TryGetValue(type, out UIBase<T> panel)) return panel.GetData(markerID, out result);
+            if (panelDict.TryGetValue(type, out UIBase<U> panel)) return panel.GetData(markerID, out result);
 
             result = default;
 
             return false;
         }
 
-        public bool GetData<U>(string markerID, out U result) => GetData(CurrentPanel, markerID, out result);
+        public bool GetData<V>(string markerID, out V result) => GetData(CurrentPanel, markerID, out result);
     }
 }
