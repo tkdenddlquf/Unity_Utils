@@ -11,6 +11,8 @@ namespace Yang.Dialogue
             if (callbacks.TryGetValue(id, out System.Action callback)) callback?.Invoke();
         }
 
+        public void ClearCallbacks() => callbacks.Clear();
+
         public void RegisterCallback(string id, System.Action callback)
         {
             if (callbacks.ContainsKey(id))

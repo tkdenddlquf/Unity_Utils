@@ -153,12 +153,18 @@ namespace Yang.Dialogue
         }
 
         #region Event
+        public void ClearEventCallbacks() => runnerEvent.ClearCallbacks();
+
         public void EventRegisterCallback(string id, System.Action callback) => runnerEvent.RegisterCallback(id, callback);
 
         public void EventUnregisterCallback(string id, System.Action callback) => runnerEvent.UnregisterCallback(id, callback);
         #endregion
 
         #region Trigger
+        public void ClearTriggerValues() => runnerTrigger.ClearValues();
+
+        public void ClearTriggerCallbacks() => runnerTrigger.ClearCallbacks();
+
         public bool ContainsKey(string key) => runnerTrigger.ContainsKey(key);
 
         public bool RemoveValue(string key) => runnerTrigger.RemoveValue(key);

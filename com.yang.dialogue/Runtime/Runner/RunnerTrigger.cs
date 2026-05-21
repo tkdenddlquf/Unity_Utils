@@ -13,10 +13,14 @@ namespace Yang.Dialogue
 
         public void SetDatas(IReadOnlyList<RunnerValue> values)
         {
-            this.values.Clear();
+            ClearValues();
 
             foreach (RunnerValue value in values) this.values.Add(value.Key, value);
         }
+
+        public void ClearValues() => values.Clear();
+
+        public void ClearCallbacks() => callbacks.Clear();
 
         public bool ContainsKey(string key) => values.ContainsKey(key);
 
