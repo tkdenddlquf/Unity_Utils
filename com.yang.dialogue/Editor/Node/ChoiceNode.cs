@@ -276,7 +276,14 @@ namespace Yang.Dialogue.Editor
             {
                 LocalizationTableCollection collection = collections[i];
 
-                if (collection.TableCollectionName == value || collection.TableCollectionNameReference.TableCollectionNameGuid == guid) return i;
+                if (collection.TableCollectionNameReference.TableCollectionNameGuid == guid) return i;
+            }
+
+            for (int i = 0; i < collections.Count; i++)
+            {
+                LocalizationTableCollection collection = collections[i];
+
+                if (collection.TableCollectionName == value) return i;
             }
 
             return -1;
