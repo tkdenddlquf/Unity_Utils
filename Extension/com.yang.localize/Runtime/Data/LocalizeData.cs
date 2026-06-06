@@ -8,14 +8,14 @@ namespace Yang.Localize
     {
         [SerializeField] private LocalizeTableType type;
 
-        [SerializeField] private string tableName;
-        [SerializeField] private string[] entryNames;
+        [SerializeField] private string tableKey;
+        [SerializeField] private string[] entryKeys;
 
-        public string Name => tableName;
+        public string Key => tableKey;
 
-        public int Length => entryNames.Length;
+        public int Length => entryKeys.Length;
 
-        public LocalizeReference this[int index] => new(tableName, entryNames[index]);
+        public LocalizeReference this[int index] => new(tableKey, entryKeys[index]);
 
 #if UNITY_EDITOR
         [SerializeField] private string tableGuid;
