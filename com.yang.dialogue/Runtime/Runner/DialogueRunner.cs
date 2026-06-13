@@ -39,7 +39,7 @@ namespace Yang.Dialogue
 
             foreach (RunnerToken token in tokens.Values)
             {
-                if (!token.IsStop)
+                if (token.IsStarted)
                 {
                     isStarted = true;
 
@@ -64,12 +64,12 @@ namespace Yang.Dialogue
 
             if (tokens.TryGetValue(key, out RunnerToken token))
             {
-                if (token.IsStop)
+                if (!token.IsStarted)
                 {
                     if (runnerNode.CheckNode(nodeName)) nextNode = nodeName;
                     else nextNode = token.TargetNode == "" ? so.StartGuid : token.TargetNode;
 
-                    token.Restart(nextNode);
+                    token.Resume(nextNode);
                 }
                 else return;
             }
@@ -89,7 +89,7 @@ namespace Yang.Dialogue
             {
                 int portIndex = await runnerNode.NextNode(views, token, token);
 
-                if (token.IsStop) break;
+                if (!token.IsStarted) break;
 
                 if (token.JumpTarget != "" && runnerNode.CheckNode(token.JumpTarget))
                 {
@@ -110,19 +110,26 @@ namespace Yang.Dialogue
                 }
             }
 
-            if (!token.IsStop) tokens.Remove(key);
+            if (token.IsStarted) tokens.Remove(key);
         }
 
         public bool IsStarted(string key)
         {
-            if (tokens.TryGetValue(key, out RunnerToken token)) return !token.IsStop;
+            if (tokens.TryGetValue(key, out RunnerToken token)) return token.IsStarted;
 
             return false;
         }
 
-        public void StopDialogue(string key)
+        public void PauseDialogue(string key)
         {
-            if (tokens.TryGetValue(key, out RunnerToken token)) token.Stop();
+            if (tokens.TryGetValue(key, out RunnerToken token)) token.Pause();
+        }
+
+        public void StopAllDialogue()
+        {
+            foreach (RunnerToken token in tokens.Values) token.Pause();
+
+            tokens.Clear();
         }
 
         public void JumpNode(string key, string nodeName)

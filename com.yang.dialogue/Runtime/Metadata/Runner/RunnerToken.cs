@@ -10,7 +10,7 @@ namespace Yang.Dialogue
 
         public Task Task { get; private set; }
 
-        public bool IsStop { get; private set; }
+        public bool IsStarted { get; private set; }
 
         public string PointNode { get; private set; }
 
@@ -22,19 +22,19 @@ namespace Yang.Dialogue
 
         public RunnerToken(string targetNode)
         {
-            IsStop = true;
+            IsStarted = false;
 
             PointNode = targetNode;
             JumpTarget = "";
 
-            Restart(targetNode);
+            Resume(targetNode);
         }
 
-        public void Restart(string targetNode)
+        public void Resume(string targetNode)
         {
-            if (!IsStop) return;
+            if (IsStarted) return;
 
-            IsStop = false;
+            IsStarted = true;
 
             cts = new();
 
@@ -43,11 +43,11 @@ namespace Yang.Dialogue
             TargetNode = targetNode;
         }
 
-        public void Stop()
+        public void Pause()
         {
-            if (IsStop) return;
+            if (!IsStarted) return;
 
-            IsStop = true;
+            IsStarted = false;
 
             cts.Cancel();
             cts.Dispose();
@@ -58,7 +58,7 @@ namespace Yang.Dialogue
 
         public async Task Delay(float second)
         {
-            if (IsStop) return;
+            if (!IsStarted) return;
 
             TimeSpan delay = TimeSpan.FromSeconds(second);
 
@@ -72,11 +72,11 @@ namespace Yang.Dialogue
     {
         public Task Task { get; }
 
-        public bool IsStop { get; }
+        public bool IsStarted { get; }
 
         public event Action OnStopCallback;
 
-        public void Stop();
+        public void Pause();
 
         public Task Delay(float second);
     }
