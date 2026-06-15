@@ -274,8 +274,6 @@ namespace Yang.Dialogue.Editor
 
                 LocalizationTableCollection collection = collections[index];
 
-                collection.SetEntries(speaker ? speakerEntries : textEntries);
-
                 Undo.RecordObject(so, "Change Table");
 
                 List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
@@ -310,6 +308,8 @@ namespace Yang.Dialogue.Editor
                             textEntries.Clear();
                         }
                     }
+
+                    collection.SetEntries(speaker ? speakerEntries : textEntries);
                 }
 
                 optionData[0] = new(collection.TableCollectionName);
