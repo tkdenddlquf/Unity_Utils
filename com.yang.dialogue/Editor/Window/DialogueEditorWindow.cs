@@ -339,7 +339,7 @@ namespace Yang.Dialogue.Editor
 
             JsonUtility.FromJsonOverwrite(saveData, SO);
 
-            AssetDatabase.SaveAssetIfDirty(SO);
+            ResetView();
 
             base.DiscardChanges();
         }
