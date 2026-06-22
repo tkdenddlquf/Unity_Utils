@@ -410,55 +410,22 @@ namespace Yang.Dialogue.Editor
             entryCache.Clear();
             keyCache.Clear();
 
-            graph.ResetCull();
-
             if (SO != null)
             {
-                foreach (Node node in graph.nodes.ToList()) graph.RemoveElement(node);
-                foreach (Edge edge in graph.edges.ToList()) graph.RemoveElement(edge);
-
                 NodeData startNode = SO.EditorStartNode;
 
                 if (string.IsNullOrEmpty(startNode.guid))
                 {
                     SO.EditorStartNode = new NodeData(NodeType.Start);
 
-                    startNode = SO.EditorStartNode;
-
                     EditorUtility.SetDirty(SO);
-                }
-
-                graph.CreateNode(startNode);
-
-                for (int i = 0; i < Nodes.Count; i++) graph.CreateNode(Nodes[i]);
-
-                for (int i = Links.Count - 1; i >= 0; i--)
-                {
-                    LinkData link = Links[i];
-
-                    BaseNode fromNode = GetLinkedNode(link.nodeGuid, out NodeData fromData);
-                    BaseNode toNode = GetLinkedNode(link.targetGuid, out NodeData toData);
-
-                    if (fromNode != null && toNode != null)
-                    {
-                        if (fromData.PortDatas.Count > link.outPortIndex)
-                        {
-                            Port fromPort = fromNode.outputContainer[link.outPortIndex] as Port;
-                            Port toPort = toNode.inputContainer[0] as Port;
-
-                            Edge edge = fromPort.ConnectTo(toPort);
-
-                            graph.AddElement(edge);
-                        }
-                        else Links.Remove(link);
-                    }
                 }
             }
 
+            graph.RebuildAll();
+
             graph.ClearSelection();
             graph.MarkDirtyRepaint();
-
-            graph.CullElements();
         }
 
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)
@@ -467,7 +434,12 @@ namespace Yang.Dialogue.Editor
 
             if (change.edgesToCreate != null) CreateEdge(change.edgesToCreate);
 
-            if (change.elementsToRemove != null) RemoveNode(change.elementsToRemove);
+            if (change.elementsToRemove != null)
+            {
+                RemoveNode(change.elementsToRemove);
+
+                graph.RequestSync();
+            }
 
             if (change.movedElements != null) MoveNode(change.movedElements);
 

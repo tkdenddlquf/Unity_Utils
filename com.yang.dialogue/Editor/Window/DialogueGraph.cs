@@ -12,10 +12,10 @@ namespace Yang.Dialogue.Editor
 
         private string jsonCopyData = "";
 
-        private const float CULL_MARGIN = 1200f;
+        private const float NODE_MARGIN = 1500f;
 
-        private readonly HashSet<VisualElement> culled = new();
-        private readonly HashSet<BaseNode> visibleNodes = new();
+        private readonly HashSet<string> visibleGuids = new();
+        private readonly Dictionary<string, BaseNode> currentNodes = new();
 
         public DialogueGraph(DialogueEditorWindow window)
         {
@@ -35,71 +35,128 @@ namespace Yang.Dialogue.Editor
 
             canPasteSerializedData = CheckSerialize;
 
-            viewTransformChanged += _ => CullElements();
+            viewTransformChanged += _ => SyncVisibleNodes();
 
-            RegisterCallback<GeometryChangedEvent>(_ => CullElements());
+            RegisterCallback<GeometryChangedEvent>(_ => SyncVisibleNodes());
         }
 
-        #region Cull
+        #region Virtualize
+        /// <summary>Full rebuild: removes every element, then creates only the on-screen nodes.</summary>
+        public void RebuildAll()
+        {
+            foreach (Node node in nodes.ToList()) RemoveElement(node);
+            foreach (Edge edge in edges.ToList()) RemoveElement(edge);
+
+            SyncVisibleNodes();
+        }
+
+        /// <summary>Schedules a reconcile after the current change (e.g. node removal) is applied.</summary>
+        public void RequestSync() => schedule.Execute(SyncVisibleNodes);
+
         /// <summary>
-        /// Hides nodes/edges outside the viewport (plus a margin) so off-screen elements aren't
-        /// laid out or rendered. Conservative: culls by content-space position only.
+        /// Instantiates only the nodes inside the viewport (+margin); off-screen nodes are never
+        /// created. Called on pan/zoom so nodes stream in and out, keeping large graphs cheap.
         /// </summary>
-        public void CullElements()
+        public void SyncVisibleNodes()
+        {
+            if (window.SO == null) return;
+
+            Rect view = GetVisibleContentRect(NODE_MARGIN);
+
+            if (view.width <= 0) return;
+
+            visibleGuids.Clear();
+
+            CollectVisible(window.SO.EditorStartNode, view);
+
+            List<NodeData> all = window.Nodes;
+
+            for (int i = 0; i < all.Count; i++) CollectVisible(all[i], view);
+
+            MapCurrentNodes();
+
+            bool changed = false;
+
+            foreach (KeyValuePair<string, BaseNode> kv in currentNodes)
+            {
+                if (!visibleGuids.Contains(kv.Key))
+                {
+                    RemoveElement(kv.Value);
+
+                    changed = true;
+                }
+            }
+
+            foreach (string guid in visibleGuids)
+            {
+                if (!currentNodes.ContainsKey(guid))
+                {
+                    CreateNode(window.GetNode(guid));
+
+                    changed = true;
+                }
+            }
+
+            if (changed) RebuildEdges();
+        }
+
+        private void CollectVisible(NodeData data, Rect view)
+        {
+            if (!string.IsNullOrEmpty(data.guid) && view.Contains(data.position)) visibleGuids.Add(data.guid);
+        }
+
+        private void MapCurrentNodes()
+        {
+            currentNodes.Clear();
+
+            foreach (Node node in nodes)
+            {
+                if (node is BaseNode baseNode) currentNodes[baseNode.GUID] = baseNode;
+            }
+        }
+
+        private void RebuildEdges()
+        {
+            foreach (Edge edge in edges.ToList()) RemoveElement(edge);
+
+            MapCurrentNodes();
+
+            List<LinkData> links = window.Links;
+
+            for (int i = 0; i < links.Count; i++)
+            {
+                LinkData link = links[i];
+
+                if (!currentNodes.TryGetValue(link.nodeGuid, out BaseNode fromNode)) continue;
+                if (!currentNodes.TryGetValue(link.targetGuid, out BaseNode toNode)) continue;
+
+                if (link.outPortIndex < 0 || link.outPortIndex >= fromNode.outputContainer.childCount) continue;
+                if (toNode.inputContainer.childCount == 0) continue;
+
+                Port fromPort = fromNode.outputContainer[link.outPortIndex] as Port;
+                Port toPort = toNode.inputContainer[0] as Port;
+
+                if (fromPort != null && toPort != null) AddElement(fromPort.ConnectTo(toPort));
+            }
+        }
+
+        private Rect GetVisibleContentRect(float margin)
         {
             Rect rect = contentRect;
 
-            if (rect.width <= 1 || rect.height <= 1) return;
+            if (rect.width <= 1 || rect.height <= 1) return Rect.zero;
 
             Vector3 translate = contentViewContainer.transform.position;
             Vector3 scale = contentViewContainer.transform.scale;
 
-            if (scale.x == 0 || scale.y == 0) return;
+            if (scale.x == 0 || scale.y == 0) return Rect.zero;
 
-            float minX = (0 - translate.x) / scale.x - CULL_MARGIN;
-            float maxX = (rect.width - translate.x) / scale.x + CULL_MARGIN;
-            float minY = (0 - translate.y) / scale.y - CULL_MARGIN;
-            float maxY = (rect.height - translate.y) / scale.y + CULL_MARGIN;
+            float minX = (0 - translate.x) / scale.x - margin;
+            float maxX = (rect.width - translate.x) / scale.x + margin;
+            float minY = (0 - translate.y) / scale.y - margin;
+            float maxY = (rect.height - translate.y) / scale.y + margin;
 
-            visibleNodes.Clear();
-
-            foreach (Node node in nodes)
-            {
-                if (node is BaseNode baseNode)
-                {
-                    Vector2 p = baseNode.GraphPosition;
-
-                    bool visible = p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
-
-                    SetCulled(baseNode, !visible);
-
-                    if (visible) visibleNodes.Add(baseNode);
-                }
-            }
-
-            foreach (Edge edge in edges)
-            {
-                bool outVisible = edge.output?.node is BaseNode outNode && visibleNodes.Contains(outNode);
-                bool inVisible = edge.input?.node is BaseNode inNode && visibleNodes.Contains(inNode);
-
-                // Hide unless both endpoints are visible (a culled endpoint has no layout to draw to).
-                SetCulled(edge, !(outVisible && inVisible));
-            }
-        }
-
-        private void SetCulled(VisualElement element, bool cull)
-        {
-            if (cull)
-            {
-                if (culled.Add(element)) element.style.display = DisplayStyle.None;
-            }
-            else if (culled.Remove(element)) element.style.display = DisplayStyle.Flex;
-        }
-
-        public void ResetCull()
-        {
-            culled.Clear();
-            visibleNodes.Clear();
+            return Rect.MinMaxRect(minX, minY, maxX, maxY);
         }
         #endregion
 
