@@ -19,6 +19,9 @@ namespace Yang.Dialogue
         public Vector2 position;
 
         public bool expended;
+
+        public readonly List<DataWrapper> EditorPortDatas => portDatas;
+        public readonly List<DataWrapper> EditorOptionDatas => optionDatas;
 #endif
 
         public NodeData(NodeType type)

@@ -1,15 +1,16 @@
 namespace Yang.Dialogue
 {
-    public struct RunnerChoiceText
+    public readonly struct RunnerChoiceText
     {
-        public int portIndex;
+        public readonly int portIndex;
 
-        public string table;
-        public string entry;
+        public readonly string table;
+        public readonly string entry;
 
-        public bool isValid;
+        public readonly bool isValid;
 
-        public RunnerCondition[] conditions;
+        private readonly RunnerCondition[] conditions;
+        public System.Collections.Generic.IReadOnlyList<RunnerCondition> Conditions => conditions;
 
         public RunnerChoiceText(int portIndex, string table, string entry, bool isValid, RunnerCondition[] conditions)
         {
@@ -57,7 +58,7 @@ namespace Yang.Dialogue
 
             checkType = default;
 
-            type = ValueType.Float;
+            type = ValueType.Bool;
         }
 
         public readonly float GetFloatValue()

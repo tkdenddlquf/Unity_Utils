@@ -3,6 +3,8 @@ using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEditor.Localization;
 using UnityEngine;
+using UnityEngine.Localization;
+using UnityEngine.Localization.Tables;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
@@ -11,16 +13,19 @@ namespace Yang.Dialogue.Editor
     {
         private DialogueGraph graph;
 
-        private System.Reflection.FieldInfo startField;
+        private const long LOCALIZATION_REFRESH_DEBOUNCE_MS = 200;
 
-        private System.Reflection.FieldInfo nodeField;
-        private System.Reflection.FieldInfo linkField;
+        private IVisualElementScheduledItem localizationRefresh;
+
+        private VisualElement languageBar;
+        private PopupField<Locale> languageDropdown;
+        private readonly List<Locale> locales = new();
 
         private string saveData;
 
         public IReadOnlyList<LocalizationTableCollection> collections;
 
-        public SystemLanguage Language { get; private set; }
+        public LocaleIdentifier Language { get; private set; }
 
         public List<string> Tables { get; } = new();
 
@@ -41,8 +46,8 @@ namespace Yang.Dialogue.Editor
 
                 if (value != null)
                 {
-                    Nodes = (List<NodeData>)nodeField.GetValue(value);
-                    Links = (List<LinkData>)linkField.GetValue(value);
+                    Nodes = value.EditorNodes;
+                    Links = value.EditorLinks;
 
                     graph.UpdateViewTransform(value.position, value.scale);
                 }
@@ -61,13 +66,6 @@ namespace Yang.Dialogue.Editor
 
         private void OnEnable()
         {
-            Language = Application.systemLanguage;
-
-            startField = typeof(DialogueSO).GetField("startNode", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-            nodeField = typeof(DialogueSO).GetField("nodes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            linkField = typeof(DialogueSO).GetField("links", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
             graph = new DialogueGraph(this);
             graph.StretchToParentSize();
 
@@ -88,7 +86,27 @@ namespace Yang.Dialogue.Editor
             graph.viewTransformChanged -= OnViewTransformChanged;
             graph.viewTransformChanged += OnViewTransformChanged;
 
+            LocalizationEditorSettings.EditorEvents.CollectionAdded -= OnLocalizationCollectionChanged;
+            LocalizationEditorSettings.EditorEvents.CollectionAdded += OnLocalizationCollectionChanged;
+
+            LocalizationEditorSettings.EditorEvents.CollectionRemoved -= OnLocalizationCollectionChanged;
+            LocalizationEditorSettings.EditorEvents.CollectionRemoved += OnLocalizationCollectionChanged;
+
+            LocalizationEditorSettings.EditorEvents.TableEntryAdded -= OnLocalizationEntryChanged;
+            LocalizationEditorSettings.EditorEvents.TableEntryAdded += OnLocalizationEntryChanged;
+
+            LocalizationEditorSettings.EditorEvents.TableEntryRemoved -= OnLocalizationEntryChanged;
+            LocalizationEditorSettings.EditorEvents.TableEntryRemoved += OnLocalizationEntryChanged;
+
+            LocalizationEditorSettings.EditorEvents.LocaleAdded -= OnLocaleChanged;
+            LocalizationEditorSettings.EditorEvents.LocaleAdded += OnLocaleChanged;
+
+            LocalizationEditorSettings.EditorEvents.LocaleRemoved -= OnLocaleChanged;
+            LocalizationEditorSettings.EditorEvents.LocaleRemoved += OnLocaleChanged;
+
             graph.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
+
+            BuildLanguageDropdown();
 
             SO = SO;
         }
@@ -105,11 +123,140 @@ namespace Yang.Dialogue.Editor
 
             graph.graphViewChanged -= OnGraphViewChanged;
 
+            graph.viewTransformChanged -= OnViewTransformChanged;
+
+            LocalizationEditorSettings.EditorEvents.CollectionAdded -= OnLocalizationCollectionChanged;
+            LocalizationEditorSettings.EditorEvents.CollectionRemoved -= OnLocalizationCollectionChanged;
+            LocalizationEditorSettings.EditorEvents.TableEntryAdded -= OnLocalizationEntryChanged;
+            LocalizationEditorSettings.EditorEvents.TableEntryRemoved -= OnLocalizationEntryChanged;
+
+            LocalizationEditorSettings.EditorEvents.LocaleAdded -= OnLocaleChanged;
+            LocalizationEditorSettings.EditorEvents.LocaleRemoved -= OnLocaleChanged;
+
+            localizationRefresh?.Pause();
+
             graph.UnregisterCallback<KeyDownEvent>(OnKeyDownEvent);
         }
 
         [MenuItem("Tools/Dialogue")]
         public static DialogueEditorWindow Open() => GetWindow<DialogueEditorWindow>("Dialogue");
+
+        private void OnLocalizationCollectionChanged(LocalizationTableCollection collection) => ScheduleLocalizationRefresh();
+
+        private void OnLocalizationEntryChanged(LocalizationTableCollection collection, SharedTableData.SharedTableEntry entry) => ScheduleLocalizationRefresh();
+
+        private void OnLocaleChanged(Locale locale) => ScheduleLocalizationRefresh();
+
+        private void ScheduleLocalizationRefresh()
+        {
+            localizationRefresh ??= rootVisualElement.schedule.Execute(RefreshLocalization);
+
+            localizationRefresh.ExecuteLater(LOCALIZATION_REFRESH_DEBOUNCE_MS);
+        }
+
+        private void RefreshLocalization()
+        {
+            BuildLanguageDropdown();
+
+            if (SO == null) return;
+
+            collections = LocalizationEditorSettings.GetStringTableCollections();
+            collections.SetTables(Tables);
+
+            ResetView();
+        }
+
+        private void BuildLanguageDropdown()
+        {
+            if (languageBar != null)
+            {
+                rootVisualElement.Remove(languageBar);
+
+                languageBar = null;
+                languageDropdown = null;
+            }
+
+            locales.Clear();
+            locales.AddRange(LocalizationEditorSettings.GetLocales());
+
+            if (locales.Count == 0)
+            {
+                Language = default;
+
+                return;
+            }
+
+            int index = locales.FindIndex(locale => locale.Identifier == Language);
+
+            if (index < 0)
+            {
+                LocaleIdentifier system = Application.systemLanguage;
+
+                index = locales.FindIndex(locale => locale.Identifier == system);
+
+                if (index < 0) index = 0;
+            }
+
+            Language = locales[index].Identifier;
+
+            languageBar = new VisualElement();
+
+            languageBar.style.position = Position.Absolute;
+            languageBar.style.top = 8;
+            languageBar.style.right = 8;
+
+            languageBar.style.flexDirection = FlexDirection.Row;
+            languageBar.style.alignItems = Align.Center;
+
+            languageBar.style.paddingLeft = 6;
+            languageBar.style.paddingRight = 6;
+            languageBar.style.paddingTop = 3;
+            languageBar.style.paddingBottom = 3;
+
+            languageBar.style.backgroundColor = new Color(0f, 0f, 0f, 0.35f);
+
+            languageBar.style.borderTopLeftRadius = 4;
+            languageBar.style.borderTopRightRadius = 4;
+            languageBar.style.borderBottomLeftRadius = 4;
+            languageBar.style.borderBottomRightRadius = 4;
+
+            Label label = new("Language")
+            {
+                style =
+                {
+                    marginRight = 6,
+                    color = new Color(0.78f, 0.78f, 0.78f),
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                }
+            };
+
+            languageDropdown = new PopupField<Locale>(locales, index, FormatLocale, FormatLocale);
+
+            languageDropdown.style.minWidth = 110;
+
+            languageDropdown.style.marginLeft = 0;
+            languageDropdown.style.marginRight = 0;
+            languageDropdown.style.marginTop = 0;
+            languageDropdown.style.marginBottom = 0;
+
+            languageDropdown.RegisterValueChangedCallback(OnLanguageChanged);
+
+            languageBar.Add(label);
+            languageBar.Add(languageDropdown);
+
+            rootVisualElement.Add(languageBar);
+        }
+
+        private static string FormatLocale(Locale locale) => locale == null ? "" : locale.LocaleName;
+
+        private void OnLanguageChanged(ChangeEvent<Locale> evt)
+        {
+            if (evt.newValue == null) return;
+
+            Language = evt.newValue.Identifier;
+
+            ResetView();
+        }
 
         private void OnKeyDownEvent(KeyDownEvent evt)
         {
@@ -223,16 +370,16 @@ namespace Yang.Dialogue.Editor
         {
             if (SO != null)
             {
-                foreach (Node node in graph.nodes) graph.RemoveElement(node);
-                foreach (Edge edge in graph.edges) graph.RemoveElement(edge);
+                foreach (Node node in graph.nodes.ToList()) graph.RemoveElement(node);
+                foreach (Edge edge in graph.edges.ToList()) graph.RemoveElement(edge);
 
-                NodeData startNode = (NodeData)startField.GetValue(SO);
+                NodeData startNode = SO.EditorStartNode;
 
                 if (string.IsNullOrEmpty(startNode.guid))
                 {
-                    startField.SetValue(SO, new NodeData(NodeType.Start));
+                    SO.EditorStartNode = new NodeData(NodeType.Start);
 
-                    startNode = (NodeData)startField.GetValue(SO);
+                    startNode = SO.EditorStartNode;
 
                     EditorUtility.SetDirty(SO);
                 }
@@ -270,6 +417,8 @@ namespace Yang.Dialogue.Editor
 
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)
         {
+            if (SO == null) return change;
+
             if (change.edgesToCreate != null) CreateEdge(change.edgesToCreate);
 
             if (change.elementsToRemove != null) RemoveNode(change.elementsToRemove);
@@ -287,7 +436,7 @@ namespace Yang.Dialogue.Editor
         #region Data
         public NodeData GetNode(string guid)
         {
-            if (guid == SO.StartGuid) return (NodeData)startField.GetValue(SO);
+            if (guid == SO.StartGuid) return SO.EditorStartNode;
 
             for (int i = 0; i < Nodes.Count; i++)
             {
@@ -299,7 +448,7 @@ namespace Yang.Dialogue.Editor
 
         public void SetNode(string guid, NodeData data)
         {
-            if (SO.StartGuid == guid) startField.SetValue(SO, data);
+            if (SO.StartGuid == guid) SO.EditorStartNode = data;
             else
             {
                 for (int i = 0; i < Nodes.Count; i++)
@@ -360,11 +509,11 @@ namespace Yang.Dialogue.Editor
                 {
                     if (node.GUID == SO.StartGuid)
                     {
-                        NodeData data = (NodeData)startField.GetValue(SO);
+                        NodeData data = SO.EditorStartNode;
 
                         data.position = node.GetPosition().position;
 
-                        startField.SetValue(SO, data);
+                        SO.EditorStartNode = data;
                     }
                     else
                     {

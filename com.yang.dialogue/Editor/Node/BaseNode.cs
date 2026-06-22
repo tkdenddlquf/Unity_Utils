@@ -14,9 +14,6 @@ namespace Yang.Dialogue.Editor
         protected readonly List<DataWrapper> portDatas;
         protected readonly List<DataWrapper> optionDatas;
 
-        private readonly System.Reflection.FieldInfo portDataField;
-        private readonly System.Reflection.FieldInfo optionDataField;
-
         public string GUID { get; private set; }
 
         protected BaseNode(DialogueEditorWindow window, string guid)
@@ -29,11 +26,8 @@ namespace Yang.Dialogue.Editor
 
             NodeData data = window.GetNode(guid);
 
-            portDataField = typeof(NodeData).GetField("portDatas", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            optionDataField = typeof(NodeData).GetField("optionDatas", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-            portDatas = (List<DataWrapper>)portDataField.GetValue(data);
-            optionDatas = (List<DataWrapper>)optionDataField.GetValue(data);
+            portDatas = data.EditorPortDatas;
+            optionDatas = data.EditorOptionDatas;
 
             GUID = guid;
 
@@ -97,7 +91,7 @@ namespace Yang.Dialogue.Editor
             return port;
         }
 
-        protected void RemovePort(Port port)
+        protected bool RemovePort(Port port)
         {
             DialogueSO so = window.SO;
 
@@ -127,7 +121,11 @@ namespace Yang.Dialogue.Editor
                 EditorUtility.SetDirty(so);
 
                 window.SetUnsaved();
+
+                return true;
             }
+
+            return false;
         }
 
         private void ChangedCallback(ChangeEvent<string> evt)
@@ -136,7 +134,10 @@ namespace Yang.Dialogue.Editor
             {
                 DialogueSO so = window.SO;
 
-                if (evt.newValue == so.StartGuid) field.SetValueWithoutNotify(GUID);
+                if (string.IsNullOrWhiteSpace(evt.newValue) || evt.newValue == so.StartGuid)
+                {
+                    field.SetValueWithoutNotify(GUID);
+                }
                 else
                 {
                     List<NodeData> nodes = window.Nodes;
@@ -151,13 +152,29 @@ namespace Yang.Dialogue.Editor
                         }
                     }
 
-                    NodeData data = window.GetNode(GUID);
+                    string oldGuid = GUID;
+
+                    NodeData data = window.GetNode(oldGuid);
 
                     Undo.RecordObject(so, "Change GUID");
 
                     data.guid = evt.newValue;
 
-                    window.SetNode(GUID, data);
+                    window.SetNode(oldGuid, data);
+
+                    List<LinkData> links = window.Links;
+
+                    for (int i = 0; i < links.Count; i++)
+                    {
+                        LinkData link = links[i];
+
+                        bool changed = false;
+
+                        if (link.nodeGuid == oldGuid) { link.nodeGuid = evt.newValue; changed = true; }
+                        if (link.targetGuid == oldGuid) { link.targetGuid = evt.newValue; changed = true; }
+
+                        if (changed) links[i] = link;
+                    }
 
                     GUID = data.guid;
 

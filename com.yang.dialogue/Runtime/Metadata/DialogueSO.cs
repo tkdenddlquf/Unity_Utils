@@ -28,6 +28,10 @@ namespace Yang.Dialogue
 #if UNITY_EDITOR
         public Vector3 position = Vector3.zero;
         public Vector3 scale = Vector3.one;
+
+        public NodeData EditorStartNode { get => startNode; set => startNode = value; }
+        public List<NodeData> EditorNodes => nodes;
+        public List<LinkData> EditorLinks => links;
 #endif
 
         internal void GetDatas(Dictionary<string, NodeData> nodes, Dictionary<RunnerPort, RunnerPort> links)

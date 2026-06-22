@@ -10,13 +10,11 @@ namespace Yang.Dialogue
         [SerializeField] private List<DialogueViewBase> viewBases = new();
 
         private readonly List<IDialogueView> views = new();
-        public List<IDialogueView> Views => views;
+        public IReadOnlyList<IDialogueView> Views => views;
 
         private readonly RunnerNode runnerNode = new();
         private readonly RunnerEvent runnerEvent = new();
         private readonly RunnerTrigger runnerTrigger = new();
-
-        private readonly DialogueWrapper wrapper = new();
 
         private readonly Dictionary<string, RunnerToken> tokens = new();
 
@@ -56,7 +54,7 @@ namespace Yang.Dialogue
             runnerNode.SetDatas(so);
         }
 
-        public async void StartDialogue(string key, string nodeName = "", List<IDialogueView> views = null)
+        public async void StartDialogue(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null)
         {
             if (so == null) return;
 
@@ -140,6 +138,8 @@ namespace Yang.Dialogue
         public DialogueWrapper Save()
         {
             if (so == null) return null;
+
+            DialogueWrapper wrapper = new();
 
             wrapper.SetDatas(tokens, runnerTrigger.Values);
 

@@ -1,9 +1,9 @@
 namespace Yang.Dialogue
 {
-    public struct RunnerText
+    public readonly struct RunnerText
     {
-        public string table;
-        public string entry;
+        public readonly string table;
+        public readonly string entry;
 
         public RunnerText(string table, string entry)
         {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Localization;
 using UnityEngine.Localization.Tables;
 
 namespace Yang.Dialogue.Editor
@@ -28,7 +29,7 @@ namespace Yang.Dialogue.Editor
             tables = null;
         }
 
-        public readonly string GetText(SystemLanguage language)
+        public readonly string GetText(LocaleIdentifier identifier)
         {
             if (tables == null) return "";
 
@@ -36,7 +37,7 @@ namespace Yang.Dialogue.Editor
             {
                 LocalizationTable table = reference.asset;
 
-                if (table.LocaleIdentifier == language && table is StringTable stringTable)
+                if (table.LocaleIdentifier == identifier && table is StringTable stringTable)
                 {
                     StringTableEntry entry = stringTable.GetEntry(key);
 
@@ -51,11 +52,11 @@ namespace Yang.Dialogue.Editor
         public override string ToString() => key;
 
         #region Equatable
-        public readonly bool Equals(EntryData other) => key == other.key || id == other.id;
+        public readonly bool Equals(EntryData other) => key == other.key && id == other.id;
 
         public readonly override bool Equals(object obj) => obj is EntryData other && Equals(other);
 
-        public readonly override int GetHashCode() => HashCode.Combine(key);
+        public readonly override int GetHashCode() => HashCode.Combine(key, id);
         #endregion
     }
 }

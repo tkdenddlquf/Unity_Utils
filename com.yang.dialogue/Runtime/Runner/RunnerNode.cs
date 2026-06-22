@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace Yang.Dialogue
 {
@@ -11,8 +13,17 @@ namespace Yang.Dialogue
         private readonly List<RunnerChoiceText> choiceDatas = new();
         private readonly List<UnityEngine.Object> objectDatas = new();
 
+        private readonly ReadOnlyCollection<RunnerChoiceText> choiceDatasView;
+        private readonly ReadOnlyCollection<UnityEngine.Object> objectDatasView;
+
         private readonly Dictionary<string, NodeData> nodes = new();
         private readonly Dictionary<RunnerPort, RunnerPort> links = new();
+
+        public RunnerNode()
+        {
+            choiceDatasView = choiceDatas.AsReadOnly();
+            objectDatasView = objectDatas.AsReadOnly();
+        }
 
         public void Init(RunnerEvent runnerEvent, RunnerTrigger runnerTrigger)
         {
@@ -245,7 +256,7 @@ namespace Yang.Dialogue
 
                         foreach (IDialogueView view in views)
                         {
-                            int result = await view.OnChoice(speaker, choiceDatas, message[0].ToString(), token);
+                            int result = await view.OnChoice(speaker, choiceDatasView, message[0].ToString(), token);
 
                             if (result != -1) index = result;
                         }
@@ -282,7 +293,7 @@ namespace Yang.Dialogue
                             if (datas[0].TryGetObject(out UnityEngine.Object value)) objectDatas.Add(value);
                         }
 
-                        foreach (IDialogueView view in views) await view.OnObject(objectDatas, token);
+                        foreach (IDialogueView view in views) await view.OnObject(objectDatasView, token);
                     }
                     return 0;
             }
@@ -292,7 +303,7 @@ namespace Yang.Dialogue
 
         public bool CheckNode(string nodeName)
         {
-            if (nodeName == "" && !nodes.ContainsKey(nodeName)) return false;
+            if (nodeName == "" || !nodes.ContainsKey(nodeName)) return false;
 
             return true;
         }
@@ -320,7 +331,7 @@ namespace Yang.Dialogue
                     break;
 
                 case ValueCheckType.Equal:
-                    if (checkValue != value) return false;
+                    if (!Mathf.Approximately(checkValue, value)) return false;
                     break;
 
                 case ValueCheckType.LessEqual:
@@ -332,7 +343,7 @@ namespace Yang.Dialogue
                     break;
 
                 case ValueCheckType.NotEqual:
-                    if (checkValue == value) return false;
+                    if (Mathf.Approximately(checkValue, value)) return false;
                     break;
 
                 case ValueCheckType.GreaterEqual:

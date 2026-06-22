@@ -621,9 +621,7 @@ namespace Yang.Dialogue.Editor
             Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
             Button removeButton = new(() =>
             {
-                RemovePort(port);
-
-                textsElement.Remove(textField);
+                if (RemovePort(port)) textsElement.Remove(textField);
             })
             { text = "X" };
 
