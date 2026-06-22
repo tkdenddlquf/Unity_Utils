@@ -410,6 +410,8 @@ namespace Yang.Dialogue.Editor
             entryCache.Clear();
             keyCache.Clear();
 
+            graph.ResetCull();
+
             if (SO != null)
             {
                 foreach (Node node in graph.nodes.ToList()) graph.RemoveElement(node);
@@ -455,6 +457,8 @@ namespace Yang.Dialogue.Editor
 
             graph.ClearSelection();
             graph.MarkDirtyRepaint();
+
+            graph.CullElements();
         }
 
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)
@@ -549,6 +553,8 @@ namespace Yang.Dialogue.Editor
             {
                 if (element is BaseNode node)
                 {
+                    node.GraphPosition = node.GetPosition().position;
+
                     if (node.GUID == SO.StartGuid)
                     {
                         NodeData data = SO.EditorStartNode;

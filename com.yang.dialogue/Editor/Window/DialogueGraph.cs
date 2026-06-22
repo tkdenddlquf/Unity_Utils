@@ -12,6 +12,11 @@ namespace Yang.Dialogue.Editor
 
         private string jsonCopyData = "";
 
+        private const float CULL_MARGIN = 1200f;
+
+        private readonly HashSet<VisualElement> culled = new();
+        private readonly HashSet<BaseNode> visibleNodes = new();
+
         public DialogueGraph(DialogueEditorWindow window)
         {
             this.window = window;
@@ -29,7 +34,74 @@ namespace Yang.Dialogue.Editor
             unserializeAndPaste = UnserializeNode;
 
             canPasteSerializedData = CheckSerialize;
+
+            viewTransformChanged += _ => CullElements();
+
+            RegisterCallback<GeometryChangedEvent>(_ => CullElements());
         }
+
+        #region Cull
+        /// <summary>
+        /// Hides nodes/edges outside the viewport (plus a margin) so off-screen elements aren't
+        /// laid out or rendered. Conservative: culls by content-space position only.
+        /// </summary>
+        public void CullElements()
+        {
+            Rect rect = contentRect;
+
+            if (rect.width <= 1 || rect.height <= 1) return;
+
+            Vector3 translate = contentViewContainer.transform.position;
+            Vector3 scale = contentViewContainer.transform.scale;
+
+            if (scale.x == 0 || scale.y == 0) return;
+
+            float minX = (0 - translate.x) / scale.x - CULL_MARGIN;
+            float maxX = (rect.width - translate.x) / scale.x + CULL_MARGIN;
+            float minY = (0 - translate.y) / scale.y - CULL_MARGIN;
+            float maxY = (rect.height - translate.y) / scale.y + CULL_MARGIN;
+
+            visibleNodes.Clear();
+
+            foreach (Node node in nodes)
+            {
+                if (node is BaseNode baseNode)
+                {
+                    Vector2 p = baseNode.GraphPosition;
+
+                    bool visible = p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
+
+                    SetCulled(baseNode, !visible);
+
+                    if (visible) visibleNodes.Add(baseNode);
+                }
+            }
+
+            foreach (Edge edge in edges)
+            {
+                bool outVisible = edge.output?.node is BaseNode outNode && visibleNodes.Contains(outNode);
+                bool inVisible = edge.input?.node is BaseNode inNode && visibleNodes.Contains(inNode);
+
+                // Hide unless both endpoints are visible (a culled endpoint has no layout to draw to).
+                SetCulled(edge, !(outVisible && inVisible));
+            }
+        }
+
+        private void SetCulled(VisualElement element, bool cull)
+        {
+            if (cull)
+            {
+                if (culled.Add(element)) element.style.display = DisplayStyle.None;
+            }
+            else if (culled.Remove(element)) element.style.display = DisplayStyle.Flex;
+        }
+
+        public void ResetCull()
+        {
+            culled.Clear();
+            visibleNodes.Clear();
+        }
+        #endregion
 
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
@@ -102,6 +174,8 @@ namespace Yang.Dialogue.Editor
         public BaseNode CreateNode(NodeData data)
         {
             BaseNode node = ConvertData(data.type, data.guid);
+
+            node.GraphPosition = data.position;
 
             node.SetPosition(new(data.position, Vector2.zero));
             node.SetPorts();

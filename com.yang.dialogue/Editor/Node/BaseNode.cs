@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
@@ -15,6 +16,9 @@ namespace Yang.Dialogue.Editor
         protected readonly List<DataWrapper> optionDatas;
 
         public string GUID { get; private set; }
+
+        /// <summary>Content-space top-left used for viewport culling (kept in sync on create/move).</summary>
+        public Vector2 GraphPosition { get; set; }
 
         protected BaseNode(DialogueEditorWindow window, string guid)
         {
