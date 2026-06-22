@@ -52,7 +52,7 @@ namespace Yang.Dialogue.Editor
 
         private void SetOptions()
         {
-            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+            window.GetKeysInto(window.SO.Conditions, conditions);
 
             AddDefaultCondition();
 
@@ -319,7 +319,7 @@ namespace Yang.Dialogue.Editor
             itemElement.style.flexDirection = FlexDirection.Row;
             itemElement.style.alignItems = Align.Center;
 
-            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+            window.GetKeysInto(window.SO.Conditions, conditions);
 
             int index = conditions.IndexOf(key);
 
@@ -423,7 +423,7 @@ namespace Yang.Dialogue.Editor
             itemElement.style.flexDirection = FlexDirection.Row;
             itemElement.style.alignItems = Align.Center;
 
-            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+            window.GetKeysInto(window.SO.Conditions, conditions);
 
             int index = conditions.IndexOf(key);
 

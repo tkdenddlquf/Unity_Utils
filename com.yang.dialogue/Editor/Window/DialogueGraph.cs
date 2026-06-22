@@ -105,6 +105,9 @@ namespace Yang.Dialogue.Editor
 
             node.SetPosition(new(data.position, Vector2.zero));
             node.SetPorts();
+
+            if (data.expended) node.EnsureExtension();
+
             node.SetExpendedWithoutNotify(data.expended);
 
             node.RefreshExpandedState();

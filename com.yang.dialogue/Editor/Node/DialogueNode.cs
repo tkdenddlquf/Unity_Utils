@@ -58,8 +58,10 @@ namespace Yang.Dialogue.Editor
             AddTextField("Speaker", "Speaker Text");
             AddTextField("Text", "Text Text");
 
-            SetOptions();
+            SetPreview();
         }
+
+        protected override void BuildExtension() => SetOptions();
 
         private void SetDefault()
         {
@@ -159,6 +161,34 @@ namespace Yang.Dialogue.Editor
             textsElement.Add(field);
         }
 
+        private void SetPreview()
+        {
+            SetPreviewField("Speaker Text", optionDatas[0].data, optionDatas[1].data);
+            SetPreviewField("Text Text", optionDatas[2].data, optionDatas[3].data);
+        }
+
+        private void SetPreviewField(string fieldName, List<GenericData> table, List<GenericData> entry)
+        {
+            TextField field = textsElement.Q<TextField>(fieldName);
+
+            if (field == null) return;
+
+            field.value = ResolvePreview(table[0].ToString(), entry[0].ToString(), entry[1].GetLong());
+        }
+
+        private string ResolvePreview(string tableName, string key, long id)
+        {
+            if (string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(key)) return "";
+
+            for (int i = 0; i < collections.Count; i++)
+            {
+                if (collections[i].TableCollectionName == tableName)
+                    return new EntryData(id, key, collections[i].Tables).GetText(window.Language);
+            }
+
+            return "";
+        }
+
         #region Table
         private void AddTableField(bool speaker)
         {
@@ -182,7 +212,7 @@ namespace Yang.Dialogue.Editor
 
             if (index != -1)
             {
-                collections[index].SetEntries(entries);
+                window.GetEntriesInto(collections[index], entries);
 
                 optionData[0] = new(collections[index].TableCollectionName);
                 optionData[1] = new(collections[index].TableCollectionNameReference.TableCollectionNameGuid);
@@ -309,7 +339,7 @@ namespace Yang.Dialogue.Editor
                         }
                     }
 
-                    collection.SetEntries(speaker ? speakerEntries : textEntries);
+                    window.GetEntriesInto(collection, speaker ? speakerEntries : textEntries);
                 }
 
                 optionData[0] = new(collection.TableCollectionName);

@@ -31,7 +31,7 @@ namespace Yang.Dialogue.Editor
             List<List<string>> rows = new();
 
             // Header
-            List<string> header = new() { "ID", "Type", "Next", "Message", "Data", "SpeakerTable", "TextTable", "SpeakerKey", "TextKey" };
+            List<string> header = new() { "ID", "Type", "Next", "Message", "Data", "SpeakerTable", "TextTable", "SpeakerKey", "TextKey", "X", "Y" };
 
             foreach (Locale locale in locales)
             {
@@ -57,10 +57,13 @@ namespace Yang.Dialogue.Editor
             IReadOnlyList<LocalizationTableCollection> collections, Dictionary<(string, int), string> linkMap,
             List<List<string>> rows, int localeCount)
         {
+            string px = node.position.x.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string py = node.position.y.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
             switch (node.type)
             {
                 case NodeType.Start:
-                    rows.Add(MakeRow(node.guid, "Start", Next(linkMap, node.guid, 0), "", "", "", "", "", "", localeCount));
+                    rows.Add(MakeRow(node.guid, "Start", Next(linkMap, node.guid, 0), "", "", "", "", "", "", px, py, localeCount));
                     break;
 
                 case NodeType.Dialogue:
@@ -73,7 +76,7 @@ namespace Yang.Dialogue.Editor
                         string textKey = opt[3].data[0].ToString();
                         string message = opt[4].data[0].ToString();
 
-                        List<string> row = MakeRow(node.guid, "Dialogue", Next(linkMap, node.guid, 0), message, "", speakerTable, textTable, speakerKey, textKey, localeCount);
+                        List<string> row = MakeRow(node.guid, "Dialogue", Next(linkMap, node.guid, 0), message, "", speakerTable, textTable, speakerKey, textKey, px, py, localeCount);
 
                         FillLocaleColumns(row, locales, collections, speakerTable, speakerKey, textTable, textKey);
 
@@ -90,7 +93,7 @@ namespace Yang.Dialogue.Editor
                         string textTable = opt[2].data[0].ToString();
                         string message = opt[3].data[0].ToString();
 
-                        List<string> row = MakeRow(node.guid, "Choice", "", message, "", speakerTable, textTable, speakerKey, "", localeCount);
+                        List<string> row = MakeRow(node.guid, "Choice", "", message, "", speakerTable, textTable, speakerKey, "", px, py, localeCount);
 
                         FillLocaleColumns(row, locales, collections, speakerTable, speakerKey, "", "");
 
@@ -108,7 +111,7 @@ namespace Yang.Dialogue.Editor
                             string conditions = ConditionsToString(data, 3);
                             string optionData = hide ? (conditions.Length == 0 ? "hide" : "hide; " + conditions) : conditions;
 
-                            List<string> optionRow = MakeRow("", "Option", Next(linkMap, node.guid, i), "", optionData, "", "", "", optionKey, localeCount);
+                            List<string> optionRow = MakeRow("", "Option", Next(linkMap, node.guid, i), "", optionData, "", "", "", optionKey, "", "", localeCount);
 
                             FillLocaleColumns(optionRow, locales, collections, "", "", textTable, optionKey);
 
@@ -118,21 +121,27 @@ namespace Yang.Dialogue.Editor
                     break;
 
                 case NodeType.Trigger:
-                    rows.Add(MakeRow(node.guid, "Trigger", Next(linkMap, node.guid, 0), "", TriggerToString(node.OptionDatas), "", "", "", "", localeCount));
+                    rows.Add(MakeRow(node.guid, "Trigger", Next(linkMap, node.guid, 0), "", TriggerToString(node.OptionDatas), "", "", "", "", px, py, localeCount));
                     break;
 
                 case NodeType.Event:
-                    rows.Add(MakeRow(node.guid, "Event", Next(linkMap, node.guid, 0), "", EventToString(node.OptionDatas), "", "", "", "", localeCount));
+                    rows.Add(MakeRow(node.guid, "Event", Next(linkMap, node.guid, 0), "", EventToString(node.OptionDatas), "", "", "", "", px, py, localeCount));
                     break;
 
                 case NodeType.Wait:
-                    rows.Add(MakeRow(node.guid, "Wait", Next(linkMap, node.guid, 0), "", WaitToString(node.OptionDatas), "", "", "", "", localeCount));
+                    rows.Add(MakeRow(node.guid, "Wait", Next(linkMap, node.guid, 0), "", WaitToString(node.OptionDatas), "", "", "", "", px, py, localeCount));
+                    break;
+
+                case NodeType.Object:
+                    // Object references can't be represented in CSV; keep the node's id, link and
+                    // position so topology survives a round-trip. Assign the objects in the editor.
+                    rows.Add(MakeRow(node.guid, "Object", Next(linkMap, node.guid, 0), "", "(object node — assign objects in editor)", "", "", "", "", px, py, localeCount));
                     break;
 
                 case NodeType.Condition:
                     {
                         // Port 0 = default/else branch -> node row's Next
-                        rows.Add(MakeRow(node.guid, "Condition", Next(linkMap, node.guid, 0), "", "", "", "", "", "", localeCount));
+                        rows.Add(MakeRow(node.guid, "Condition", Next(linkMap, node.guid, 0), "", "", "", "", "", "", px, py, localeCount));
 
                         IReadOnlyList<DataWrapper> ports = node.PortDatas;
 
@@ -140,7 +149,7 @@ namespace Yang.Dialogue.Editor
                         {
                             string conditions = ConditionsToString(ports[i].data, 0);
 
-                            rows.Add(MakeRow("", "Branch", Next(linkMap, node.guid, i), "", conditions, "", "", "", "", localeCount));
+                            rows.Add(MakeRow("", "Branch", Next(linkMap, node.guid, i), "", conditions, "", "", "", "", "", "", localeCount));
                         }
                     }
                     break;
@@ -148,9 +157,9 @@ namespace Yang.Dialogue.Editor
         }
 
         private static List<string> MakeRow(string id, string type, string next, string message, string data,
-            string speakerTable, string textTable, string speakerKey, string textKey, int localeCount)
+            string speakerTable, string textTable, string speakerKey, string textKey, string x, string y, int localeCount)
         {
-            List<string> row = new() { id, type, next, message, data, speakerTable, textTable, speakerKey, textKey };
+            List<string> row = new() { id, type, next, message, data, speakerTable, textTable, speakerKey, textKey, x, y };
 
             for (int i = 0; i < localeCount; i++)
             {
@@ -169,7 +178,7 @@ namespace Yang.Dialogue.Editor
             {
                 LocaleIdentifier id = locales[i].Identifier;
 
-                int speakerColumn = 9 + i * 2;
+                int speakerColumn = 11 + i * 2;
                 int textColumn = speakerColumn + 1;
 
                 row[speakerColumn] = ResolveValue(collections, speakerTable, speakerKey, id);

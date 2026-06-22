@@ -24,7 +24,9 @@ namespace Yang.Dialogue.Editor
         private const int COL_TEXT_TABLE = 6;
         private const int COL_SPEAKER_KEY = 7;
         private const int COL_TEXT_KEY = 8;
-        private const int FIXED_COLUMNS = 9;
+        private const int COL_X = 9;
+        private const int COL_Y = 10;
+        private const int FIXED_COLUMNS = 11;
 
         private class LocaleColumn
         {
@@ -44,6 +46,8 @@ namespace Yang.Dialogue.Editor
             public string textTable;
             public string speakerKey;
             public string textKey;
+            public string posX;
+            public string posY;
 
             public readonly Dictionary<string, string> speaker = new();
             public readonly Dictionary<string, string> text = new();
@@ -57,6 +61,7 @@ namespace Yang.Dialogue.Editor
             public StringTableCollection fallbackSpeaker;
             public StringTableCollection fallbackText;
             public readonly List<string> warnings = new();
+            public readonly Dictionary<string, List<DataWrapper>> existingObjects = new();
         }
 
         public static bool Import(DialogueSO so, string csv, out string message)
@@ -82,6 +87,11 @@ namespace Yang.Dialogue.Editor
                 fallbackSpeaker = ResolveCollection(so.SpeakerTable),
                 fallbackText = ResolveCollection(so.TextTable),
             };
+
+            foreach (NodeData node in so.EditorNodes)
+            {
+                if (node.type == NodeType.Object) ctx.existingObjects[node.guid] = node.EditorOptionDatas;
+            }
 
             Build(so, nodes, ctx);
 
@@ -193,6 +203,8 @@ namespace Yang.Dialogue.Editor
                 textTable = Cell(cells, COL_TEXT_TABLE),
                 speakerKey = Cell(cells, COL_SPEAKER_KEY),
                 textKey = Cell(cells, COL_TEXT_KEY),
+                posX = Cell(cells, COL_X),
+                posY = Cell(cells, COL_Y),
             };
 
             foreach (LocaleColumn column in localeColumns)
@@ -266,7 +278,20 @@ namespace Yang.Dialogue.Editor
                 links.Add(new LinkData { nodeGuid = source, targetGuid = target, outPortIndex = port });
             }
 
-            AssignPositions(ref startNode, nodeList, links);
+            Dictionary<string, Vector2> explicitPositions = new();
+
+            foreach (Row row in rows)
+            {
+                if (string.IsNullOrEmpty(row.id)) continue;
+
+                if (float.TryParse(row.posX, NumberStyles.Float, CultureInfo.InvariantCulture, out float x) &&
+                    float.TryParse(row.posY, NumberStyles.Float, CultureInfo.InvariantCulture, out float y))
+                {
+                    explicitPositions[row.id] = new Vector2(x, y);
+                }
+            }
+
+            AssignPositions(ref startNode, nodeList, links, explicitPositions);
 
             so.EditorStartNode = startNode;
 
@@ -406,6 +431,26 @@ namespace Yang.Dialogue.Editor
                         AddLink(linkRequests, row.id, i + 1, branch.next);
                     }
                     break;
+
+                case NodeType.Object:
+                    // CSV can't carry asset references. Reuse the existing node's object slots
+                    // (matched by id) so assignments survive; only fall back to an empty slot
+                    // when this is a brand-new object node.
+                    if (ctx.existingObjects.TryGetValue(row.id, out List<DataWrapper> existing) && existing.Count > 0)
+                    {
+                        foreach (DataWrapper slot in existing) options.Add(new DataWrapper(slot));
+                    }
+                    else
+                    {
+                        options.Add(new DataWrapper(new GenericData(GenericData.DataType.Object)));
+
+                        ctx.warnings.Add($"'{row.id}': new Object node imported empty — assign objects in the editor.");
+                    }
+
+                    ports.Add(new DataWrapper());
+
+                    AddLink(linkRequests, row.id, 0, row.next);
+                    break;
             }
 
             return node;
@@ -533,6 +578,7 @@ namespace Yang.Dialogue.Editor
             "Event" => NodeType.Event,
             "Wait" => NodeType.Wait,
             "Condition" => NodeType.Condition,
+            "Object" => NodeType.Object,
             _ => NodeType.Dialogue,
         };
 
@@ -701,7 +747,8 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Layout
-        private static void AssignPositions(ref NodeData startNode, List<NodeData> nodeList, List<LinkData> links)
+        private static void AssignPositions(ref NodeData startNode, List<NodeData> nodeList, List<LinkData> links,
+            Dictionary<string, Vector2> explicitPositions)
         {
             Dictionary<string, List<string>> outgoing = new();
 
@@ -741,21 +788,30 @@ namespace Yang.Dialogue.Editor
 
             Dictionary<int, int> rowInColumn = new();
 
-            startNode.position = NextPosition(depth, rowInColumn, startNode.guid, 0);
+            startNode.position = explicitPositions.TryGetValue(startNode.guid, out Vector2 startPos)
+                ? startPos
+                : NextPosition(rowInColumn, 0);
 
             for (int i = 0; i < nodeList.Count; i++)
             {
                 NodeData node = nodeList[i];
 
-                int column = depth.TryGetValue(node.guid, out int d) ? d : 0;
+                if (explicitPositions.TryGetValue(node.guid, out Vector2 pos))
+                {
+                    node.position = pos;
+                }
+                else
+                {
+                    int column = depth.TryGetValue(node.guid, out int d) ? d : 0;
 
-                node.position = NextPosition(depth, rowInColumn, node.guid, column);
+                    node.position = NextPosition(rowInColumn, column);
+                }
 
                 nodeList[i] = node;
             }
         }
 
-        private static Vector2 NextPosition(Dictionary<string, int> depth, Dictionary<int, int> rowInColumn, string guid, int column)
+        private static Vector2 NextPosition(Dictionary<int, int> rowInColumn, int column)
         {
             int rowIndex = rowInColumn.TryGetValue(column, out int r) ? r : 0;
 

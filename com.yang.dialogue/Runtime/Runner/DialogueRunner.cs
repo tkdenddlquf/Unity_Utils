@@ -85,7 +85,9 @@ namespace Yang.Dialogue
 
             while (true)
             {
-                int portIndex = await runnerNode.NextNode(views, token, token);
+                IReadOnlyList<IDialogueView> snapshot = Snapshot(views);
+
+                int portIndex = await runnerNode.NextNode(snapshot, token, token);
 
                 if (!token.IsStarted) break;
 
@@ -101,7 +103,7 @@ namespace Yang.Dialogue
                     if (runnerNode.TryGetLink(port, out string result)) token.TargetNode = result;
                     else
                     {
-                        foreach (IDialogueView view in views) await view.OnMessage("", token);
+                        foreach (IDialogueView view in snapshot) await view.OnMessage("", token);
 
                         break;
                     }
@@ -109,6 +111,15 @@ namespace Yang.Dialogue
             }
 
             if (token.IsStarted) tokens.Remove(key);
+        }
+
+        private static IReadOnlyList<IDialogueView> Snapshot(IReadOnlyList<IDialogueView> source)
+        {
+            IDialogueView[] copy = new IDialogueView[source.Count];
+
+            for (int i = 0; i < source.Count; i++) copy[i] = source[i];
+
+            return copy;
         }
 
         public bool IsStarted(string key)
@@ -134,6 +145,21 @@ namespace Yang.Dialogue
         {
             if (tokens.TryGetValue(key, out RunnerToken token)) token.JumpTarget = nodeName;
         }
+
+        #region View
+        public bool AddView(IDialogueView view)
+        {
+            if (view == null || views.Contains(view)) return false;
+
+            views.Add(view);
+
+            return true;
+        }
+
+        public bool RemoveView(IDialogueView view) => views.Remove(view);
+
+        public void ClearViews() => views.Clear();
+        #endregion
 
         public DialogueWrapper Save()
         {

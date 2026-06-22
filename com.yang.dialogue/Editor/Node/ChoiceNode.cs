@@ -145,7 +145,7 @@ namespace Yang.Dialogue.Editor
 
         private void SetOptions()
         {
-            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+            window.GetKeysInto(window.SO.Conditions, conditions);
 
             AddTableField(true);
             AddSpeakerEntryField();
@@ -263,7 +263,7 @@ namespace Yang.Dialogue.Editor
             {
                 LocalizationTableCollection collection = collections[index];
 
-                collection.SetEntries(speaker ? speakerEntries : textEntries);
+                window.GetEntriesInto(collection, speaker ? speakerEntries : textEntries);
 
                 optionData[0] = new(collection.TableCollectionName);
                 optionData[1] = new(collection.TableCollectionNameReference.TableCollectionNameGuid);
@@ -413,7 +413,7 @@ namespace Yang.Dialogue.Editor
                     }
                 }
 
-                collection.SetEntries(speaker ? speakerEntries : textEntries);
+                window.GetEntriesInto(collection, speaker ? speakerEntries : textEntries);
 
                 optionData[0] = new(collection.TableCollectionName);
                 optionData[1] = new(collection.TableCollectionNameReference.TableCollectionNameGuid);
@@ -823,7 +823,7 @@ namespace Yang.Dialogue.Editor
             itemElement.style.flexDirection = FlexDirection.Row;
             itemElement.style.alignItems = Align.Center;
 
-            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+            window.GetKeysInto(window.SO.Conditions, conditions);
 
             int index = conditions.IndexOf(key);
 
@@ -931,7 +931,7 @@ namespace Yang.Dialogue.Editor
             itemElement.style.flexDirection = FlexDirection.Row;
             itemElement.style.alignItems = Align.Center;
 
-            KeyConverter.GetKeys(window.SO.Conditions, conditions);
+            window.GetKeysInto(window.SO.Conditions, conditions);
 
             int index = conditions.IndexOf(key);
 

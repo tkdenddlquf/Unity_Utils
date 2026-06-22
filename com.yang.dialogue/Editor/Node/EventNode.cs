@@ -54,7 +54,7 @@ namespace Yang.Dialogue.Editor
 
         private void SetOptions()
         {
-            KeyConverter.GetKeys(window.SO.Events, events);
+            window.GetKeysInto(window.SO.Events, events);
 
             for (int i = 0; i < optionDatas.Count; i++)
             {
@@ -90,7 +90,7 @@ namespace Yang.Dialogue.Editor
             container.style.flexDirection = FlexDirection.Row;
             container.style.alignItems = Align.Center;
 
-            KeyConverter.GetKeys(window.SO.Events, events);
+            window.GetKeysInto(window.SO.Events, events);
 
             int index = events.IndexOf(key);
 

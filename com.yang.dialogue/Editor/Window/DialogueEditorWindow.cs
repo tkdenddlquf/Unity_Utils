@@ -21,6 +21,9 @@ namespace Yang.Dialogue.Editor
         private PopupField<Locale> languageDropdown;
         private readonly List<Locale> locales = new();
 
+        private readonly Dictionary<string, List<EntryData>> entryCache = new();
+        private readonly Dictionary<object, List<string>> keyCache = new();
+
         private string saveData;
 
         public IReadOnlyList<LocalizationTableCollection> collections;
@@ -258,6 +261,42 @@ namespace Yang.Dialogue.Editor
             ResetView();
         }
 
+        public void GetEntriesInto(LocalizationTableCollection collection, List<EntryData> target)
+        {
+            target.Clear();
+
+            if (collection == null) return;
+
+            if (!entryCache.TryGetValue(collection.TableCollectionName, out List<EntryData> cached))
+            {
+                cached = new List<EntryData>();
+
+                collection.SetEntries(cached);
+
+                entryCache[collection.TableCollectionName] = cached;
+            }
+
+            target.AddRange(cached);
+        }
+
+        public void GetKeysInto(object marker, List<string> target)
+        {
+            target.Clear();
+
+            if (marker == null) return;
+
+            if (!keyCache.TryGetValue(marker, out List<string> cached))
+            {
+                cached = new List<string>();
+
+                KeyConverter.GetKeys(marker, cached);
+
+                keyCache[marker] = cached;
+            }
+
+            target.AddRange(cached);
+        }
+
         private void OnKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.ctrlKey && evt.keyCode == KeyCode.S)
@@ -368,6 +407,9 @@ namespace Yang.Dialogue.Editor
 
         private void ResetView()
         {
+            entryCache.Clear();
+            keyCache.Clear();
+
             if (SO != null)
             {
                 foreach (Node node in graph.nodes.ToList()) graph.RemoveElement(node);

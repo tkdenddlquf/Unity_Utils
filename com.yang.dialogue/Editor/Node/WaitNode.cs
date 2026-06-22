@@ -31,9 +31,9 @@ namespace Yang.Dialogue.Editor
 
             CreateInputPort();
             CreateOutputPort();
-
-            SetOptions();
         }
+
+        protected override void BuildExtension() => SetOptions();
 
         private void SetDefault()
         {

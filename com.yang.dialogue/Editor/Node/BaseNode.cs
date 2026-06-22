@@ -44,6 +44,8 @@ namespace Yang.Dialogue.Editor
 
             data.expended = !data.expended;
 
+            if (data.expended) EnsureExtension();
+
             SetExpendedWithoutNotify(data.expended);
 
             window.SetNode(GUID, data);
@@ -54,6 +56,25 @@ namespace Yang.Dialogue.Editor
         }
 
         public abstract void SetPorts();
+
+        private bool extensionBuilt;
+
+        /// <summary>
+        /// Heavy, hidden-while-collapsed UI. Override in nodes that build it lazily; it runs once,
+        /// either at create time (when expanded) or the first time the node is expanded.
+        /// </summary>
+        protected virtual void BuildExtension() { }
+
+        public void EnsureExtension()
+        {
+            if (extensionBuilt) return;
+
+            extensionBuilt = true;
+
+            BuildExtension();
+
+            RefreshExpandedState();
+        }
 
         public void SetExpendedWithoutNotify(bool expended)
         {
