@@ -100,8 +100,7 @@ using Yang.Dialogue;
 
 public class SampleDialogueView : DialogueViewBase
 {
-    public override async Task OnDialogue(RunnerText speaker, RunnerText text,
-                                          string message, IRunnerToken token)
+    public override async Task OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token)
     {
         // RunnerText.table / RunnerText.entry 로 Localization 키를 받음
         string speakerName = await Localize(speaker);
@@ -110,25 +109,21 @@ public class SampleDialogueView : DialogueViewBase
         // UI 출력 + 클릭 대기 등...
     }
 
-    public override Task<int> OnChoice(RunnerText speaker,
-                                       IReadOnlyList<RunnerChoiceText> texts,
-                                       string message, IRunnerToken token)
+    public override Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerChoiceText> texts, string message, IRunnerToken token)
     {
         // texts[i].isValid 가 false 면 조건 미충족 선택지
         // 사용자가 고른 인덱스를 반환 (선택 안 하면 -1)
         return Task.FromResult(0);
     }
 
-    public override Task OnObject(IReadOnlyList<Object> target, IRunnerToken token)
-        => Task.CompletedTask;   // Object 노드가 넘긴 에셋 처리
+    public override Task OnObject(IReadOnlyList<Object> target, IRunnerToken token) => Task.CompletedTask;   // Object 노드가 넘긴 에셋 처리
 
-    public override Task OnMessage(string reason, IRunnerToken token)
-        => Task.CompletedTask;   // 대화 종료/Wait 신호 등 알림
+    public override Task OnMessage(string reason, IRunnerToken token) => Task.CompletedTask;   // 대화 종료/Wait 신호 등 알림
 
     private async Task<string> Localize(RunnerText t)
     {
-        var table = await LocalizationSettings.StringDatabase
-            .GetTableAsync(t.table).Task;
+        var table = await LocalizationSettings.StringDatabase.GetTableAsync(t.table).Task;
+
         return table.GetEntry(t.entry)?.GetLocalizedString() ?? t.entry;
     }
 }
