@@ -104,7 +104,10 @@ namespace Yang.Dialogue.Editor
             bool needsQuote = value.IndexOf(',') >= 0 ||
                               value.IndexOf('"') >= 0 ||
                               value.IndexOf('\n') >= 0 ||
-                              value.IndexOf('\r') >= 0;
+                              value.IndexOf('\r') >= 0 ||
+                              // Quote leading/trailing whitespace so it is preserved (RFC 4180 keeps it,
+                              // but spreadsheet editors trim unquoted padding).
+                              (value.Length > 0 && (char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1])));
 
             if (!needsQuote) return value;
 

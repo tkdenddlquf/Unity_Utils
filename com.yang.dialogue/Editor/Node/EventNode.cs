@@ -87,8 +87,7 @@ namespace Yang.Dialogue.Editor
         {
             VisualElement container = new() { name = "Item Element" };
 
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Center;
+            container.AddToClassList("dlg-row");
 
             window.GetKeysInto(window.SO.Events, events);
 
@@ -96,17 +95,32 @@ namespace Yang.Dialogue.Editor
 
             PopupField<string> field = new(events, index);
 
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
+            field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
             Button removeButton = new(() => RemoveEventField(container)) { text = "X" };
 
+            container.Add(RowDrag.CreateHandle(container, 0, SwapOption));
             container.Add(field);
             container.Add(removeButton);
 
             extensionContainer.Add(container);
+        }
+
+        private void SwapOption(int a, int b)
+        {
+            DialogueSO so = window.SO;
+
+            Undo.RecordObject(so, "Reorder Event");
+
+            (optionDatas[a], optionDatas[b]) = (optionDatas[b], optionDatas[a]);
+
+            extensionContainer.Insert(a, extensionContainer[b]);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
         }
 
         private void RemoveEventField(VisualElement itemElement)

@@ -26,11 +26,13 @@ namespace Yang.Dialogue
 
         public bool RemoveValue(string key)
         {
+            if (!values.Remove(key)) return false;
+
             if (callbacks.TryGetValue(key, out System.Action callback)) callback?.Invoke();
 
             OnAnyValueChanged?.Invoke(key);
 
-            return values.Remove(key);
+            return true;
         }
 
         #region Get Set

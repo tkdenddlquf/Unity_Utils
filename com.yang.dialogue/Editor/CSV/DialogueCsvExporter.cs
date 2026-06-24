@@ -5,8 +5,8 @@ using UnityEngine.Localization;
 namespace Yang.Dialogue.Editor
 {
     /// <summary>
-    /// Exports a <see cref="DialogueSO"/> to CSV (one row per node; Choice options and Condition
-    /// branches are emitted as sub-rows below their owner).
+    /// Exports a <see cref="DialogueSO"/> to CSV (one row per node; Choice options, Condition
+    /// branches and Object references are emitted as sub-rows below their owner).
     ///
     /// Columns: ID, Type, Next, Message, Data, then Speaker[code] / Text[code] per project locale.
     ///
@@ -14,6 +14,8 @@ namespace Yang.Dialogue.Editor
     ///   Trigger : "key+10" (plus) / "key-5" (minus) / "key=10" (set float) / "key=true" (bool); joined by "; "
     ///   Event   : "id1; id2"
     ///   Wait    : "2.5" (seconds) or "notify" / "notify:reason"
+    ///   Object  : one "Asset" sub-row per slot, object name in Message (reference-only; re-import
+    ///             reuses the editor slots by id, so names are informational)
     ///   Option  : optional "hide" + conditions, e.g. "hide; gold>=10; flag==true"
     ///   Branch  : conditions, e.g. "gold>=10; hasKey==true"
     /// </summary>
@@ -133,9 +135,25 @@ namespace Yang.Dialogue.Editor
                     break;
 
                 case NodeType.Object:
-                    // Object references can't be represented in CSV; keep the node's id, link and
-                    // position so topology survives a round-trip. Assign the objects in the editor.
-                    rows.Add(MakeRow(node.guid, "Object", Next(linkMap, node.guid, 0), "", "(object node — assign objects in editor)", "", "", "", "", px, py, localeCount));
+                    {
+                        // Object references can't be represented in CSV; keep the node's id, link and
+                        // position so topology survives a round-trip. Each referenced object becomes an
+                        // "Asset" sub-row showing its name (reference-only — re-import reuses editor slots).
+                        rows.Add(MakeRow(node.guid, "Object", Next(linkMap, node.guid, 0), "", "", "", "", "", "", px, py, localeCount));
+
+                        IReadOnlyList<DataWrapper> objs = node.OptionDatas;
+
+                        for (int i = 0; i < objs.Count; i++)
+                        {
+                            IReadOnlyList<GenericData> data = objs[i].data;
+
+                            string name = "";
+
+                            if (data.Count > 0 && data[0].TryGetObject(out UnityEngine.Object obj) && obj != null) name = obj.name;
+
+                            rows.Add(MakeRow("", "Asset", "", name, "", "", "", "", "", "", "", localeCount));
+                        }
+                    }
                     break;
 
                 case NodeType.Condition:

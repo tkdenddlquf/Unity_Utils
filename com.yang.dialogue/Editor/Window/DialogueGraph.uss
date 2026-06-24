@@ -1,0 +1,203 @@
+/* Dialogue graph node theme — type-colored title bars.
+   Body/ports keep the default GraphView dark look; only the header is accented per node type.
+   Type classes (node-dialogue, node-choice, ...) are added in DialogueGraph.ConvertData. */
+
+.node #title {
+    height: 26px;
+    padding-left: 8px;
+    padding-right: 4px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+
+.node #title-label {
+    -unity-font-style: bold;
+    font-size: 12px;
+    color: rgb(244, 244, 244);
+    margin-right: 6px;
+    -unity-text-align: middle-left;
+}
+
+/* Per-type accent colors */
+.node-start #title {
+    background-color: rgb(201, 162, 39);
+}
+
+.node-dialogue #title {
+    background-color: rgb(45, 108, 192);
+}
+
+.node-choice #title {
+    background-color: rgb(60, 157, 78);
+}
+
+.node-condition #title {
+    background-color: rgb(126, 87, 194);
+}
+
+.node-trigger #title {
+    background-color: rgb(224, 138, 30);
+}
+
+.node-event #title {
+    background-color: rgb(192, 57, 43);
+}
+
+.node-wait #title {
+    background-color: rgb(93, 112, 128);
+}
+
+.node-object #title {
+    background-color: rgb(176, 73, 143);
+}
+
+/* ---- Body fields ---- */
+
+/* Labelled field: auto-width label, fixed-min input */
+.dlg-field > .unity-base-field__label {
+    min-width: auto;
+    width: auto;
+}
+
+.dlg-field > .unity-base-field__input {
+    min-width: 150px;
+}
+
+/* Field that fills its row (auto-width label, grows to fill) */
+.dlg-grow {
+    min-width: 150px;
+    flex-grow: 1;
+}
+
+.dlg-grow > .unity-base-field__label {
+    min-width: auto;
+    width: auto;
+}
+
+/* Read-only preview text (wraps) */
+.dlg-preview {
+    min-width: auto;
+    white-space: normal;
+}
+
+.dlg-preview > .unity-base-field__label {
+    min-width: auto;
+    width: auto;
+}
+
+/* Small inline value fields */
+.dlg-num {
+    min-width: 60px;
+}
+
+.dlg-enum {
+    min-width: 70px;
+}
+
+/* Horizontal item row */
+.dlg-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+/* ---- Port row layout (Choice / Condition) ---- */
+.dlg-port-row {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.dlg-port-col {
+    flex-grow: 1;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.dlg-port-entry {
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.dlg-port-items {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.dlg-port-buttons {
+    flex-direction: row;
+    align-items: flex-end;
+    align-self: flex-end;
+}
+
+.dlg-port-line {
+    margin-top: 7px;
+    margin-bottom: 7px;
+    width: 2px;
+    background-color: rgb(128, 128, 128);
+}
+
+/* ---- Drag-to-reorder handle ---- */
+.dlg-grip {
+    width: 16px;
+    -unity-text-align: middle-center;
+    color: rgb(150, 150, 150);
+    margin-left: 2px;
+    margin-right: 2px;
+    transition-property: color;
+    transition-duration: 0.1s;
+}
+
+.dlg-grip:hover {
+    color: rgb(225, 225, 225);
+}
+
+.dlg-grip--active {
+    color: rgb(255, 255, 255);
+}
+
+/* Row lifted while it is being dragged (USS has no box-shadow, so elevation is faked with an
+   accent outline + a slight scale-up). RowDrag floats it with position:absolute and drives `top`
+   inline to follow the cursor; only background-color and scale are animated so the pop-in eases
+   while the cursor-follow stays instant. */
+.dlg-row--drag {
+    background-color: rgba(90, 130, 200, 0.30);
+
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgba(130, 170, 235, 0.85);
+    border-right-color: rgba(130, 170, 235, 0.85);
+    border-top-color: rgba(130, 170, 235, 0.85);
+    border-bottom-color: rgba(130, 170, 235, 0.85);
+
+    scale: 1.02;
+
+    transition-property: background-color, scale;
+    transition-duration: 0.1s;
+}
+
+/* Drop-target gap left behind while a row is being dragged: a faint dashed slot showing where the
+   row will land. Height/margins are set inline by RowDrag to match the lifted row's footprint. */
+.dlg-row-placeholder {
+    background-color: rgba(90, 130, 200, 0.10);
+
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgba(130, 170, 235, 0.45);
+    border-right-color: rgba(130, 170, 235, 0.45);
+    border-top-color: rgba(130, 170, 235, 0.45);
+    border-bottom-color: rgba(130, 170, 235, 0.45);
+}

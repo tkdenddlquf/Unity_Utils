@@ -121,10 +121,7 @@ namespace Yang.Dialogue.Editor
         {
             EnumField field = new("Type", waitType);
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
+            field.AddToClassList("dlg-field");
 
             field.RegisterValueChangedCallback(ChangedCallback);
 
@@ -135,10 +132,7 @@ namespace Yang.Dialogue.Editor
         {
             FloatField field = new("Seconds") { value = data };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
+            field.AddToClassList("dlg-field");
 
             field.RegisterValueChangedCallback(ChangedCallback);
 
@@ -149,10 +143,7 @@ namespace Yang.Dialogue.Editor
         {
             TextField field = new("Reason") { value = data };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
+            field.AddToClassList("dlg-field");
 
             field.RegisterValueChangedCallback(ChangedCallback);
 

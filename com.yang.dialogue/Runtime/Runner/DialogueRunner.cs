@@ -172,17 +172,38 @@ namespace Yang.Dialogue
             return wrapper;
         }
 
-        public IEnumerator<KeyValuePair<string, string>> Load(DialogueWrapper wrapper)
+        // Restores trigger values immediately, then returns the saved flows as (key, nodeId) pairs for
+        // the caller to resume via StartDialogue. Eager (not a lazy iterator) so the trigger restore
+        // always runs — even if the caller ignores the result or there are no flows to resume.
+        // Call StopAllDialogue() first if the runner already holds flows, so the keys don't collide.
+        public IEnumerable<KeyValuePair<string, string>> Load(DialogueWrapper wrapper)
         {
+            if (wrapper == null) return System.Array.Empty<KeyValuePair<string, string>>();
+
             runnerTrigger.SetDatas(wrapper.Values);
 
-            if (so != null && wrapper != null)
+            List<KeyValuePair<string, string>> flows = new();
+
+            if (so != null)
             {
                 IReadOnlyList<string> keys = wrapper.Keys;
                 IReadOnlyList<string> names = wrapper.Names;
 
-                for (int i = 0; i < keys.Count; i++) yield return new(keys[i], names[i]);
+                for (int i = 0; i < keys.Count; i++) flows.Add(new(keys[i], names[i]));
             }
+
+            return flows;
+        }
+
+        // One-shot restore: clears any flows the runner already holds, restores trigger values, and
+        // resumes every saved flow at its stored node. Use this instead of Load when you just want to
+        // apply a save without hand-wiring StopAllDialogue + StartDialogue yourself.
+        public void LoadAndStart(DialogueWrapper wrapper, IReadOnlyList<IDialogueView> views = null)
+        {
+            StopAllDialogue();
+
+            foreach (KeyValuePair<string, string> flow in Load(wrapper))
+                StartDialogue(flow.Key, flow.Value, views);
         }
 
         #region Event

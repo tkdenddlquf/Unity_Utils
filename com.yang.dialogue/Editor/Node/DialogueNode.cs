@@ -152,11 +152,7 @@ namespace Yang.Dialogue.Editor
                 isReadOnly = true,
             };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field.style.whiteSpace = WhiteSpace.Normal;
-            field.style.minWidth = StyleKeyword.Auto;
+            field.AddToClassList("dlg-preview");
 
             textsElement.Add(field);
         }
@@ -200,10 +196,7 @@ namespace Yang.Dialogue.Editor
             string name = speaker ? "Speaker Table" : "Text Table";
             PopupField<string> field = new(name, tables, index) { name = name };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
+            field.AddToClassList("dlg-field");
 
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnTableKeyDownEvent);
@@ -363,10 +356,7 @@ namespace Yang.Dialogue.Editor
             string name = speaker ? "Speaker Entry" : "Text Entry";
             PopupField<EntryData> field = new(name, entries, index) { name = name };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
+            field.AddToClassList("dlg-field");
 
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnEntryKeyDownEvent);
@@ -495,10 +485,7 @@ namespace Yang.Dialogue.Editor
         {
             TextField field = new("Message") { value = optionDatas[4].data[0].ToString() };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
+            field.AddToClassList("dlg-field");
 
             field.RegisterValueChangedCallback(MessageChangedCallback);
 

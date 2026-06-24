@@ -17,9 +17,17 @@ namespace Yang.Dialogue.Editor
         private readonly HashSet<string> visibleGuids = new();
         private readonly Dictionary<string, BaseNode> currentNodes = new();
 
+        // Selection tracked by guid (the "logical" selection) so nodes culled off-screen by the
+        // virtualizer stay selected and can still be copied. While the virtualizer adds/removes the
+        // on-screen elements it sets suppressSelectionTracking so those churn events don't mutate it.
+        private readonly HashSet<string> selectedGuids = new();
+        private bool suppressSelectionTracking;
+
         public DialogueGraph(DialogueEditorWindow window)
         {
             this.window = window;
+
+            LoadStyleSheet();
 
             Insert(0, new GridBackground());
 
@@ -38,6 +46,31 @@ namespace Yang.Dialogue.Editor
             viewTransformChanged += _ => SyncVisibleNodes();
 
             RegisterCallback<GeometryChangedEvent>(_ => SyncVisibleNodes());
+
+            // Lets Ctrl+C work even when every selected node is currently culled off-screen
+            // (GraphView's own copy is gated on the visible selection).
+            RegisterCallback<ValidateCommandEvent>(OnValidateCommand);
+            RegisterCallback<ExecuteCommandEvent>(OnExecuteCommand);
+        }
+
+        /// <summary>Loads the node theme stylesheet by name so it survives the package being moved.</summary>
+        private void LoadStyleSheet()
+        {
+            foreach (string guid in AssetDatabase.FindAssets("t:StyleSheet DialogueGraph"))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+
+                if (!path.EndsWith("DialogueGraph.uss")) continue;
+
+                StyleSheet sheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(path);
+
+                if (sheet != null)
+                {
+                    styleSheets.Add(sheet);
+
+                    return;
+                }
+            }
         }
 
         #region Virtualize
@@ -77,10 +110,15 @@ namespace Yang.Dialogue.Editor
 
             bool changed = false;
 
+            // The element churn below would otherwise clobber the logical (guid) selection.
+            suppressSelectionTracking = true;
+
             foreach (KeyValuePair<string, BaseNode> kv in currentNodes)
             {
                 if (!visibleGuids.Contains(kv.Key))
                 {
+                    if (selectedGuids.Contains(kv.Key)) RemoveFromSelection(kv.Value);
+
                     RemoveElement(kv.Value);
 
                     changed = true;
@@ -91,11 +129,16 @@ namespace Yang.Dialogue.Editor
             {
                 if (!currentNodes.ContainsKey(guid))
                 {
-                    CreateNode(window.GetNode(guid));
+                    BaseNode node = CreateNode(window.GetNode(guid));
+
+                    // Re-show the selection highlight for nodes that are logically selected.
+                    if (selectedGuids.Contains(guid)) AddToSelection(node);
 
                     changed = true;
                 }
             }
+
+            suppressSelectionTracking = false;
 
             if (changed) RebuildEdges();
         }
@@ -146,8 +189,10 @@ namespace Yang.Dialogue.Editor
 
             if (rect.width <= 1 || rect.height <= 1) return Rect.zero;
 
-            Vector3 translate = contentViewContainer.transform.position;
-            Vector3 scale = contentViewContainer.transform.scale;
+            IResolvedStyle style = contentViewContainer.resolvedStyle;
+
+            Vector3 translate = style.translate;
+            Vector3 scale = style.scale.value;
 
             if (scale.x == 0 || scale.y == 0) return Rect.zero;
 
@@ -160,11 +205,64 @@ namespace Yang.Dialogue.Editor
         }
         #endregion
 
+        #region Selection
+        public override void AddToSelection(ISelectable selectable)
+        {
+            base.AddToSelection(selectable);
+
+            if (!suppressSelectionTracking && selectable is BaseNode node) selectedGuids.Add(node.GUID);
+        }
+
+        public override void RemoveFromSelection(ISelectable selectable)
+        {
+            base.RemoveFromSelection(selectable);
+
+            if (!suppressSelectionTracking && selectable is BaseNode node) selectedGuids.Remove(node.GUID);
+        }
+
+        public override void ClearSelection()
+        {
+            base.ClearSelection();
+
+            if (!suppressSelectionTracking) selectedGuids.Clear();
+        }
+
+        /// <summary>True when there is a logical (guid) selection but nothing copiable is on screen —
+        /// the case GraphView's built-in Copy can't see, so we handle it ourselves.</summary>
+        private bool CanLogicalCopy()
+        {
+            if (selectedGuids.Count == 0) return false;
+
+            foreach (ISelectable selectable in selection)
+            {
+                if (selectable is BaseNode) return false;
+            }
+
+            return true;
+        }
+
+        private void OnValidateCommand(ValidateCommandEvent evt)
+        {
+            // Marking the command handled is what makes the editor send the matching ExecuteCommand.
+            if (evt.commandName == "Copy" && CanLogicalCopy()) evt.StopPropagation();
+        }
+
+        private void OnExecuteCommand(ExecuteCommandEvent evt)
+        {
+            if (evt.commandName == "Copy" && CanLogicalCopy())
+            {
+                EditorGUIUtility.systemCopyBuffer = BuildCopy();
+
+                evt.StopPropagation();
+            }
+        }
+        #endregion
+
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             DropdownMenu menu = evt.menu;
 
-            menu.AppendAction("Copy", MenuActionCopy, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+            menu.AppendAction("Copy", MenuActionCopy, selectedGuids.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
             menu.AppendAction("Paste", MenuActionPaste, jsonCopyData == "" ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
             menu.AppendAction("Remove", MenuActionRemove, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
 
@@ -263,42 +361,73 @@ namespace Yang.Dialogue.Editor
                 _ => null,
             };
 
-            if (node != null) node.title = type.ToString();
+            if (node != null)
+            {
+                node.title = type.ToString();
+
+                node.AddToClassList($"node-{type.ToString().ToLowerInvariant()}");
+            }
 
             return node;
         }
         #endregion
 
         #region Action
-        private string SerializeNodes(IEnumerable<GraphElement> elements)
+        private string SerializeNodes(IEnumerable<GraphElement> elements) => BuildCopy();
+
+        /// <summary>
+        /// Serializes the logically selected nodes (tracked by guid, so nodes culled off-screen by
+        /// the virtualizer are still included) plus every link whose endpoints are both inside the
+        /// selection, so connections between copied nodes survive a paste.
+        /// </summary>
+        private string BuildCopy()
         {
             DialogueSO so = window.SO;
 
             CopyData data = new();
 
-            foreach (GraphElement element in elements)
+            HashSet<string> guids = new();
+
+            foreach (string guid in selectedGuids)
             {
-                if (element is BaseNode node)
-                {
-                    NodeData nodeData = window.GetNode(node.GUID);
+                if (guid == so.StartGuid) continue;
 
-                    if (nodeData.guid == so.StartGuid) continue;
+                NodeData nodeData = window.GetNode(guid);
 
-                    data.nodes.Add(nodeData);
-                }
+                if (string.IsNullOrEmpty(nodeData.guid)) continue;
+
+                data.nodes.Add(nodeData);
+                guids.Add(guid);
             }
 
-            if (data.nodes.Count == 0) jsonCopyData = "";
-            else jsonCopyData = JsonUtility.ToJson(data);
+            if (data.nodes.Count == 0)
+            {
+                jsonCopyData = "";
+
+                return jsonCopyData;
+            }
+
+            List<LinkData> links = window.Links;
+
+            for (int i = 0; i < links.Count; i++)
+            {
+                LinkData link = links[i];
+
+                if (guids.Contains(link.nodeGuid) && guids.Contains(link.targetGuid)) data.links.Add(link);
+            }
+
+            jsonCopyData = JsonUtility.ToJson(data);
 
             return jsonCopyData;
         }
 
         private void UnserializeNode(string operationName, string data)
         {
-            if (data == "") return;
+            if (string.IsNullOrEmpty(data)) return;
 
             CopyData copyData = JsonUtility.FromJson<CopyData>(data);
+
+            if (copyData == null || copyData.nodes == null || copyData.nodes.Count == 0) return;
 
             ClearSelection();
 
@@ -315,17 +444,37 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Paste Node");
 
+            // Old guid -> new guid, so links between the pasted nodes can be remapped below.
+            Dictionary<string, string> guidMap = new();
+
             foreach (NodeData nodeData in copyData.nodes)
             {
                 NodeData newNodeData = new(nodeData);
 
                 newNodeData.position += addedPos;
 
+                guidMap[nodeData.guid] = newNodeData.guid;
+
                 window.Nodes.Add(newNodeData);
 
                 BaseNode node = CreateNode(newNodeData);
 
                 AddToSelection(node);
+            }
+
+            if (copyData.links != null)
+            {
+                for (int i = 0; i < copyData.links.Count; i++)
+                {
+                    LinkData link = copyData.links[i];
+
+                    if (!guidMap.TryGetValue(link.nodeGuid, out string source)) continue;
+                    if (!guidMap.TryGetValue(link.targetGuid, out string target)) continue;
+
+                    window.Links.Add(new LinkData { nodeGuid = source, targetGuid = target, outPortIndex = link.outPortIndex });
+                }
+
+                RebuildEdges();
             }
 
             EditorUtility.SetDirty(so);
@@ -337,31 +486,14 @@ namespace Yang.Dialogue.Editor
 
         private void MenuActionCopy(DropdownMenuAction menuAction)
         {
-            if (selection.Count == 0)
+            if (selectedGuids.Count == 0)
             {
                 jsonCopyData = "";
 
                 return;
             }
 
-            DialogueSO so = window.SO;
-
-            CopyData data = new();
-
-            foreach (ISelectable element in selection)
-            {
-                if (element is BaseNode node)
-                {
-                    NodeData nodeData = window.GetNode(node.GUID);
-
-                    if (nodeData.guid == so.StartGuid) continue;
-
-                    data.nodes.Add(nodeData);
-                }
-            }
-
-            if (data.nodes.Count == 0) jsonCopyData = "";
-            else jsonCopyData = JsonUtility.ToJson(data);
+            BuildCopy();
         }
 
         private void MenuActionPaste(DropdownMenuAction menuAction) => UnserializeNode("", jsonCopyData);
@@ -372,7 +504,12 @@ namespace Yang.Dialogue.Editor
 
             for (int i = selection.Count - 1; i >= 0; i--)
             {
-                if (selection[i] is BaseNode node) RemoveElement(node);
+                if (selection[i] is BaseNode node)
+                {
+                    selectedGuids.Remove(node.GUID);
+
+                    RemoveElement(node);
+                }
             }
         }
 
@@ -380,6 +517,7 @@ namespace Yang.Dialogue.Editor
         private class CopyData
         {
             public List<NodeData> nodes = new();
+            public List<LinkData> links = new();
         }
         #endregion
     }

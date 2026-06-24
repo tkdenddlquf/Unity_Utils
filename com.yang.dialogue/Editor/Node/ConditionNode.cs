@@ -89,26 +89,15 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private void MovePort(Port port, int direction)
+        private void SwapPort(int a, int b)
         {
-            VisualElement container = port.parent;
-
-            if (container == null) return;
-
-            int currentIndex = container.IndexOf(port);
-            int newIndex = currentIndex + direction;
-
-            if (newIndex < 1 || newIndex >= container.childCount) return;
-
             DialogueSO so = window.SO;
 
-            Undo.RecordObject(so, "Move Port Index");
+            Undo.RecordObject(so, "Reorder Condition Port");
 
-            (portDatas[currentIndex], portDatas[newIndex]) = (portDatas[newIndex], portDatas[currentIndex]);
+            (portDatas[a], portDatas[b]) = (portDatas[b], portDatas[a]);
 
-            container.Insert(newIndex, port);
-
-            RefreshPorts();
+            outputContainer.Insert(a, outputContainer[b]);
 
             EditorUtility.SetDirty(so);
 
@@ -121,9 +110,8 @@ namespace Yang.Dialogue.Editor
 
             VisualElement container = new();
 
+            container.AddToClassList("dlg-row");
             container.style.flexGrow = 1;
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Center;
 
             Label label = new("Default");
 
@@ -168,41 +156,24 @@ namespace Yang.Dialogue.Editor
 
             VisualElement line = new();
 
-            portElement.style.flexGrow = 1;
-            portElement.style.flexDirection = FlexDirection.Row;
-            portElement.style.alignItems = Align.Stretch;
-
-            groupContainer.style.flexGrow = 1;
-            groupContainer.style.flexDirection = FlexDirection.Column;
-            groupContainer.style.alignItems = Align.Stretch;
-
-            line.style.marginTop = 7;
-            line.style.marginBottom = 7;
-            line.style.width = 2;
-            line.style.backgroundColor = Color.gray;
-
-            itemContainer.style.flexDirection = FlexDirection.Column;
-            itemContainer.style.alignItems = Align.Stretch;
-
-            buttonContainer.style.flexDirection = FlexDirection.Row;
-            buttonContainer.style.alignItems = Align.FlexEnd;
-            buttonContainer.style.alignSelf = Align.FlexEnd;
+            portElement.AddToClassList("dlg-port-row");
+            groupContainer.AddToClassList("dlg-port-col");
+            itemContainer.AddToClassList("dlg-port-items");
+            buttonContainer.AddToClassList("dlg-port-buttons");
+            line.AddToClassList("dlg-port-line");
 
             Button createFloatButton = new(() => CreateConditionFloatField(itemContainer)) { text = "F" };
             Button createBoolButton = new(() => CreateConditionBoolField(itemContainer)) { text = "B" };
-            Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
-            Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
             Button removeButton = new(() => RemovePort(port)) { text = "X" };
 
             buttonContainer.Add(createFloatButton);
             buttonContainer.Add(createBoolButton);
-            buttonContainer.Add(upButton);
-            buttonContainer.Add(downButton);
             buttonContainer.Add(removeButton);
 
             groupContainer.Add(itemContainer);
             groupContainer.Add(buttonContainer);
 
+            portElement.Add(RowDrag.CreateHandle(port, 1, SwapPort, () => RefreshPorts()));
             portElement.Add(groupContainer);
             portElement.Add(line);
 
@@ -316,8 +287,7 @@ namespace Yang.Dialogue.Editor
         {
             VisualElement itemElement = new() { name = "Item Element" };
 
-            itemElement.style.flexDirection = FlexDirection.Row;
-            itemElement.style.alignItems = Align.Center;
+            itemElement.AddToClassList("dlg-row");
 
             window.GetKeysInto(window.SO.Conditions, conditions);
 
@@ -325,22 +295,18 @@ namespace Yang.Dialogue.Editor
 
             PopupField<string> field = new("Float Condition", conditions, index);
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
+            field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
             FloatField floatField = new() { value = value };
 
-            floatField.style.minWidth = 60;
+            floatField.AddToClassList("dlg-num");
             floatField.RegisterValueChangedCallback(ChangedCallback);
 
             EnumField typeField = new(type);
 
-            typeField.style.minWidth = 70;
+            typeField.AddToClassList("dlg-enum");
             typeField.RegisterValueChangedCallback(ChangedCallback);
 
             Button remove = new(() => RemoveConditionField(itemElement)) { text = "-" };
@@ -420,8 +386,7 @@ namespace Yang.Dialogue.Editor
         {
             VisualElement itemElement = new() { name = "Item Element" };
 
-            itemElement.style.flexDirection = FlexDirection.Row;
-            itemElement.style.alignItems = Align.Center;
+            itemElement.AddToClassList("dlg-row");
 
             window.GetKeysInto(window.SO.Conditions, conditions);
 
@@ -429,11 +394,7 @@ namespace Yang.Dialogue.Editor
 
             PopupField<string> field = new("Bool Condition", conditions, index);
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
+            field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 

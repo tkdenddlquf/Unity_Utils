@@ -84,47 +84,31 @@ namespace Yang.Dialogue.Editor
         {
             VisualElement container = new() { name = "Item Element" };
 
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Center;
+            container.AddToClassList("dlg-row");
 
             ObjectField field = new() { value = target };
 
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
+            field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedCallback);
 
-            Button upButton = new(() => MoveObjectField(container, -1)) { text = "▲" };
-            Button downButton = new(() => MoveObjectField(container, 1)) { text = "▼" };
             Button removeButton = new(() => RemoveObjectField(container)) { text = "X" };
 
+            container.Add(RowDrag.CreateHandle(container, 0, SwapObject, () => RefreshPorts()));
             container.Add(field);
-            container.Add(upButton);
-            container.Add(downButton);
             container.Add(removeButton);
 
             extensionContainer.Add(container);
         }
 
-        private void MoveObjectField(VisualElement itemElement, int direction)
+        private void SwapObject(int a, int b)
         {
-            VisualElement container = itemElement.parent;
-
-            if (container == null) return;
-
-            int currentIndex = container.IndexOf(itemElement);
-            int newIndex = currentIndex + direction;
-
-            if (newIndex < 0 || newIndex >= container.childCount) return;
-
             DialogueSO so = window.SO;
 
-            Undo.RecordObject(so, "Move Option Index");
+            Undo.RecordObject(so, "Reorder Object");
 
-            (optionDatas[currentIndex], optionDatas[newIndex]) = (optionDatas[newIndex], optionDatas[currentIndex]);
+            (optionDatas[a], optionDatas[b]) = (optionDatas[b], optionDatas[a]);
 
-            container.Insert(newIndex, itemElement);
-
-            RefreshPorts();
+            extensionContainer.Insert(a, extensionContainer[b]);
 
             EditorUtility.SetDirty(so);
 

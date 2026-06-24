@@ -58,8 +58,7 @@ namespace Yang.Dialogue.Editor
         private class Ctx
         {
             public IReadOnlyList<StringTableCollection> collections;
-            public StringTableCollection fallbackSpeaker;
-            public StringTableCollection fallbackText;
+            public readonly Dictionary<string, StringTableCollection> resolvedTables = new();
             public readonly List<string> warnings = new();
             public readonly Dictionary<string, List<DataWrapper>> existingObjects = new();
         }
@@ -84,14 +83,16 @@ namespace Yang.Dialogue.Editor
             Ctx ctx = new()
             {
                 collections = LocalizationEditorSettings.GetStringTableCollections(),
-                fallbackSpeaker = ResolveCollection(so.SpeakerTable),
-                fallbackText = ResolveCollection(so.TextTable),
             };
 
             foreach (NodeData node in so.EditorNodes)
             {
                 if (node.type == NodeType.Object) ctx.existingObjects[node.guid] = node.EditorOptionDatas;
             }
+
+            // Resolve every referenced Speaker/Text table up front (may prompt to create or abort)
+            // so we never half-write the SO when a table is missing.
+            if (!ResolveTables(so, nodes, ctx, out message)) return false;
 
             Build(so, nodes, ctx);
 
@@ -165,7 +166,7 @@ namespace Yang.Dialogue.Editor
 
                 Row row = ReadRow(cells, localeColumns);
 
-                if (row.type == "Option" || row.type == "Branch")
+                if (row.type == "Option" || row.type == "Branch" || row.type == "Asset")
                 {
                     current?.children.Add(row);
                 }
@@ -197,7 +198,9 @@ namespace Yang.Dialogue.Editor
                 id = Cell(cells, COL_ID),
                 type = Cell(cells, COL_TYPE),
                 next = Cell(cells, COL_NEXT),
-                message = Cell(cells, COL_MESSAGE),
+                // Content fields keep their leading/trailing whitespace; structural fields are trimmed.
+                // A cell that is only whitespace counts as empty.
+                message = Content(Cell(cells, COL_MESSAGE, false)),
                 data = Cell(cells, COL_DATA),
                 speakerTable = Cell(cells, COL_SPEAKER_TABLE),
                 textTable = Cell(cells, COL_TEXT_TABLE),
@@ -209,8 +212,8 @@ namespace Yang.Dialogue.Editor
 
             foreach (LocaleColumn column in localeColumns)
             {
-                string speaker = Cell(cells, column.speakerColumn);
-                string text = Cell(cells, column.textColumn);
+                string speaker = Content(Cell(cells, column.speakerColumn, false));
+                string text = Content(Cell(cells, column.textColumn, false));
 
                 if (!string.IsNullOrEmpty(speaker)) row.speaker[column.code] = speaker;
                 if (!string.IsNullOrEmpty(text)) row.text[column.code] = text;
@@ -219,8 +222,18 @@ namespace Yang.Dialogue.Editor
             return row;
         }
 
-        private static string Cell(List<string> cells, int index)
-            => index >= 0 && index < cells.Count ? cells[index].Trim() : "";
+        private static string Cell(List<string> cells, int index, bool trim = true)
+        {
+            if (index < 0 || index >= cells.Count) return "";
+
+            string value = cells[index];
+
+            return trim ? value.Trim() : value;
+        }
+
+        /// <summary>Normalizes a content cell: a whitespace-only value is treated as empty, while a value
+        /// with real text keeps its surrounding whitespace intact.</summary>
+        private static string Content(string value) => string.IsNullOrWhiteSpace(value) ? "" : value;
         #endregion
 
         #region Build
@@ -320,14 +333,8 @@ namespace Yang.Dialogue.Editor
             List<DataWrapper> options = node.EditorOptionDatas;
             List<DataWrapper> ports = node.EditorPortDatas;
 
-            StringTableCollection speakerCol = ResolveByNameOrFallback(ctx, row.speakerTable, ctx.fallbackSpeaker);
-            StringTableCollection textCol = ResolveByNameOrFallback(ctx, row.textTable, ctx.fallbackText);
-
-            if ((type == NodeType.Dialogue || type == NodeType.Choice) && row.speaker.Count > 0 && speakerCol == null)
-                ctx.warnings.Add($"'{row.id}': speaker text skipped (no Speaker table resolved).");
-
-            if ((type == NodeType.Dialogue || type == NodeType.Choice) && HasContent(row, true) && textCol == null)
-                ctx.warnings.Add($"'{row.id}': dialogue/choice text skipped (no Text table resolved).");
+            StringTableCollection speakerCol = ResolveTable(ctx, row.speakerTable);
+            StringTableCollection textCol = ResolveTable(ctx, row.textTable);
 
             switch (type)
             {
@@ -434,17 +441,19 @@ namespace Yang.Dialogue.Editor
 
                 case NodeType.Object:
                     // CSV can't carry asset references. Reuse the existing node's object slots
-                    // (matched by id) so assignments survive; only fall back to an empty slot
-                    // when this is a brand-new object node.
+                    // (matched by id) so assignments survive; for a brand-new object node create one
+                    // empty slot per "Asset" sub-row so the editor shows the right number to fill in.
                     if (ctx.existingObjects.TryGetValue(row.id, out List<DataWrapper> existing) && existing.Count > 0)
                     {
                         foreach (DataWrapper slot in existing) options.Add(new DataWrapper(slot));
                     }
                     else
                     {
-                        options.Add(new DataWrapper(new GenericData(GenericData.DataType.Object)));
+                        int slotCount = row.children.Count > 0 ? row.children.Count : 1;
 
-                        ctx.warnings.Add($"'{row.id}': new Object node imported empty — assign objects in the editor.");
+                        for (int i = 0; i < slotCount; i++) options.Add(new DataWrapper(new GenericData(GenericData.DataType.Object)));
+
+                        ctx.warnings.Add($"'{row.id}': new Object node imported with {slotCount} empty slot(s) — assign objects in the editor.");
                     }
 
                     ports.Add(new DataWrapper());
@@ -473,23 +482,233 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Localization
-        private static StringTableCollection ResolveCollection(LocalizedStringTable table)
+        /// <summary>
+        /// Resolves every Speaker/Text table referenced by content rows before the SO is touched.
+        /// An empty table name (on a row that has text) aborts the import; an unknown table name
+        /// prompts the user to create it (with a folder picker) or abort.
+        /// </summary>
+        private static bool ResolveTables(DialogueSO so, List<Row> nodes, Ctx ctx, out string error)
         {
-            if (table == null || table.IsEmpty) return null;
+            error = "";
 
-            return LocalizationEditorSettings.GetStringTableCollection(table.TableReference);
-        }
+            // Empty table name on a content row? Offer the SO's default Speaker/Text table (if any)
+            // before the empty-name check below would abort the import.
+            ApplyDefaultTables(so, nodes, ctx);
 
-        private static StringTableCollection ResolveByNameOrFallback(Ctx ctx, string name, StringTableCollection fallback)
-        {
-            if (string.IsNullOrEmpty(name)) return fallback;
+            List<(string name, string nodeId, string kind)> needed = new();
 
-            for (int i = 0; i < ctx.collections.Count; i++)
+            foreach (Row row in nodes)
             {
-                if (ctx.collections[i].TableCollectionName == name) return ctx.collections[i];
+                NodeType type = ParseType(row.type);
+
+                if (type == NodeType.Dialogue)
+                {
+                    if (row.speaker.Count > 0) needed.Add((row.speakerTable, row.id, "Speaker"));
+                    if (row.text.Count > 0) needed.Add((row.textTable, row.id, "Text"));
+                }
+                else if (type == NodeType.Choice)
+                {
+                    if (row.speaker.Count > 0) needed.Add((row.speakerTable, row.id, "Speaker"));
+
+                    foreach (Row option in row.children)
+                    {
+                        if (option.text.Count > 0)
+                        {
+                            needed.Add((row.textTable, row.id, "Text"));
+
+                            break;
+                        }
+                    }
+                }
             }
 
-            return fallback;
+            // 1) Empty table name on a row that carries text -> warn and abort (before creating anything).
+            foreach ((string name, string nodeId, string kind) in needed)
+            {
+                if (string.IsNullOrEmpty(name))
+                {
+                    error = $"Node '{nodeId}' has {kind} text but its {kind} table name is empty.\nImport aborted.";
+
+                    return false;
+                }
+            }
+
+            // 2) Unknown table name -> ask to create (with folder picker), else abort.
+            foreach ((string name, string nodeId, string kind) in needed)
+            {
+                if (ctx.resolvedTables.ContainsKey(name)) continue;
+
+                StringTableCollection existing = FindCollection(ctx.collections, name);
+
+                if (existing != null)
+                {
+                    ctx.resolvedTables[name] = existing;
+
+                    continue;
+                }
+
+                bool create = EditorUtility.DisplayDialog(
+                    "Table Not Found",
+                    $"The {kind} table '{name}' (used by node '{nodeId}') does not exist.\n\nCreate it?",
+                    "Create",
+                    "Cancel");
+
+                if (!create)
+                {
+                    error = $"Import aborted: {kind} table '{name}' does not exist.";
+
+                    return false;
+                }
+
+                string absolute = EditorUtility.SaveFolderPanel($"Select a folder for new table '{name}'", "Assets", name);
+
+                if (string.IsNullOrEmpty(absolute))
+                {
+                    error = $"Import aborted: no folder selected for new table '{name}'.";
+
+                    return false;
+                }
+
+                string relative = ToProjectRelative(absolute);
+
+                if (relative == null)
+                {
+                    error = "Import aborted: the selected folder must be inside this project's Assets folder.";
+
+                    return false;
+                }
+
+                StringTableCollection created = LocalizationEditorSettings.CreateStringTableCollection(name, relative);
+
+                if (created == null)
+                {
+                    error = $"Import aborted: failed to create table '{name}'.";
+
+                    return false;
+                }
+
+                ctx.collections = LocalizationEditorSettings.GetStringTableCollections();
+                ctx.resolvedTables[name] = created;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Fills empty Speaker/Text table names on content rows with the SO's default table, asking the
+        /// user once per kind whether to use it. Rows left empty (no default, or the user skips) fall
+        /// through to the empty-name abort in <see cref="ResolveTables"/>.
+        /// </summary>
+        private static void ApplyDefaultTables(DialogueSO so, List<Row> nodes, Ctx ctx)
+        {
+            string speakerDefault = GetDefaultTableName(so.SpeakerTable, ctx);
+            string textDefault = GetDefaultTableName(so.TextTable, ctx);
+
+            if (string.IsNullOrEmpty(speakerDefault) && string.IsNullOrEmpty(textDefault)) return;
+
+            // Cache the "use default 'X'?" answer per table name: the same default table is asked once
+            // (no matter how many nodes need it), while distinct default tables are still asked separately.
+            Dictionary<string, bool> decisions = new();
+
+            foreach (Row row in nodes)
+            {
+                NodeType type = ParseType(row.type);
+
+                if (type == NodeType.Dialogue)
+                {
+                    row.speakerTable = ResolveDefault(row.speaker.Count > 0, row.speakerTable, speakerDefault, "Speaker", row.id, decisions);
+                    row.textTable = ResolveDefault(row.text.Count > 0, row.textTable, textDefault, "Text", row.id, decisions);
+                }
+                else if (type == NodeType.Choice)
+                {
+                    row.speakerTable = ResolveDefault(row.speaker.Count > 0, row.speakerTable, speakerDefault, "Speaker", row.id, decisions);
+
+                    bool hasOptionText = false;
+
+                    foreach (Row option in row.children)
+                    {
+                        if (option.text.Count > 0)
+                        {
+                            hasOptionText = true;
+
+                            break;
+                        }
+                    }
+
+                    row.textTable = ResolveDefault(hasOptionText, row.textTable, textDefault, "Text", row.id, decisions);
+                }
+            }
+        }
+
+        /// <summary>Returns <paramref name="defaultName"/> when a content row's table name is empty and
+        /// the user agrees to fall back to the SO default; otherwise the original name. The answer is
+        /// cached in <paramref name="decisions"/> by table name, so a table already decided by an earlier
+        /// node is not asked again while a different default table still prompts.</summary>
+        private static string ResolveDefault(bool hasText, string tableName, string defaultName, string kind, string nodeId, Dictionary<string, bool> decisions)
+        {
+            if (!hasText || !string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(defaultName)) return tableName;
+
+            if (!decisions.TryGetValue(defaultName, out bool use))
+            {
+                use = EditorUtility.DisplayDialog(
+                    $"Use Default {kind} Table?",
+                    $"Node '{nodeId}' has {kind} text but no {kind} table name in the CSV.\n\nUse the dialogue's default {kind} table '{defaultName}'?",
+                    "Use Default",
+                    "Skip");
+
+                decisions[defaultName] = use;
+            }
+
+            return use ? defaultName : tableName;
+        }
+
+        /// <summary>Resolves the SO's default <see cref="LocalizedStringTable"/> to a collection name,
+        /// matching by GUID against the known collections when the reference carries no name.</summary>
+        private static string GetDefaultTableName(LocalizedStringTable table, Ctx ctx)
+        {
+            if (table == null || table.IsEmpty) return "";
+
+            TableReference reference = table.TableReference;
+
+            if (!string.IsNullOrEmpty(reference.TableCollectionName)) return reference.TableCollectionName;
+
+            System.Guid guid = reference.TableCollectionNameGuid;
+
+            if (guid != System.Guid.Empty)
+            {
+                for (int i = 0; i < ctx.collections.Count; i++)
+                {
+                    if (ctx.collections[i].TableCollectionNameReference.TableCollectionNameGuid == guid)
+                        return ctx.collections[i].TableCollectionName;
+                }
+            }
+
+            return "";
+        }
+
+        private static StringTableCollection ResolveTable(Ctx ctx, string name)
+            => !string.IsNullOrEmpty(name) && ctx.resolvedTables.TryGetValue(name, out StringTableCollection collection) ? collection : null;
+
+        private static StringTableCollection FindCollection(IReadOnlyList<StringTableCollection> collections, string name)
+        {
+            for (int i = 0; i < collections.Count; i++)
+            {
+                if (collections[i].TableCollectionName == name) return collections[i];
+            }
+
+            return null;
+        }
+
+        private static string ToProjectRelative(string absolute)
+        {
+            absolute = absolute.Replace('\\', '/');
+
+            string dataPath = Application.dataPath.Replace('\\', '/');
+
+            if (absolute == dataPath) return "Assets";
+            if (absolute.StartsWith(dataPath + "/")) return "Assets" + absolute.Substring(dataPath.Length);
+
+            return null;
         }
 
         /// <summary>Speaker/Text table descriptor (name + guid) for a node option slot.</summary>

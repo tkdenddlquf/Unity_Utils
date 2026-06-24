@@ -85,6 +85,21 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        private void SwapOption(int a, int b)
+        {
+            DialogueSO so = window.SO;
+
+            Undo.RecordObject(so, "Reorder Trigger");
+
+            (optionDatas[a], optionDatas[b]) = (optionDatas[b], optionDatas[a]);
+
+            extensionContainer.Insert(a, extensionContainer[b]);
+
+            EditorUtility.SetDirty(so);
+
+            window.SetUnsaved();
+        }
+
         private void OnKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
@@ -154,8 +169,7 @@ namespace Yang.Dialogue.Editor
         {
             VisualElement container = new() { name = "Item Element" };
 
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Center;
+            container.AddToClassList("dlg-row");
 
             window.GetKeysInto(window.SO.Conditions, conditions);
 
@@ -163,26 +177,23 @@ namespace Yang.Dialogue.Editor
 
             PopupField<string> field = new("Float Trigger", conditions, index);
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
+            field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
             FloatField floatField = new() { value = value };
 
-            floatField.style.minWidth = 60;
+            floatField.AddToClassList("dlg-num");
             floatField.RegisterValueChangedCallback(ChangedCallback);
 
             EnumField typeField = new(type);
 
-            typeField.style.minWidth = 70;
+            typeField.AddToClassList("dlg-enum");
             typeField.RegisterValueChangedCallback(ChangedCallback);
 
             Button removeButton = new(() => RemoveFloatField(container)) { text = "X" };
 
+            container.Add(RowDrag.CreateHandle(container, 0, SwapOption));
             container.Add(field);
             container.Add(floatField);
             container.Add(typeField);
@@ -273,8 +284,7 @@ namespace Yang.Dialogue.Editor
         {
             VisualElement container = new() { name = "Item Element" };
 
-            container.style.flexDirection = FlexDirection.Row;
-            container.style.alignItems = Align.Center;
+            container.AddToClassList("dlg-row");
 
             window.GetKeysInto(window.SO.Conditions, conditions);
 
@@ -282,11 +292,7 @@ namespace Yang.Dialogue.Editor
 
             PopupField<string> field = new("Bool Trigger", conditions, index);
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
+            field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
@@ -296,6 +302,7 @@ namespace Yang.Dialogue.Editor
 
             Button removeButton = new(() => RemoveBoolField(container)) { text = "X" };
 
+            container.Add(RowDrag.CreateHandle(container, 0, SwapOption));
             container.Add(field);
             container.Add(toggle);
             container.Add(removeButton);

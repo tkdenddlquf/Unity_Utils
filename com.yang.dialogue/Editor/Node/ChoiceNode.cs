@@ -200,38 +200,23 @@ namespace Yang.Dialogue.Editor
                 isReadOnly = true,
             };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field.style.whiteSpace = WhiteSpace.Normal;
-            field.style.minWidth = StyleKeyword.Auto;
+            field.AddToClassList("dlg-preview");
 
             textsElement.Add(field);
 
             return field;
         }
 
-        private void MovePort(Port port, int direction)
+        private void SwapPort(int a, int b)
         {
-            VisualElement container = port.parent;
-
-            if (container == null) return;
-
-            int currentIndex = container.IndexOf(port);
-            int newIndex = currentIndex + direction;
-
-            if (newIndex < 0 || newIndex >= container.childCount) return;
-
             DialogueSO so = window.SO;
 
-            Undo.RecordObject(so, "Move Port Index");
+            Undo.RecordObject(so, "Reorder Choice Port");
 
-            (portDatas[currentIndex], portDatas[newIndex]) = (portDatas[newIndex], portDatas[currentIndex]);
+            (portDatas[a], portDatas[b]) = (portDatas[b], portDatas[a]);
 
-            textsElement.Insert(newIndex + 1, textsElement[currentIndex + 1]);
-            container.Insert(newIndex, port);
-
-            RefreshPorts();
+            textsElement.Insert(a + 1, textsElement[b + 1]);
+            outputContainer.Insert(a, outputContainer[b]);
 
             EditorUtility.SetDirty(so);
 
@@ -249,10 +234,7 @@ namespace Yang.Dialogue.Editor
 
             PopupField<string> field = new(name, tables, index) { name = name };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
+            field.AddToClassList("dlg-field");
 
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnTableKeyDownEvent);
@@ -435,10 +417,7 @@ namespace Yang.Dialogue.Editor
             string name = "Speaker Entry";
             PopupField<EntryData> field = new(name, speakerEntries, index) { name = name };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
+            field.AddToClassList("dlg-field");
 
             field.RegisterValueChangedCallback(ChangedSpeakerCallback);
             field.RegisterCallback<KeyDownEvent>(OnEntryKeyDownEvent);
@@ -572,37 +551,17 @@ namespace Yang.Dialogue.Editor
 
             VisualElement line = new();
 
-            portElement.style.flexGrow = 1;
-            portElement.style.flexDirection = FlexDirection.Row;
-            portElement.style.alignItems = Align.Stretch;
-
-            groupContainer.style.flexGrow = 1;
-            groupContainer.style.flexDirection = FlexDirection.Column;
-            groupContainer.style.alignItems = Align.Stretch;
-
-            line.style.marginTop = 7;
-            line.style.marginBottom = 7;
-            line.style.width = 2;
-            line.style.backgroundColor = Color.gray;
-
-            entryContainer.style.flexDirection = FlexDirection.Row;
-            entryContainer.style.alignItems = Align.Stretch;
-
-            itemContainer.style.flexDirection = FlexDirection.Column;
-            itemContainer.style.alignItems = Align.Stretch;
-
-            buttonContainer.style.flexDirection = FlexDirection.Row;
-            buttonContainer.style.alignItems = Align.FlexEnd;
-            buttonContainer.style.alignSelf = Align.FlexEnd;
+            portElement.AddToClassList("dlg-port-row");
+            groupContainer.AddToClassList("dlg-port-col");
+            entryContainer.AddToClassList("dlg-port-entry");
+            itemContainer.AddToClassList("dlg-port-items");
+            buttonContainer.AddToClassList("dlg-port-buttons");
+            line.AddToClassList("dlg-port-line");
 
             string name = "Text Entry";
             PopupField<EntryData> field = new(name, textEntries, index) { name = name };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
+            field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedTextCallback);
             field.RegisterCallback<KeyDownEvent>(OnEntryKeyDownEvent);
 
@@ -617,8 +576,6 @@ namespace Yang.Dialogue.Editor
 
             Button createFloatButton = new(() => CreateConditionFloatField(itemContainer)) { text = "F" };
             Button createBoolButton = new(() => CreateConditionBoolField(itemContainer)) { text = "B" };
-            Button upButton = new(() => MovePort(port, -1)) { text = "▲" };
-            Button downButton = new(() => MovePort(port, 1)) { text = "▼" };
             Button removeButton = new(() =>
             {
                 if (RemovePort(port)) textsElement.Remove(textField);
@@ -630,14 +587,13 @@ namespace Yang.Dialogue.Editor
 
             buttonContainer.Add(createFloatButton);
             buttonContainer.Add(createBoolButton);
-            buttonContainer.Add(upButton);
-            buttonContainer.Add(downButton);
             buttonContainer.Add(removeButton);
 
             groupContainer.Add(entryContainer);
             groupContainer.Add(itemContainer);
             groupContainer.Add(buttonContainer);
 
+            portElement.Add(RowDrag.CreateHandle(port, 0, SwapPort, () => RefreshPorts()));
             portElement.Add(groupContainer);
             portElement.Add(line);
 
@@ -820,8 +776,7 @@ namespace Yang.Dialogue.Editor
         {
             VisualElement itemElement = new() { name = "Item Element" };
 
-            itemElement.style.flexDirection = FlexDirection.Row;
-            itemElement.style.alignItems = Align.Center;
+            itemElement.AddToClassList("dlg-row");
 
             window.GetKeysInto(window.SO.Conditions, conditions);
 
@@ -829,22 +784,18 @@ namespace Yang.Dialogue.Editor
 
             PopupField<string> field = new("Float Condition", conditions, index);
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
+            field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedConditionCallback);
             field.RegisterCallback<KeyDownEvent>(OnConditionKeyDownEvent);
 
             FloatField floatField = new() { value = value };
 
-            floatField.style.minWidth = 60;
+            floatField.AddToClassList("dlg-num");
             floatField.RegisterValueChangedCallback(ChangedCallback);
 
             EnumField typeField = new(type);
 
-            typeField.style.minWidth = 70;
+            typeField.AddToClassList("dlg-enum");
             typeField.RegisterValueChangedCallback(ChangedCallback);
 
             Button remove = new(() => RemoveConditionField(itemElement)) { text = "-" };
@@ -928,8 +879,7 @@ namespace Yang.Dialogue.Editor
         {
             VisualElement itemElement = new() { name = "Item Element" };
 
-            itemElement.style.flexDirection = FlexDirection.Row;
-            itemElement.style.alignItems = Align.Center;
+            itemElement.AddToClassList("dlg-row");
 
             window.GetKeysInto(window.SO.Conditions, conditions);
 
@@ -937,11 +887,7 @@ namespace Yang.Dialogue.Editor
 
             PopupField<string> field = new("Bool Condition", conditions, index);
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field.style.minWidth = ITEM_MIN_WIDTH;
-            field.style.flexGrow = 1;
+            field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedConditionCallback);
             field.RegisterCallback<KeyDownEvent>(OnConditionKeyDownEvent);
 
@@ -1000,10 +946,7 @@ namespace Yang.Dialogue.Editor
 
             TextField field = new("Message") { value = optionData[0].ToString() };
 
-            field.labelElement.style.minWidth = StyleKeyword.Auto;
-            field.labelElement.style.width = StyleKeyword.Auto;
-
-            field[1].style.minWidth = ITEM_MIN_WIDTH;
+            field.AddToClassList("dlg-field");
 
             field.RegisterValueChangedCallback(MessageChangedCallback);
 
