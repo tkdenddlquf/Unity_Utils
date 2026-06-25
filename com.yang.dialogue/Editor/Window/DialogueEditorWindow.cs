@@ -9,6 +9,7 @@ using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
 {
+    /// <summary>Editor window hosting the dialogue graph, localization controls, and node search.</summary>
     public class DialogueEditorWindow : EditorWindow
     {
         private DialogueGraph graph;
@@ -17,7 +18,9 @@ namespace Yang.Dialogue.Editor
 
         private IVisualElementScheduledItem localizationRefresh;
 
+        private VisualElement topRightBar;
         private VisualElement languageBar;
+        private VisualElement searchBar;
         private PopupField<Locale> languageDropdown;
         private readonly List<Locale> locales = new();
 
@@ -67,6 +70,7 @@ namespace Yang.Dialogue.Editor
         public List<NodeData> Nodes { get; private set; }
         public List<LinkData> Links { get; private set; }
 
+        /// <summary>Initializes the graph, registers undo/localization/event hooks, and builds the UI.</summary>
         private void OnEnable()
         {
             graph = new DialogueGraph(this);
@@ -109,11 +113,14 @@ namespace Yang.Dialogue.Editor
 
             graph.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
+            BuildTopRightBar();
+
             BuildLanguageDropdown();
 
             SO = SO;
         }
 
+        /// <summary>Detaches the graph and unsubscribes all registered hooks and callbacks.</summary>
         private void OnDisable()
         {
             rootVisualElement.Remove(graph);
@@ -139,17 +146,32 @@ namespace Yang.Dialogue.Editor
             localizationRefresh?.Pause();
 
             graph.UnregisterCallback<KeyDownEvent>(OnKeyDownEvent);
+
+            if (topRightBar != null)
+            {
+                rootVisualElement.Remove(topRightBar);
+
+                topRightBar = null;
+                searchBar = null;
+                languageBar = null;
+                languageDropdown = null;
+            }
         }
 
+        /// <summary>Opens or focuses the dialogue editor window.</summary>
         [MenuItem("Tools/Dialogue")]
         public static DialogueEditorWindow Open() => GetWindow<DialogueEditorWindow>("Dialogue");
 
+        /// <summary>Schedules a localization refresh when a table collection changes.</summary>
         private void OnLocalizationCollectionChanged(LocalizationTableCollection collection) => ScheduleLocalizationRefresh();
 
+        /// <summary>Schedules a localization refresh when a table entry changes.</summary>
         private void OnLocalizationEntryChanged(LocalizationTableCollection collection, SharedTableData.SharedTableEntry entry) => ScheduleLocalizationRefresh();
 
+        /// <summary>Schedules a localization refresh when a locale is added or removed.</summary>
         private void OnLocaleChanged(Locale locale) => ScheduleLocalizationRefresh();
 
+        /// <summary>Debounces and queues a localization refresh.</summary>
         private void ScheduleLocalizationRefresh()
         {
             localizationRefresh ??= rootVisualElement.schedule.Execute(RefreshLocalization);
@@ -157,6 +179,7 @@ namespace Yang.Dialogue.Editor
             localizationRefresh.ExecuteLater(LOCALIZATION_REFRESH_DEBOUNCE_MS);
         }
 
+        /// <summary>Rebuilds the language dropdown and refreshes tables and the view.</summary>
         private void RefreshLocalization()
         {
             BuildLanguageDropdown();
@@ -169,11 +192,12 @@ namespace Yang.Dialogue.Editor
             ResetView();
         }
 
+        /// <summary>Rebuilds the language selector bar from the available locales.</summary>
         private void BuildLanguageDropdown()
         {
             if (languageBar != null)
             {
-                rootVisualElement.Remove(languageBar);
+                topRightBar?.Remove(languageBar);
 
                 languageBar = null;
                 languageDropdown = null;
@@ -204,24 +228,7 @@ namespace Yang.Dialogue.Editor
 
             languageBar = new VisualElement();
 
-            languageBar.style.position = Position.Absolute;
-            languageBar.style.top = 8;
-            languageBar.style.right = 8;
-
-            languageBar.style.flexDirection = FlexDirection.Row;
-            languageBar.style.alignItems = Align.Center;
-
-            languageBar.style.paddingLeft = 6;
-            languageBar.style.paddingRight = 6;
-            languageBar.style.paddingTop = 3;
-            languageBar.style.paddingBottom = 3;
-
-            languageBar.style.backgroundColor = new Color(0f, 0f, 0f, 0.35f);
-
-            languageBar.style.borderTopLeftRadius = 4;
-            languageBar.style.borderTopRightRadius = 4;
-            languageBar.style.borderBottomLeftRadius = 4;
-            languageBar.style.borderBottomRightRadius = 4;
+            StyleBar(languageBar);
 
             Label label = new("Language")
             {
@@ -247,11 +254,246 @@ namespace Yang.Dialogue.Editor
             languageBar.Add(label);
             languageBar.Add(languageDropdown);
 
-            rootVisualElement.Add(languageBar);
+            topRightBar.Insert(0, languageBar);
         }
 
+        /// <summary>Creates the top-right toolbar stack and the node-search bar.</summary>
+        private void BuildTopRightBar()
+        {
+            topRightBar = new VisualElement();
+
+            topRightBar.style.position = Position.Absolute;
+            topRightBar.style.top = 8;
+            topRightBar.style.right = 8;
+
+            topRightBar.style.flexDirection = FlexDirection.Column;
+            topRightBar.style.alignItems = Align.FlexEnd;
+
+            rootVisualElement.Add(topRightBar);
+
+            searchBar = new VisualElement();
+
+            StyleBar(searchBar);
+
+            searchBar.style.flexDirection = FlexDirection.Column;
+            searchBar.style.alignItems = Align.Stretch;
+            searchBar.style.marginTop = 6;
+
+            VisualElement inputRow = new();
+
+            inputRow.style.flexDirection = FlexDirection.Row;
+            inputRow.style.alignItems = Align.Center;
+
+            Label searchLabel = new("ID")
+            {
+                style =
+                {
+                    marginRight = 6,
+                    color = new Color(0.78f, 0.78f, 0.78f),
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                }
+            };
+
+            TextField searchField = new() { name = "node-search", tooltip = "노드 ID 입력 — 일치하는 항목을 골라 이동" };
+
+            searchField.style.minWidth = 160;
+            searchField.style.marginLeft = 0;
+            searchField.style.marginRight = 4;
+            searchField.style.marginTop = 0;
+            searchField.style.marginBottom = 0;
+
+            VisualElement suggestions = new() { name = "node-suggestions" };
+
+            suggestions.style.display = DisplayStyle.None;
+            suggestions.style.marginTop = 4;
+
+            searchField.RegisterValueChangedCallback(evt => RefreshSuggestions(searchField, suggestions, evt.newValue));
+
+            searchField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter) return;
+
+                SearchNode(searchField, suggestions);
+
+                evt.StopPropagation();
+            });
+
+            searchField.RegisterCallback<FocusOutEvent>(_ => suggestions.schedule.Execute(() => HideSuggestions(suggestions)).StartingIn(150));
+
+            Button searchButton = new(() => SearchNode(searchField, suggestions)) { text = "이동" };
+
+            searchButton.style.marginLeft = 0;
+            searchButton.style.marginRight = 0;
+            searchButton.style.marginTop = 0;
+            searchButton.style.marginBottom = 0;
+
+            inputRow.Add(searchLabel);
+            inputRow.Add(searchField);
+            inputRow.Add(searchButton);
+
+            searchBar.Add(inputRow);
+            searchBar.Add(suggestions);
+
+            topRightBar.Add(searchBar);
+        }
+
+        /// <summary>Applies the shared dark, rounded toolbar styling to a bar element.</summary>
+        private static void StyleBar(VisualElement bar)
+        {
+            bar.style.flexDirection = FlexDirection.Row;
+            bar.style.alignItems = Align.Center;
+
+            bar.style.paddingLeft = 6;
+            bar.style.paddingRight = 6;
+            bar.style.paddingTop = 3;
+            bar.style.paddingBottom = 3;
+
+            bar.style.backgroundColor = new Color(0f, 0f, 0f, 0.35f);
+
+            bar.style.borderTopLeftRadius = 4;
+            bar.style.borderTopRightRadius = 4;
+            bar.style.borderBottomLeftRadius = 4;
+            bar.style.borderBottomRightRadius = 4;
+        }
+
+        private const int MAX_SUGGESTIONS = 10;
+
+        /// <summary>Rebuilds the autocomplete list from node ids matching the typed text.</summary>
+        private void RefreshSuggestions(TextField field, VisualElement container, string rawQuery)
+        {
+            container.Clear();
+
+            string query = rawQuery?.Trim();
+
+            if (SO == null || string.IsNullOrEmpty(query))
+            {
+                HideSuggestions(container);
+
+                return;
+            }
+
+            int shown = 0;
+
+            foreach (string id in AllNodeIds())
+            {
+                if (id.IndexOf(query, System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                container.Add(MakeSuggestion(field, container, id));
+
+                if (++shown >= MAX_SUGGESTIONS) break;
+            }
+
+            container.style.display = shown > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        /// <summary>One clickable row in the autocomplete list.</summary>
+        private VisualElement MakeSuggestion(TextField field, VisualElement container, string id)
+        {
+            Label item = new(id);
+
+            item.style.paddingLeft = 6;
+            item.style.paddingRight = 6;
+            item.style.paddingTop = 2;
+            item.style.paddingBottom = 2;
+            item.style.color = new Color(0.86f, 0.86f, 0.86f);
+            item.style.whiteSpace = WhiteSpace.NoWrap;
+
+            Color hover = new(1f, 1f, 1f, 0.12f);
+
+            item.RegisterCallback<MouseEnterEvent>(_ => item.style.backgroundColor = hover);
+            item.RegisterCallback<MouseLeaveEvent>(_ => item.style.backgroundColor = StyleKeyword.Null);
+
+            item.RegisterCallback<MouseDownEvent>(evt =>
+            {
+                field.SetValueWithoutNotify(id);
+
+                HideSuggestions(container);
+
+                FocusNode(id, true);
+
+                evt.StopPropagation();
+            });
+
+            return item;
+        }
+
+        /// <summary>Clears and hides the suggestion list.</summary>
+        private static void HideSuggestions(VisualElement container)
+        {
+            container.Clear();
+
+            container.style.display = DisplayStyle.None;
+        }
+
+        /// <summary>Jumps to the node matching the query, preferring an exact id over the first suggestion.</summary>
+        private void SearchNode(TextField field, VisualElement suggestions)
+        {
+            if (SO == null) return;
+
+            string query = field.value?.Trim();
+
+            if (string.IsNullOrEmpty(query)) return;
+
+            NodeData exact = GetNode(query);
+
+            string guid = !string.IsNullOrEmpty(exact.guid) ? exact.guid : FirstSuggestion(query);
+
+            if (guid == null)
+            {
+                FlashInvalid(field);
+
+                return;
+            }
+
+            field.SetValueWithoutNotify(guid);
+
+            HideSuggestions(suggestions);
+
+            FocusNode(guid, true);
+        }
+
+        /// <summary>Returns the first node id containing the query, or null if none match.</summary>
+        private string FirstSuggestion(string query)
+        {
+            foreach (string id in AllNodeIds())
+            {
+                if (id.IndexOf(query, System.StringComparison.OrdinalIgnoreCase) >= 0) return id;
+            }
+
+            return null;
+        }
+
+        /// <summary>Returns all node ids including the start node, for search and autocomplete.</summary>
+        private List<string> AllNodeIds()
+        {
+            List<string> ids = new();
+
+            if (SO == null) return ids;
+
+            if (!string.IsNullOrEmpty(SO.StartGuid)) ids.Add(SO.StartGuid);
+
+            for (int i = 0; i < Nodes.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(Nodes[i].guid)) ids.Add(Nodes[i].guid);
+            }
+
+            return ids;
+        }
+
+        /// <summary>Briefly tints the search field red to signal no matching node id.</summary>
+        private static void FlashInvalid(TextField field)
+        {
+            VisualElement input = field.Q("unity-text-input") ?? field;
+
+            input.style.backgroundColor = new Color(0.55f, 0.20f, 0.20f);
+
+            input.schedule.Execute(() => input.style.backgroundColor = StyleKeyword.Null).StartingIn(700);
+        }
+
+        /// <summary>Returns the display name for a locale, or empty if null.</summary>
         private static string FormatLocale(Locale locale) => locale == null ? "" : locale.LocaleName;
 
+        /// <summary>Updates the active language and refreshes the view when the dropdown changes.</summary>
         private void OnLanguageChanged(ChangeEvent<Locale> evt)
         {
             if (evt.newValue == null) return;
@@ -261,6 +503,7 @@ namespace Yang.Dialogue.Editor
             ResetView();
         }
 
+        /// <summary>Fills the target list with the collection's entries, caching per collection.</summary>
         public void GetEntriesInto(LocalizationTableCollection collection, List<EntryData> target)
         {
             target.Clear();
@@ -279,6 +522,7 @@ namespace Yang.Dialogue.Editor
             target.AddRange(cached);
         }
 
+        /// <summary>Fills the target list with the marker's keys, caching per marker.</summary>
         public void GetKeysInto(object marker, List<string> target)
         {
             target.Clear();
@@ -297,6 +541,7 @@ namespace Yang.Dialogue.Editor
             target.AddRange(cached);
         }
 
+        /// <summary>Saves changes on Ctrl+S.</summary>
         private void OnKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.ctrlKey && evt.keyCode == KeyCode.S)
@@ -307,6 +552,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Prompts to save or discard when there are unsaved changes.</summary>
         private void CheckSave()
         {
             if (!hasUnsavedChanges) return;
@@ -322,6 +568,7 @@ namespace Yang.Dialogue.Editor
             else DiscardChanges();
         }
 
+        /// <summary>Persists the dialogue asset and captures its serialized state.</summary>
         public override void SaveChanges()
         {
             if (SO == null) return;
@@ -333,6 +580,7 @@ namespace Yang.Dialogue.Editor
             base.SaveChanges();
         }
 
+        /// <summary>Reverts the dialogue asset to the last saved serialized state.</summary>
         public override void DiscardChanges()
         {
             if (SO == null) return;
@@ -344,8 +592,10 @@ namespace Yang.Dialogue.Editor
             base.DiscardChanges();
         }
 
+        /// <summary>Marks the window as having unsaved changes.</summary>
         public void SetUnsaved() => hasUnsavedChanges = true;
 
+        /// <summary>Refreshes the view when undo-tracked condition or event properties change.</summary>
         private UndoPropertyModification[] OnPostprocessModifications(UndoPropertyModification[] mods)
         {
             for (int i = 0; i < mods.Length; i++)
@@ -366,6 +616,7 @@ namespace Yang.Dialogue.Editor
             return mods;
         }
 
+        /// <summary>Stores the graph's pan/zoom into the asset and flags unsaved changes.</summary>
         private void OnViewTransformChanged(GraphView graphView)
         {
             if (SO == null) return;
@@ -384,6 +635,13 @@ namespace Yang.Dialogue.Editor
         }
 
         #region View
+        /// <summary>Re-tints the graph's port colors to reflect current links.</summary>
+        public void RefreshPortColors() => graph?.RefreshPortColors();
+
+        /// <summary>Pans the graph so the given node is centered.</summary>
+        public void FocusNode(string guid, bool select = false) => graph?.FocusNode(guid, select);
+
+        /// <summary>Disconnects and removes every edge attached to a port.</summary>
         public void RemoveEdge(Port port)
         {
             IEnumerator<Edge> enumerator = port.connections.GetEnumerator();
@@ -405,6 +663,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Clears caches, ensures a start node exists, and rebuilds the graph.</summary>
         private void ResetView()
         {
             entryCache.Clear();
@@ -428,6 +687,7 @@ namespace Yang.Dialogue.Editor
             graph.MarkDirtyRepaint();
         }
 
+        /// <summary>Applies graph edits (edge/node create, remove, move) back into the data and marks dirty.</summary>
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)
         {
             if (SO == null) return change;
@@ -443,6 +703,8 @@ namespace Yang.Dialogue.Editor
 
             if (change.movedElements != null) MoveNode(change.movedElements);
 
+            graph.RefreshPortColors();
+
             EditorUtility.SetDirty(SO);
 
             SetUnsaved();
@@ -452,6 +714,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Data
+        /// <summary>Returns the node data for a guid, or default if not found.</summary>
         public NodeData GetNode(string guid)
         {
             if (guid == SO.StartGuid) return SO.EditorStartNode;
@@ -464,6 +727,7 @@ namespace Yang.Dialogue.Editor
             return default;
         }
 
+        /// <summary>Replaces the stored node data for the given guid.</summary>
         public void SetNode(string guid, NodeData data)
         {
             if (SO.StartGuid == guid) SO.EditorStartNode = data;
@@ -476,6 +740,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Adds link data for each new edge, avoiding duplicates.</summary>
         public void CreateEdge(List<Edge> selectable)
         {
             Undo.RecordObject(SO, "Create Edge");
@@ -488,6 +753,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Removes the selected edges' links and nodes (except the start node) from the data.</summary>
         public void RemoveNode<T>(List<T> selectable) where T : ISelectable
         {
             Undo.RecordObject(SO, "Remove Node");
@@ -517,6 +783,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Writes moved nodes' new positions back into the stored node data.</summary>
         private void MoveNode<T>(List<T> selectable) where T : ISelectable
         {
             Undo.RecordObject(SO, "Move Node");
@@ -554,6 +821,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Builds link data from an edge's endpoint nodes and output port index.</summary>
         private LinkData CreateLink(Edge edge)
         {
             Port outputPort = edge.output;
@@ -578,6 +846,7 @@ namespace Yang.Dialogue.Editor
             return default;
         }
 
+        /// <summary>Finds the on-screen node whose data matches the guid, returning it and its data.</summary>
         private BaseNode GetLinkedNode(string guid, out NodeData data)
         {
             foreach (Node node in graph.nodes)

@@ -15,6 +15,9 @@ namespace Yang.Dialogue.Editor
     /// </summary>
     public static class DialogueCsvImporter
     {
+        // Fixed column index layout (FIXED_COLUMNS = count; locale columns follow):
+        //   0 : ID, 1 : Type, 2 : Next, 3 : Message, 4 : Data,
+        //   5 : SpeakerTable, 6 : TextTable, 7 : SpeakerKey, 8 : TextKey, 9 : X, 10 : Y
         private const int COL_ID = 0;
         private const int COL_TYPE = 1;
         private const int COL_NEXT = 2;
@@ -28,6 +31,7 @@ namespace Yang.Dialogue.Editor
         private const int COL_Y = 10;
         private const int FIXED_COLUMNS = 11;
 
+        /// <summary>Maps a locale code to its Speaker and Text column indices in the CSV.</summary>
         private class LocaleColumn
         {
             public string code;
@@ -35,6 +39,7 @@ namespace Yang.Dialogue.Editor
             public int textColumn;
         }
 
+        /// <summary>Parsed representation of one CSV row plus its localized values and any child sub-rows.</summary>
         private class Row
         {
             public string id;
@@ -55,6 +60,7 @@ namespace Yang.Dialogue.Editor
             public readonly List<Row> children = new();
         }
 
+        /// <summary>Shared import state: known collections, resolved tables, warnings, and existing object slots.</summary>
         private class Ctx
         {
             public IReadOnlyList<StringTableCollection> collections;
@@ -63,6 +69,7 @@ namespace Yang.Dialogue.Editor
             public readonly Dictionary<string, List<DataWrapper>> existingObjects = new();
         }
 
+        /// <summary>Parses the CSV and rebuilds the SO's nodes, links and localized text; returns false on abort.</summary>
         public static bool Import(DialogueSO so, string csv, out string message)
         {
             message = "";
@@ -80,6 +87,8 @@ namespace Yang.Dialogue.Editor
 
             List<Row> nodes = ParseRows(rows, localeColumns);
 
+            ResolveIds(nodes);
+
             Ctx ctx = new()
             {
                 collections = LocalizationEditorSettings.GetStringTableCollections(),
@@ -90,8 +99,6 @@ namespace Yang.Dialogue.Editor
                 if (node.type == NodeType.Object) ctx.existingObjects[node.guid] = node.EditorOptionDatas;
             }
 
-            // Resolve every referenced Speaker/Text table up front (may prompt to create or abort)
-            // so we never half-write the SO when a table is missing.
             if (!ResolveTables(so, nodes, ctx, out message)) return false;
 
             Build(so, nodes, ctx);
@@ -101,7 +108,7 @@ namespace Yang.Dialogue.Editor
             return true;
         }
 
-        #region Parse
+        /// <summary>Reads the header row into per-locale Speaker/Text column mappings.</summary>
         private static List<LocaleColumn> ParseHeader(List<string> header)
         {
             Dictionary<string, LocaleColumn> byCode = new();
@@ -127,6 +134,7 @@ namespace Yang.Dialogue.Editor
             return new List<LocaleColumn>(byCode.Values);
         }
 
+        /// <summary>Returns the locale column for a code, creating an empty one if absent.</summary>
         private static LocaleColumn GetOrAdd(Dictionary<string, LocaleColumn> map, string code)
         {
             if (!map.TryGetValue(code, out LocaleColumn column))
@@ -139,6 +147,7 @@ namespace Yang.Dialogue.Editor
             return column;
         }
 
+        /// <summary>Extracts the locale code from a "Prefix[code]" header, returning false if it doesn't match.</summary>
         private static bool TryParseLocaleHeader(string name, string prefix, out string code)
         {
             code = "";
@@ -152,6 +161,7 @@ namespace Yang.Dialogue.Editor
             return true;
         }
 
+        /// <summary>Parses data rows into node rows, attaching Option/Branch/Asset rows as children of the prior node.</summary>
         private static List<Row> ParseRows(List<List<string>> rows, List<LocaleColumn> localeColumns)
         {
             List<Row> nodes = new();
@@ -181,6 +191,46 @@ namespace Yang.Dialogue.Editor
             return nodes;
         }
 
+        /// <summary>Ensures each node row has a unique id, prompting per node to generate or skip on missing/duplicate ids.</summary>
+        private static void ResolveIds(List<Row> nodes)
+        {
+            HashSet<string> seen = new();
+
+            bool generateAll = false;
+
+            foreach (Row row in nodes)
+            {
+                if (string.IsNullOrEmpty(row.type)) continue;
+
+                bool missing = string.IsNullOrEmpty(row.id);
+                bool duplicate = !missing && seen.Contains(row.id);
+
+                if (missing || duplicate)
+                {
+                    if (generateAll)
+                    {
+                        row.id = System.Guid.NewGuid().ToString();
+                    }
+                    else
+                    {
+                        string title = missing ? "Missing Node ID" : "Duplicate Node ID";
+                        string body = missing
+                            ? $"A '{row.type}' node has no ID.\n\nGenerate a new ID for it?"
+                            : $"The ID '{row.id}' is already used by another node.\n\nGenerate a new ID for this '{row.type}' node?";
+
+                        int choice = EditorUtility.DisplayDialogComplex(title, body, "Generate", "Skip Node", "Generate All");
+
+                        if (choice == 2) generateAll = true;
+
+                        row.id = choice == 1 ? "" : System.Guid.NewGuid().ToString();
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(row.id)) seen.Add(row.id);
+            }
+        }
+
+        /// <summary>Returns true when every cell in the row is null or empty.</summary>
         private static bool IsEmptyRow(List<string> cells)
         {
             for (int i = 0; i < cells.Count; i++)
@@ -191,6 +241,7 @@ namespace Yang.Dialogue.Editor
             return true;
         }
 
+        /// <summary>Builds a <see cref="Row"/> from raw cells, trimming structural fields and preserving content whitespace.</summary>
         private static Row ReadRow(List<string> cells, List<LocaleColumn> localeColumns)
         {
             Row row = new()
@@ -198,8 +249,6 @@ namespace Yang.Dialogue.Editor
                 id = Cell(cells, COL_ID),
                 type = Cell(cells, COL_TYPE),
                 next = Cell(cells, COL_NEXT),
-                // Content fields keep their leading/trailing whitespace; structural fields are trimmed.
-                // A cell that is only whitespace counts as empty.
                 message = Content(Cell(cells, COL_MESSAGE, false)),
                 data = Cell(cells, COL_DATA),
                 speakerTable = Cell(cells, COL_SPEAKER_TABLE),
@@ -222,6 +271,7 @@ namespace Yang.Dialogue.Editor
             return row;
         }
 
+        /// <summary>Safely reads a cell by index, returning empty when out of range and trimming when requested.</summary>
         private static string Cell(List<string> cells, int index, bool trim = true)
         {
             if (index < 0 || index >= cells.Count) return "";
@@ -231,12 +281,10 @@ namespace Yang.Dialogue.Editor
             return trim ? value.Trim() : value;
         }
 
-        /// <summary>Normalizes a content cell: a whitespace-only value is treated as empty, while a value
-        /// with real text keeps its surrounding whitespace intact.</summary>
+        /// <summary>Treats a whitespace-only content value as empty while preserving surrounding whitespace otherwise.</summary>
         private static string Content(string value) => string.IsNullOrWhiteSpace(value) ? "" : value;
-        #endregion
 
-        #region Build
+        /// <summary>Constructs nodes, links and positions from the parsed rows and writes them onto the SO.</summary>
         private static void Build(DialogueSO so, List<Row> rows, Ctx ctx)
         {
             Undo.RecordObject(so, "Import Dialogue CSV");
@@ -284,12 +332,22 @@ namespace Yang.Dialogue.Editor
 
             foreach (NodeData node in nodeList) validIds.Add(node.guid);
 
+            List<string> droppedLinks = new();
+
             foreach ((string source, int port, string target) in linkRequests)
             {
-                if (!validIds.Contains(target)) continue;
+                if (!validIds.Contains(target))
+                {
+                    droppedLinks.Add($"{source} → {target}");
+
+                    continue;
+                }
 
                 links.Add(new LinkData { nodeGuid = source, targetGuid = target, outPortIndex = port });
             }
+
+            if (droppedLinks.Count > 0)
+                ctx.warnings.Add($"{droppedLinks.Count} link(s) dropped — target node missing or skipped: " + string.Join(", ", droppedLinks));
 
             Dictionary<string, Vector2> explicitPositions = new();
 
@@ -319,11 +377,13 @@ namespace Yang.Dialogue.Editor
             AssetDatabase.SaveAssets();
         }
 
+        /// <summary>Queues a link request from a source port to a target, ignoring empty targets.</summary>
         private static void AddLink(List<(string, int, string)> requests, string source, int port, string target)
         {
             if (!string.IsNullOrEmpty(target)) requests.Add((source, port, target));
         }
 
+        /// <summary>Builds a single <see cref="NodeData"/> from a row, populating options, ports and link requests by type.</summary>
         private static NodeData BuildNode(Row row, Ctx ctx, List<(string, int, string)> linkRequests)
         {
             NodeType type = ParseType(row.type);
@@ -440,9 +500,6 @@ namespace Yang.Dialogue.Editor
                     break;
 
                 case NodeType.Object:
-                    // CSV can't carry asset references. Reuse the existing node's object slots
-                    // (matched by id) so assignments survive; for a brand-new object node create one
-                    // empty slot per "Asset" sub-row so the editor shows the right number to fill in.
                     if (ctx.existingObjects.TryGetValue(row.id, out List<DataWrapper> existing) && existing.Count > 0)
                     {
                         foreach (DataWrapper slot in existing) options.Add(new DataWrapper(slot));
@@ -465,6 +522,7 @@ namespace Yang.Dialogue.Editor
             return node;
         }
 
+        /// <summary>Returns true when the row (or optionally any child) has localized text.</summary>
         private static bool HasContent(Row row, bool checkChildren)
         {
             if (row.text.Count > 0) return true;
@@ -479,26 +537,20 @@ namespace Yang.Dialogue.Editor
 
             return false;
         }
-        #endregion
 
-        #region Localization
-        /// <summary>
-        /// Resolves every Speaker/Text table referenced by content rows before the SO is touched.
-        /// An empty table name (on a row that has text) aborts the import; an unknown table name
-        /// prompts the user to create it (with a folder picker) or abort.
-        /// </summary>
+        /// <summary>Resolves (and optionally creates) every Speaker/Text table referenced by content rows; returns false to abort.</summary>
         private static bool ResolveTables(DialogueSO so, List<Row> nodes, Ctx ctx, out string error)
         {
             error = "";
 
-            // Empty table name on a content row? Offer the SO's default Speaker/Text table (if any)
-            // before the empty-name check below would abort the import.
             ApplyDefaultTables(so, nodes, ctx);
 
             List<(string name, string nodeId, string kind)> needed = new();
 
             foreach (Row row in nodes)
             {
+                if (string.IsNullOrEmpty(row.id)) continue;
+
                 NodeType type = ParseType(row.type);
 
                 if (type == NodeType.Dialogue)
@@ -522,7 +574,6 @@ namespace Yang.Dialogue.Editor
                 }
             }
 
-            // 1) Empty table name on a row that carries text -> warn and abort (before creating anything).
             foreach ((string name, string nodeId, string kind) in needed)
             {
                 if (string.IsNullOrEmpty(name))
@@ -533,7 +584,6 @@ namespace Yang.Dialogue.Editor
                 }
             }
 
-            // 2) Unknown table name -> ask to create (with folder picker), else abort.
             foreach ((string name, string nodeId, string kind) in needed)
             {
                 if (ctx.resolvedTables.ContainsKey(name)) continue;
@@ -594,11 +644,7 @@ namespace Yang.Dialogue.Editor
             return true;
         }
 
-        /// <summary>
-        /// Fills empty Speaker/Text table names on content rows with the SO's default table, asking the
-        /// user once per kind whether to use it. Rows left empty (no default, or the user skips) fall
-        /// through to the empty-name abort in <see cref="ResolveTables"/>.
-        /// </summary>
+        /// <summary>Fills empty Speaker/Text table names on content rows with the SO's default table, prompting once per default.</summary>
         private static void ApplyDefaultTables(DialogueSO so, List<Row> nodes, Ctx ctx)
         {
             string speakerDefault = GetDefaultTableName(so.SpeakerTable, ctx);
@@ -606,12 +652,12 @@ namespace Yang.Dialogue.Editor
 
             if (string.IsNullOrEmpty(speakerDefault) && string.IsNullOrEmpty(textDefault)) return;
 
-            // Cache the "use default 'X'?" answer per table name: the same default table is asked once
-            // (no matter how many nodes need it), while distinct default tables are still asked separately.
             Dictionary<string, bool> decisions = new();
 
             foreach (Row row in nodes)
             {
+                if (string.IsNullOrEmpty(row.id)) continue;
+
                 NodeType type = ParseType(row.type);
 
                 if (type == NodeType.Dialogue)
@@ -640,10 +686,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        /// <summary>Returns <paramref name="defaultName"/> when a content row's table name is empty and
-        /// the user agrees to fall back to the SO default; otherwise the original name. The answer is
-        /// cached in <paramref name="decisions"/> by table name, so a table already decided by an earlier
-        /// node is not asked again while a different default table still prompts.</summary>
+        /// <summary>Substitutes the SO default table name for an empty one when the (cached) user choice agrees.</summary>
         private static string ResolveDefault(bool hasText, string tableName, string defaultName, string kind, string nodeId, Dictionary<string, bool> decisions)
         {
             if (!hasText || !string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(defaultName)) return tableName;
@@ -662,8 +705,7 @@ namespace Yang.Dialogue.Editor
             return use ? defaultName : tableName;
         }
 
-        /// <summary>Resolves the SO's default <see cref="LocalizedStringTable"/> to a collection name,
-        /// matching by GUID against the known collections when the reference carries no name.</summary>
+        /// <summary>Resolves the SO's default <see cref="LocalizedStringTable"/> to a collection name (matching by GUID if needed).</summary>
         private static string GetDefaultTableName(LocalizedStringTable table, Ctx ctx)
         {
             if (table == null || table.IsEmpty) return "";
@@ -686,9 +728,11 @@ namespace Yang.Dialogue.Editor
             return "";
         }
 
+        /// <summary>Returns the already-resolved collection for a table name, or null.</summary>
         private static StringTableCollection ResolveTable(Ctx ctx, string name)
             => !string.IsNullOrEmpty(name) && ctx.resolvedTables.TryGetValue(name, out StringTableCollection collection) ? collection : null;
 
+        /// <summary>Finds a collection by its display name within the given list, or null.</summary>
         private static StringTableCollection FindCollection(IReadOnlyList<StringTableCollection> collections, string name)
         {
             for (int i = 0; i < collections.Count; i++)
@@ -699,6 +743,7 @@ namespace Yang.Dialogue.Editor
             return null;
         }
 
+        /// <summary>Converts an absolute path under the project's Assets folder to an "Assets/..." path, or null if outside.</summary>
         private static string ToProjectRelative(string absolute)
         {
             absolute = absolute.Replace('\\', '/');
@@ -711,7 +756,7 @@ namespace Yang.Dialogue.Editor
             return null;
         }
 
-        /// <summary>Speaker/Text table descriptor (name + guid) for a node option slot.</summary>
+        /// <summary>Writes the entry's locale values and returns a table-name descriptor slot for it.</summary>
         private static DataWrapper MakeTableEntry(StringTableCollection collection, string key, Dictionary<string, string> values, out long id)
         {
             id = WriteEntry(collection, key, values);
@@ -719,6 +764,7 @@ namespace Yang.Dialogue.Editor
             return MakeTableName(collection, id != 0);
         }
 
+        /// <summary>Builds a name+guid table descriptor slot, or an empty slot when there is no content.</summary>
         private static DataWrapper MakeTableName(StringTableCollection collection, bool hasContent)
         {
             if (collection == null || !hasContent)
@@ -733,6 +779,7 @@ namespace Yang.Dialogue.Editor
                 new GenericData(collection.TableCollectionNameReference.TableCollectionNameGuid));
         }
 
+        /// <summary>Builds a key+id reference slot for an entry, or an empty slot when it has no id.</summary>
         private static DataWrapper MakeEntryRef(StringTableCollection collection, string key, Dictionary<string, string> values)
         {
             long id = collection == null ? 0 : LookupId(collection, key, values);
@@ -747,6 +794,7 @@ namespace Yang.Dialogue.Editor
             return new DataWrapper(new GenericData(key), new GenericData(id));
         }
 
+        /// <summary>Returns the shared entry id for a key when values exist, or 0.</summary>
         private static long LookupId(StringTableCollection collection, string key, Dictionary<string, string> values)
         {
             if (values.Count == 0) return 0;
@@ -786,9 +834,8 @@ namespace Yang.Dialogue.Editor
 
             return id;
         }
-        #endregion
 
-        #region Data parsing
+        /// <summary>Maps a CSV type label to its <see cref="NodeType"/>, defaulting to Dialogue.</summary>
         private static NodeType ParseType(string type) => type switch
         {
             "Dialogue" => NodeType.Dialogue,
@@ -801,9 +848,11 @@ namespace Yang.Dialogue.Editor
             _ => NodeType.Dialogue,
         };
 
+        /// <summary>Returns the CSV key, or a synthesized "id_suffix" key when none was provided.</summary>
         private static string ResolveKey(string csvKey, string id, string suffix)
             => string.IsNullOrEmpty(csvKey) ? $"{id}_{suffix}" : csvKey;
 
+        /// <summary>Returns true when the option Data string contains the "hide" flag.</summary>
         private static bool ParseHide(string data)
         {
             foreach (string part in SplitData(data))
@@ -814,6 +863,7 @@ namespace Yang.Dialogue.Editor
             return false;
         }
 
+        /// <summary>Parses the encoded condition string and appends key/value/comparison triples to the target list.</summary>
         private static void AppendConditions(List<GenericData> target, string data)
         {
             foreach (string part in SplitData(data))
@@ -837,6 +887,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Parses the encoded setter string into Trigger option wrappers, adding an empty slot if none.</summary>
         private static void AppendTrigger(List<DataWrapper> options, string data)
         {
             foreach (string part in SplitData(data))
@@ -866,6 +917,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Parses the encoded event ids into Event option wrappers, adding an empty slot if none.</summary>
         private static void AppendEvent(List<DataWrapper> options, string data)
         {
             foreach (string part in SplitData(data))
@@ -879,6 +931,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Decodes a Wait Data string into a Seconds or Notify(reason) option wrapper.</summary>
         private static DataWrapper MakeWait(string data)
         {
             data = data.Trim();
@@ -896,6 +949,7 @@ namespace Yang.Dialogue.Editor
             return new DataWrapper(new GenericData(WaitNode.WaitType.Notify), new GenericData(reason));
         }
 
+        /// <summary>Splits a "; "-joined Data string into trimmed, non-empty parts.</summary>
         private static IEnumerable<string> SplitData(string data)
         {
             if (string.IsNullOrEmpty(data)) yield break;
@@ -908,6 +962,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Splits a condition like "gold>=10" into key, comparison operator and value; false if no operator.</summary>
         private static bool TrySplitCondition(string part, out string key, out string op, out string value)
         {
             key = op = value = "";
@@ -931,6 +986,7 @@ namespace Yang.Dialogue.Editor
             return false;
         }
 
+        /// <summary>Splits a setter like "gold+10" into key, +/-/= operator and value; false if no operator.</summary>
         private static bool TrySplitSetter(string part, out string key, out char op, out string value)
         {
             key = value = "";
@@ -953,6 +1009,7 @@ namespace Yang.Dialogue.Editor
             return false;
         }
 
+        /// <summary>Maps a comparison operator string to its <see cref="ValueCheckType"/>, defaulting to Equal.</summary>
         private static ValueCheckType OpToCheckType(string op) => op switch
         {
             "<" => ValueCheckType.Less,
@@ -963,9 +1020,8 @@ namespace Yang.Dialogue.Editor
             ">=" => ValueCheckType.GreaterEqual,
             _ => ValueCheckType.Equal,
         };
-        #endregion
 
-        #region Layout
+        /// <summary>Assigns each node a position, using explicit CSV coordinates or a BFS-depth grid layout otherwise.</summary>
         private static void AssignPositions(ref NodeData startNode, List<NodeData> nodeList, List<LinkData> links,
             Dictionary<string, Vector2> explicitPositions)
         {
@@ -1030,6 +1086,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Returns the next free grid position in a column, advancing that column's row counter.</summary>
         private static Vector2 NextPosition(Dictionary<int, int> rowInColumn, int column)
         {
             int rowIndex = rowInColumn.TryGetValue(column, out int r) ? r : 0;
@@ -1038,6 +1095,5 @@ namespace Yang.Dialogue.Editor
 
             return new Vector2(column * 280, rowIndex * 170);
         }
-        #endregion
     }
 }

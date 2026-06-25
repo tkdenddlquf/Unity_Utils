@@ -5,6 +5,9 @@ using UnityEngine;
 
 namespace Yang.Dialogue
 {
+    /// <summary>
+    /// Holds the dialogue graph's nodes and links and executes one node at a time, driving Views and updating triggers.
+    /// </summary>
     internal class RunnerNode
     {
         private RunnerEvent runnerEvent;
@@ -19,18 +22,21 @@ namespace Yang.Dialogue
         private readonly Dictionary<string, NodeData> nodes = new();
         private readonly Dictionary<RunnerPort, RunnerPort> links = new();
 
+        /// <summary>Initializes the read-only views exposed to dialogue Views.</summary>
         public RunnerNode()
         {
             choiceDatasView = choiceDatas.AsReadOnly();
             objectDatasView = objectDatas.AsReadOnly();
         }
 
+        /// <summary>Wires in the event dispatcher and trigger store this node runner uses while executing nodes.</summary>
         public void Init(RunnerEvent runnerEvent, RunnerTrigger runnerTrigger)
         {
             this.runnerEvent = runnerEvent;
             this.runnerTrigger = runnerTrigger;
         }
 
+        /// <summary>Loads the node and link data from the given dialogue asset.</summary>
         public void SetDatas(DialogueSO so)
         {
             if (so == null) return;
@@ -38,6 +44,7 @@ namespace Yang.Dialogue
             so.GetDatas(nodes, links);
         }
 
+        /// <summary>Executes the checker's current node by type, invoking Views as needed, and returns the chosen output port index (-1 if unhandled).</summary>
         public async Task<int> NextNode(IReadOnlyList<IDialogueView> views, IRunnerNodeChecker checker, IRunnerToken token)
         {
             NodeData nodeData = nodes[checker.TargetNode];
@@ -301,6 +308,7 @@ namespace Yang.Dialogue
             return -1;
         }
 
+        /// <summary>Returns true if a node with the given name exists in the loaded graph.</summary>
         public bool CheckNode(string nodeName)
         {
             if (nodeName == "" || !nodes.ContainsKey(nodeName)) return false;
@@ -308,6 +316,7 @@ namespace Yang.Dialogue
             return true;
         }
 
+        /// <summary>Resolves the node linked to the given output port; returns false with an empty name when no link exists.</summary>
         public bool TryGetLink(RunnerPort port, out string nodeName)
         {
             if (links.TryGetValue(port, out RunnerPort targetPort))
@@ -322,6 +331,7 @@ namespace Yang.Dialogue
             return false;
         }
 
+        /// <summary>Evaluates a float comparison between the current value and check value using the given operator.</summary>
         private bool CheckValue(float value, float checkValue, ValueCheckType type)
         {
             switch (type)

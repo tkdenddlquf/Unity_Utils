@@ -9,23 +9,25 @@ namespace Yang.Dialogue.Editor
     /// <summary>
     /// Port Data (0 : Default)
     /// Unused Options
-    /// 
+    ///
     /// Port Data (Common)
     /// N : Condition - string
     /// N + 1 : Value - float, bool
     /// N + 2 : CheckType - enum
-    /// 
+    ///
     /// Option Data (Unused)
     /// </summary>
     public class ConditionNode : BaseNode
     {
         private readonly List<string> conditions = new();
 
+        /// <summary>Constructs the node from the editor window and guid.</summary>
         public ConditionNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
         }
 
+        /// <summary>Builds the input port and condition output boxes.</summary>
         public override void SetPorts()
         {
             SetDefault();
@@ -35,6 +37,7 @@ namespace Yang.Dialogue.Editor
             SetOptions();
         }
 
+        /// <summary>Adds the right-click menu entry for creating a new condition box.</summary>
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             if (evt.target != this) return;
@@ -45,11 +48,13 @@ namespace Yang.Dialogue.Editor
             menu.AppendSeparator();
         }
 
+        /// <summary>Seeds the default port data slot when the node has none yet.</summary>
         private void SetDefault()
         {
             if (portDatas.Count == 0) portDatas.Add(new());
         }
 
+        /// <summary>Builds the default port and rebuilds each condition box's rows from data.</summary>
         private void SetOptions()
         {
             window.GetKeysInto(window.SO.Conditions, conditions);
@@ -89,6 +94,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Reorders two condition ports along with their links.</summary>
         private void SwapPort(int a, int b)
         {
             DialogueSO so = window.SO;
@@ -99,11 +105,14 @@ namespace Yang.Dialogue.Editor
 
             outputContainer.Insert(a, outputContainer[b]);
 
+            SwapPortLinks(a, b);
+
             EditorUtility.SetDirty(so);
 
             window.SetUnsaved();
         }
 
+        /// <summary>Builds the fixed "Default" fallback output port.</summary>
         private void AddDefaultCondition()
         {
             Port port = CreateOutputPort();
@@ -126,6 +135,7 @@ namespace Yang.Dialogue.Editor
         }
 
         #region Condition
+        /// <summary>Creates a new empty condition box and its port data entry.</summary>
         private void CreateConditionBox()
         {
             DialogueSO so = window.SO;
@@ -143,9 +153,10 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a condition box port row (item container, add buttons, remove) and returns its item container.</summary>
         private VisualElement AddConditionBox()
         {
-            Port port = CreateOutputPort();
+            Port port = CreateOutputPort(false);
 
             VisualElement portElement = new();
 
@@ -177,6 +188,8 @@ namespace Yang.Dialogue.Editor
             portElement.Add(groupContainer);
             portElement.Add(line);
 
+            RegisterPortJump(line, port);
+
             port.style.height = StyleKeyword.Auto;
             port.Q<Label>("type").style.display = DisplayStyle.None;
             port.Add(portElement);
@@ -184,6 +197,7 @@ namespace Yang.Dialogue.Editor
             return itemContainer;
         }
 
+        /// <summary>Removes a condition row from a box and its 3-slot data group.</summary>
         private void RemoveConditionField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
@@ -211,6 +225,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Clears a condition key selection when Delete is pressed.</summary>
         private void OnKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
@@ -239,6 +254,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Persists a condition key change into the matching port data slot.</summary>
         private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
@@ -260,6 +276,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Float
+        /// <summary>Adds a float condition row and its 3-slot data group to a condition box.</summary>
         private void CreateConditionFloatField(VisualElement itemContainer)
         {
             Port port = itemContainer.FindParent<Port>();
@@ -283,6 +300,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a float condition row (key dropdown, value, comparison enum, remove button).</summary>
         private VisualElement GetConditionFloatField(string key, float value, ValueCheckType type)
         {
             VisualElement itemElement = new() { name = "Item Element" };
@@ -319,6 +337,7 @@ namespace Yang.Dialogue.Editor
             return itemElement;
         }
 
+        /// <summary>Persists a float condition value change into its port data slot.</summary>
         private void ChangedCallback(ChangeEvent<float> evt)
         {
             DialogueSO so = window.SO;
@@ -338,6 +357,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Persists a comparison-type enum change into its port data slot.</summary>
         private void ChangedCallback(ChangeEvent<System.Enum> evt)
         {
             DialogueSO so = window.SO;
@@ -359,6 +379,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Bool
+        /// <summary>Adds a bool condition row and its 3-slot data group to a condition box.</summary>
         private void CreateConditionBoolField(VisualElement itemContainer)
         {
             Port port = itemContainer.FindParent<Port>();
@@ -382,6 +403,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a bool condition row (key dropdown, toggle, remove button).</summary>
         private VisualElement GetConditionBoolField(string key, bool value)
         {
             VisualElement itemElement = new() { name = "Item Element" };
@@ -411,6 +433,7 @@ namespace Yang.Dialogue.Editor
             return itemElement;
         }
 
+        /// <summary>Persists a bool condition value change into its port data slot.</summary>
         private void ChangedCallback(ChangeEvent<bool> evt)
         {
             DialogueSO so = window.SO;

@@ -10,17 +10,17 @@ namespace Yang.Dialogue.Editor
     ///
     /// Columns: ID, Type, Next, Message, Data, then Speaker[code] / Text[code] per project locale.
     ///
-    /// Data encodings:
+    /// Data column encodings:
     ///   Trigger : "key+10" (plus) / "key-5" (minus) / "key=10" (set float) / "key=true" (bool); joined by "; "
     ///   Event   : "id1; id2"
     ///   Wait    : "2.5" (seconds) or "notify" / "notify:reason"
-    ///   Object  : one "Asset" sub-row per slot, object name in Message (reference-only; re-import
-    ///             reuses the editor slots by id, so names are informational)
+    ///   Object  : one "Asset" sub-row per slot, object name in Message
     ///   Option  : optional "hide" + conditions, e.g. "hide; gold>=10; flag==true"
     ///   Branch  : conditions, e.g. "gold>=10; hasKey==true"
     /// </summary>
     public static class DialogueCsvExporter
     {
+        /// <summary>Builds the full CSV string for the dialogue: header row plus every node and its sub-rows.</summary>
         public static string Export(DialogueSO so)
         {
             IReadOnlyList<Locale> locales = LocalizationEditorSettings.GetLocales();
@@ -32,7 +32,6 @@ namespace Yang.Dialogue.Editor
 
             List<List<string>> rows = new();
 
-            // Header
             List<string> header = new() { "ID", "Type", "Next", "Message", "Data", "SpeakerTable", "TextTable", "SpeakerKey", "TextKey", "X", "Y" };
 
             foreach (Locale locale in locales)
@@ -47,7 +46,6 @@ namespace Yang.Dialogue.Editor
 
             int localeCount = locales.Count;
 
-            // Start node first
             EmitNode(so.EditorStartNode, so, locales, collections, linkMap, rows, localeCount);
 
             foreach (NodeData node in so.EditorNodes) EmitNode(node, so, locales, collections, linkMap, rows, localeCount);
@@ -55,6 +53,7 @@ namespace Yang.Dialogue.Editor
             return CsvUtility.ToCsv(rows);
         }
 
+        /// <summary>Appends the CSV row(s) for a single node, dispatching on its type and emitting any sub-rows.</summary>
         private static void EmitNode(NodeData node, DialogueSO so, IReadOnlyList<Locale> locales,
             IReadOnlyList<LocalizationTableCollection> collections, Dictionary<(string, int), string> linkMap,
             List<List<string>> rows, int localeCount)
@@ -136,9 +135,6 @@ namespace Yang.Dialogue.Editor
 
                 case NodeType.Object:
                     {
-                        // Object references can't be represented in CSV; keep the node's id, link and
-                        // position so topology survives a round-trip. Each referenced object becomes an
-                        // "Asset" sub-row showing its name (reference-only — re-import reuses editor slots).
                         rows.Add(MakeRow(node.guid, "Object", Next(linkMap, node.guid, 0), "", "", "", "", "", "", px, py, localeCount));
 
                         IReadOnlyList<DataWrapper> objs = node.OptionDatas;
@@ -158,7 +154,6 @@ namespace Yang.Dialogue.Editor
 
                 case NodeType.Condition:
                     {
-                        // Port 0 = default/else branch -> node row's Next
                         rows.Add(MakeRow(node.guid, "Condition", Next(linkMap, node.guid, 0), "", "", "", "", "", "", px, py, localeCount));
 
                         IReadOnlyList<DataWrapper> ports = node.PortDatas;
@@ -174,6 +169,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Creates a row pre-sized with the fixed columns plus an empty Speaker/Text pair per locale.</summary>
         private static List<string> MakeRow(string id, string type, string next, string message, string data,
             string speakerTable, string textTable, string speakerKey, string textKey, string x, string y, int localeCount)
         {
@@ -188,6 +184,7 @@ namespace Yang.Dialogue.Editor
             return row;
         }
 
+        /// <summary>Writes the resolved Speaker/Text values into each locale's columns of the row.</summary>
         private static void FillLocaleColumns(List<string> row, IReadOnlyList<Locale> locales,
             IReadOnlyList<LocalizationTableCollection> collections,
             string speakerTable, string speakerKey, string textTable, string textKey)
@@ -204,6 +201,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Looks up a key's localized text in the named collection for one locale, or empty.</summary>
         private static string ResolveValue(IReadOnlyList<LocalizationTableCollection> collections,
             string tableName, string key, LocaleIdentifier locale)
         {
@@ -218,9 +216,11 @@ namespace Yang.Dialogue.Editor
             return "";
         }
 
+        /// <summary>Returns the target guid linked from the given node port, or empty if none.</summary>
         private static string Next(Dictionary<(string, int), string> linkMap, string guid, int port)
             => linkMap.TryGetValue((guid, port), out string target) ? target : "";
 
+        /// <summary>Encodes a Trigger node's setter options into the "; "-joined Data string.</summary>
         private static string TriggerToString(IReadOnlyList<DataWrapper> optionDatas)
         {
             List<string> parts = new();
@@ -257,6 +257,7 @@ namespace Yang.Dialogue.Editor
             return string.Join("; ", parts);
         }
 
+        /// <summary>Encodes an Event node's ids into the "; "-joined Data string.</summary>
         private static string EventToString(IReadOnlyList<DataWrapper> optionDatas)
         {
             List<string> parts = new();
@@ -271,6 +272,7 @@ namespace Yang.Dialogue.Editor
             return string.Join("; ", parts);
         }
 
+        /// <summary>Encodes a Wait node as a seconds value or a "notify"/"notify:reason" Data string.</summary>
         private static string WaitToString(IReadOnlyList<DataWrapper> optionDatas)
         {
             IReadOnlyList<GenericData> data = optionDatas[0].data;
@@ -282,6 +284,7 @@ namespace Yang.Dialogue.Editor
             return string.IsNullOrEmpty(reason) ? "notify" : $"notify:{reason}";
         }
 
+        /// <summary>Encodes condition triples (starting at <paramref name="start"/>) into a "; "-joined string.</summary>
         private static string ConditionsToString(IReadOnlyList<GenericData> data, int start)
         {
             List<string> parts = new();

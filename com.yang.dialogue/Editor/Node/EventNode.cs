@@ -15,11 +15,13 @@ namespace Yang.Dialogue.Editor
     {
         private readonly List<string> events = new();
 
+        /// <summary>Creates the event node.</summary>
         public EventNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
         }
 
+        /// <summary>Ensures default data, creates input/output ports, and builds the event fields.</summary>
         public override void SetPorts()
         {
             SetDefault();
@@ -30,6 +32,7 @@ namespace Yang.Dialogue.Editor
             SetOptions();
         }
 
+        /// <summary>Adds an "Add Event" entry to the node's context menu.</summary>
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             if (evt.target != this) return;
@@ -40,6 +43,7 @@ namespace Yang.Dialogue.Editor
             menu.AppendSeparator();
         }
 
+        /// <summary>Seeds default option and port data when none exist.</summary>
         private void SetDefault()
         {
             if (portDatas.Count == 0)
@@ -52,6 +56,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Loads available event keys and builds an event field per option entry.</summary>
         private void SetOptions()
         {
             window.GetKeysInto(window.SO.Events, events);
@@ -66,6 +71,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Appends a new empty event field and its option data with undo support.</summary>
         private void CreateEvent()
         {
             DialogueSO so = window.SO;
@@ -83,6 +89,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a draggable row with an event key popup and a remove button.</summary>
         private void AddEventField(string key)
         {
             VisualElement container = new() { name = "Item Element" };
@@ -108,6 +115,7 @@ namespace Yang.Dialogue.Editor
             extensionContainer.Add(container);
         }
 
+        /// <summary>Swaps two option entries and their row elements for reordering.</summary>
         private void SwapOption(int a, int b)
         {
             DialogueSO so = window.SO;
@@ -123,6 +131,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Removes an event row and its option data, keeping at least one entry.</summary>
         private void RemoveEventField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
@@ -145,6 +154,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>On Delete, clears the focused event field's value.</summary>
         private void OnKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
@@ -159,6 +169,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Writes a changed event key into the matching option data entry.</summary>
         private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;

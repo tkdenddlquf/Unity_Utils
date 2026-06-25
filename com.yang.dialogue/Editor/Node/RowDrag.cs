@@ -4,24 +4,10 @@ using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
 {
-    /// <summary>
-    /// Drag-to-reorder grip for node rows, replacing the old ▲▼ buttons. Grab the handle and drag a
-    /// row up/down within its sibling container; reordering is performed as a sequence of adjacent
-    /// swaps so each node only has to implement one primitive.
-    ///
-    /// While dragging, the row is lifted out of layout flow (<c>position: absolute</c>) and tracks the
-    /// cursor by its <c>top</c> offset, so it glides smoothly with no per-frame layout reads (the source
-    /// of the old jitter). A placeholder holds the gap and slides between siblings to preview where the
-    /// row will land. The data/element order is left untouched during the drag and committed once on
-    /// release, so <paramref name="swapAdjacent"/> never sees an inconsistent index.
-    ///
-    /// <paramref name="row"/> is the element that moves (an item container, or an output Port).
-    /// <paramref name="lockedCount"/> leading siblings can never move (e.g. a Condition's default port).
-    /// <paramref name="swapAdjacent"/> swaps data + elements for the adjacent pair (lower, lower + 1).
-    /// <paramref name="onComplete"/> runs once after a drag settles (e.g. RefreshPorts).
-    /// </summary>
+    /// <summary>Provides a drag-to-reorder grip for node rows, committing reorders via adjacent swaps.</summary>
     internal static class RowDrag
     {
+        /// <summary>Creates a drag handle that reorders the given row within its container on release.</summary>
         public static Label CreateHandle(VisualElement row, int lockedCount, Action<int, int> swapAdjacent, Action onComplete = null)
         {
             Label grip = new("≡") { name = "drag-handle", tooltip = "Drag to reorder" };
@@ -32,14 +18,12 @@ namespace Yang.Dialogue.Editor
 
             VisualElement placeholder = null;
 
-            int originalIndex = 0;       // row's index/data slot at grab time — never touched mid-drag
-            int currentTarget = 0;       // index the row will land on, tracked from the placeholder
-            float startTop = 0f;         // row's layout top at grab time
-            float grabPointerY = 0f;     // pointer Y at grab time, to drive the absolute follow by delta
+            int originalIndex = 0;
+            int currentTarget = 0;
+            float startTop = 0f;
+            float grabPointerY = 0f;
 
-            // Slides the placeholder to the slot under the pointer so the siblings make room there. The
-            // dragged row is skipped while measuring (it floats), and the placeholder is pulled out first
-            // so the raw insert index is unambiguous.
+            /// <summary>Moves the placeholder to the slot under the pointer to preview the drop position.</summary>
             void Track(float pointerY)
             {
                 VisualElement container = row.parent;
@@ -55,13 +39,13 @@ namespace Yang.Dialogue.Editor
                 container.Insert(insert, placeholder);
             }
 
-            // Move the floating row by the pointer delta only — no layout reads, so it never lags or snaps.
+            /// <summary>Moves the floating row to follow the pointer by its drag delta.</summary>
             void FollowPointer(float pointerY)
             {
                 row.style.top = startTop + (pointerY - grabPointerY);
             }
 
-            // Restore the row to normal flow and tear down the placeholder / drag styling.
+            /// <summary>Restores the row to normal layout flow and tears down the placeholder and drag styling.</summary>
             void EndDrag()
             {
                 dragging = false;
@@ -78,8 +62,7 @@ namespace Yang.Dialogue.Editor
                 placeholder = null;
             }
 
-            // Settle the drag: put the row element back at its data slot, then walk it to the target with
-            // the adjacent-swap primitive so data and elements move together.
+            /// <summary>Settles the drag by returning the row to its slot and walking it to the target via adjacent swaps.</summary>
             void Commit()
             {
                 int to = currentTarget;
@@ -115,8 +98,6 @@ namespace Yang.Dialogue.Editor
                 Rect bound = row.layout;
                 startTop = bound.y;
 
-                // Placeholder takes over the row's vertical footprint (height + margins) so nothing shifts
-                // when the row pops out of flow.
                 placeholder = new VisualElement();
                 placeholder.AddToClassList("dlg-row-placeholder");
                 placeholder.style.height = bound.height;
@@ -125,8 +106,6 @@ namespace Yang.Dialogue.Editor
                 placeholder.style.marginBottom = row.resolvedStyle.marginBottom;
                 placeholder.style.flexShrink = 0f;
 
-                // Lift the row out of flow, pin its size, and raise it above its siblings. BringToFront
-                // only moves the element (not the data) and is undone in Commit before any swap.
                 row.style.position = Position.Absolute;
                 row.style.left = bound.x;
                 row.style.width = bound.width;
@@ -163,7 +142,6 @@ namespace Yang.Dialogue.Editor
                 evt.StopPropagation();
             });
 
-            // Settle the drag if pointer capture is lost without a normal release (e.g. focus change).
             grip.RegisterCallback<PointerCaptureOutEvent>(_ =>
             {
                 if (!dragging) return;
@@ -174,8 +152,7 @@ namespace Yang.Dialogue.Editor
             return grip;
         }
 
-        /// <summary>Final index the dragged row should land on: locked offset plus the number of
-        /// reorderable siblings whose vertical center sits above the pointer.</summary>
+        /// <summary>Computes the target landing index from how many reorderable siblings sit above the pointer.</summary>
         private static int TargetIndex(VisualElement container, VisualElement row, float pointerY, int locked)
         {
             int count = container.childCount;

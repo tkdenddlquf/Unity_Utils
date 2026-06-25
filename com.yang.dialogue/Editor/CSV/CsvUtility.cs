@@ -8,6 +8,7 @@ namespace Yang.Dialogue.Editor
     /// </summary>
     public static class CsvUtility
     {
+        /// <summary>Serializes rows of cells into a CSV string, escaping cells as needed.</summary>
         public static string ToCsv(IReadOnlyList<IReadOnlyList<string>> rows)
         {
             StringBuilder sb = new();
@@ -29,6 +30,7 @@ namespace Yang.Dialogue.Editor
             return sb.ToString();
         }
 
+        /// <summary>Parses CSV text into rows of cells, honoring quoting and embedded delimiters.</summary>
         public static List<List<string>> FromCsv(string text)
         {
             List<List<string>> rows = new();
@@ -97,6 +99,7 @@ namespace Yang.Dialogue.Editor
             return rows;
         }
 
+        /// <summary>Quotes and escapes a single cell value when it contains delimiters or edge whitespace.</summary>
         private static string Escape(string value)
         {
             value ??= "";
@@ -105,8 +108,6 @@ namespace Yang.Dialogue.Editor
                               value.IndexOf('"') >= 0 ||
                               value.IndexOf('\n') >= 0 ||
                               value.IndexOf('\r') >= 0 ||
-                              // Quote leading/trailing whitespace so it is preserved (RFC 4180 keeps it,
-                              // but spreadsheet editors trim unquoted padding).
                               (value.Length > 0 && (char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1])));
 
             if (!needsQuote) return value;

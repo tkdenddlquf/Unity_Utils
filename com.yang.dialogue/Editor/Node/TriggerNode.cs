@@ -21,11 +21,13 @@ namespace Yang.Dialogue.Editor
     {
         private readonly List<string> conditions = new();
 
+        /// <summary>Creates the trigger node.</summary>
         public TriggerNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
         }
 
+        /// <summary>Ensures default data, creates input/output ports, and builds the trigger fields.</summary>
         public override void SetPorts()
         {
             SetDefault();
@@ -36,6 +38,7 @@ namespace Yang.Dialogue.Editor
             SetOptions();
         }
 
+        /// <summary>Adds "Add Float Trigger" and "Add Bool Trigger" entries to the context menu.</summary>
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             if (evt.target != this) return;
@@ -47,6 +50,7 @@ namespace Yang.Dialogue.Editor
             menu.AppendSeparator();
         }
 
+        /// <summary>Seeds default option and port data when none exist.</summary>
         private void SetDefault()
         {
             if (portDatas.Count == 0)
@@ -62,6 +66,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Loads condition keys and builds a float or bool field per option entry by its data type.</summary>
         private void SetOptions()
         {
             window.GetKeysInto(window.SO.Conditions, conditions);
@@ -85,6 +90,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Swaps two option entries and their row elements for reordering.</summary>
         private void SwapOption(int a, int b)
         {
             DialogueSO so = window.SO;
@@ -100,6 +106,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>On Delete, clears the focused trigger field and its key option data.</summary>
         private void OnKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
@@ -126,6 +133,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Writes a changed trigger key into the matching option data entry.</summary>
         private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
@@ -143,7 +151,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        #region Float
+        /// <summary>Appends a new float trigger field and its option data with undo support.</summary>
         private void CreateFloatField()
         {
             DialogueSO so = window.SO;
@@ -165,6 +173,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a draggable row with a condition popup, float value, setter-type enum, and remove button.</summary>
         private void AddFloatField(string key, float value, ValueSetterType type)
         {
             VisualElement container = new() { name = "Item Element" };
@@ -202,6 +211,7 @@ namespace Yang.Dialogue.Editor
             extensionContainer.Add(container);
         }
 
+        /// <summary>Removes a float trigger row and its option data, keeping at least one entry.</summary>
         private void RemoveFloatField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
@@ -224,6 +234,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Writes a changed float trigger value into the matching option data entry.</summary>
         private void ChangedCallback(ChangeEvent<float> evt)
         {
             DialogueSO so = window.SO;
@@ -241,6 +252,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Writes a changed setter-type enum into the matching option data entry.</summary>
         private void ChangedCallback(ChangeEvent<System.Enum> evt)
         {
             DialogueSO so = window.SO;
@@ -257,9 +269,7 @@ namespace Yang.Dialogue.Editor
 
             window.SetUnsaved();
         }
-        #endregion
-
-        #region Bool
+        /// <summary>Appends a new bool trigger field and its option data with undo support.</summary>
         private void CreateBoolField()
         {
             DialogueSO so = window.SO;
@@ -280,6 +290,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a draggable row with a condition popup, bool toggle, and remove button.</summary>
         private void AddBoolField(string key, bool value)
         {
             VisualElement container = new() { name = "Item Element" };
@@ -310,6 +321,7 @@ namespace Yang.Dialogue.Editor
             extensionContainer.Add(container);
         }
 
+        /// <summary>Removes a bool trigger row and its option data, keeping at least one entry.</summary>
         private void RemoveBoolField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
@@ -332,6 +344,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Writes a changed bool trigger value into the matching option data entry.</summary>
         private void ChangedCallback(ChangeEvent<bool> evt)
         {
             DialogueSO so = window.SO;
@@ -348,6 +361,5 @@ namespace Yang.Dialogue.Editor
 
             window.SetUnsaved();
         }
-        #endregion
     }
 }

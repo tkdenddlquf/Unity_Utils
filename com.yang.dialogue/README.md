@@ -67,6 +67,12 @@ https://github.com/tkdenddlquf/Unity_Utils.git?path=/com.yang.dialogue
 3. 에디터에서 노드를 배치하고 포트를 연결합니다.
 4. Dialogue/Choice 노드의 화자·대사는 Localization String Table의 키로 지정합니다. (`DialogueSO`의 `SpeakerTable`, `TextTable`)
 
+**에디터 편의 기능**
+
+- **연결 표시 막대** — 포트 끝의 막대로 연결 여부를 표시합니다. *꽉 찬 막대* = 연결됨, *속이 빈 막대* = 미연결 (색은 초록/회색, 색 없이 모양만으로도 구분됩니다).
+- **연결 노드로 이동** — 포트의 막대를 더블클릭하면 연결된 노드로 화면이 이동합니다. 입력 포트에 여러 개가 연결돼 있으면 더블클릭할 때마다 순환합니다.
+- **ID 검색** — 우측 상단(언어 선택 아래) 검색창에 노드 ID 일부를 입력하면 자동완성 목록에서 골라 해당 노드로 이동할 수 있습니다.
+
 ### 3-2. 마커 클래스 (선택)
 
 Event 노드의 이벤트 ID와 Condition/Choice의 조건 키를 에디터 드롭다운에 노출하려면 마커 인터페이스를 구현한 클래스를 만들고, 상수(`const string`)로 값을 정의한 뒤 `DialogueSO`에 지정합니다.
@@ -245,6 +251,8 @@ foreach (var flow in runner.Load(data))
 
 - 컬럼: `ID, Type, Next, Message, Data` + 로케일별 `Speaker[code]` / `Text[code]`
 - Choice 옵션, Condition 분기, Object 참조는 소유 노드 아래 하위 행으로 표현됩니다.
+- 가져올 때 노드 ID가 **비어 있거나 중복**되면 노드마다 확인창이 떠서 *새 ID 생성 / 건너뛰기 / 모두 생성* 을 고를 수 있습니다.
+- 가리키는 노드가 없거나 건너뛴 링크는 가져오기 후 경고 메시지로 모아 알려줍니다.
 
 ---
 

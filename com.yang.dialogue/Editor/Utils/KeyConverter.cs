@@ -4,8 +4,12 @@ using System.Reflection;
 
 namespace Yang.Dialogue.Editor
 {
+    /// <summary>
+    /// Extracts string key constants declared on a marker object's type via reflection.
+    /// </summary>
     public static class KeyConverter
     {
+        /// <summary>Fills the list with every public static string const declared on the marker's type.</summary>
         public static void GetKeys(object marker, List<string> keys)
         {
             if (keys == null) return;

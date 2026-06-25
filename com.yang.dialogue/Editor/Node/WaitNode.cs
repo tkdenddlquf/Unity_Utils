@@ -20,11 +20,13 @@ namespace Yang.Dialogue.Editor
             Seconds,
         }
 
+        /// <summary>Creates the wait node.</summary>
         public WaitNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
         }
 
+        /// <summary>Ensures default data exists, then creates the input and output ports.</summary>
         public override void SetPorts()
         {
             SetDefault();
@@ -33,8 +35,10 @@ namespace Yang.Dialogue.Editor
             CreateOutputPort();
         }
 
+        /// <summary>Builds the wait type, seconds, and reason fields in the extension container.</summary>
         protected override void BuildExtension() => SetOptions();
 
+        /// <summary>Seeds default option and port data when none exist.</summary>
         private void SetDefault()
         {
             if (portDatas.Count == 0)
@@ -50,6 +54,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Builds the type, seconds, and reason fields from option data and sets initial visibility.</summary>
         private void SetOptions()
         {
             List<GenericData> optionData = optionDatas[0].data;
@@ -68,6 +73,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Toggles the seconds and reason fields per wait type and refreshes the shown field's value.</summary>
         private void SetDisplaySeconds(WaitType waitType, bool setElementValue)
         {
             TextField reasonField = extensionContainer.Q<TextField>();
@@ -117,6 +123,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Creates the wait-type enum field bound to the change callback.</summary>
         private EnumField GetTypeField(WaitType waitType)
         {
             EnumField field = new("Type", waitType);
@@ -128,6 +135,7 @@ namespace Yang.Dialogue.Editor
             return field;
         }
 
+        /// <summary>Creates the seconds float field bound to the change callback.</summary>
         private FloatField GetSecondsField(float data)
         {
             FloatField field = new("Seconds") { value = data };
@@ -139,6 +147,7 @@ namespace Yang.Dialogue.Editor
             return field;
         }
 
+        /// <summary>Creates the reason text field bound to the change callback.</summary>
         private TextField GetReasonField(string data)
         {
             TextField field = new("Reason") { value = data };
@@ -150,6 +159,7 @@ namespace Yang.Dialogue.Editor
             return field;
         }
 
+        /// <summary>Handles a wait-type change, updating option data and refreshing field visibility.</summary>
         private void ChangedCallback(ChangeEvent<Enum> evt)
         {
             DialogueSO so = window.SO;
@@ -167,6 +177,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Handles a seconds change, writing the new value into option data.</summary>
         private void ChangedCallback(ChangeEvent<float> evt)
         {
             DialogueSO so = window.SO;
@@ -180,6 +191,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Handles a reason change, writing the new value into option data.</summary>
         private void ChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;

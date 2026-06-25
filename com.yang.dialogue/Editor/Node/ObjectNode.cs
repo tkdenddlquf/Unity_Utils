@@ -14,11 +14,13 @@ namespace Yang.Dialogue.Editor
     /// </summary>
     public class ObjectNode : BaseNode
     {
+        /// <summary>Creates the object node.</summary>
         public ObjectNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
 
         }
 
+        /// <summary>Ensures default data, creates input/output ports, and builds the object fields.</summary>
         public override void SetPorts()
         {
             SetDefault();
@@ -29,6 +31,7 @@ namespace Yang.Dialogue.Editor
             SetOptions();
         }
 
+        /// <summary>Adds an "Add Object" entry to the node's context menu.</summary>
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             if (evt.target != this) return;
@@ -39,6 +42,7 @@ namespace Yang.Dialogue.Editor
             menu.AppendSeparator();
         }
 
+        /// <summary>Seeds default option and port data when none exist.</summary>
         private void SetDefault()
         {
             if (portDatas.Count == 0)
@@ -51,6 +55,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Builds an object field per option entry from its stored object reference.</summary>
         private void SetOptions()
         {
             for (int i = 0; i < optionDatas.Count; i++)
@@ -63,6 +68,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Appends a new empty object field and its option data with undo support.</summary>
         private void CreateEvent()
         {
             DialogueSO so = window.SO;
@@ -80,6 +86,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a draggable row with an object field and a remove button.</summary>
         private void AddEventField(Object target)
         {
             VisualElement container = new() { name = "Item Element" };
@@ -100,6 +107,7 @@ namespace Yang.Dialogue.Editor
             extensionContainer.Add(container);
         }
 
+        /// <summary>Swaps two option entries and their row elements for reordering.</summary>
         private void SwapObject(int a, int b)
         {
             DialogueSO so = window.SO;
@@ -115,6 +123,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Removes an object row and its option data, keeping at least one entry.</summary>
         private void RemoveObjectField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
@@ -137,6 +146,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Writes a changed object reference into the matching option data entry.</summary>
         private void ChangedCallback(ChangeEvent<Object> evt)
         {
             DialogueSO so = window.SO;

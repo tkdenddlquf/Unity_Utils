@@ -4,8 +4,12 @@ using UnityEngine.Localization.Tables;
 
 namespace Yang.Dialogue.Editor
 {
+    /// <summary>
+    /// Extension helpers that populate lists of table names and entries from localization collections.
+    /// </summary>
     public static class LocalizeSetter
     {
+        /// <summary>Fills the list with each collection's display name, prefixed by its group when present.</summary>
         public static void SetTables(this IReadOnlyList<LocalizationTableCollection> collections, List<string> tables)
         {
             tables.Clear();
@@ -21,6 +25,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Fills the list with one <see cref="EntryData"/> per shared entry in the collection.</summary>
         public static void SetEntries(this LocalizationTableCollection collection, List<EntryData> entries)
         {
             entries.Clear();

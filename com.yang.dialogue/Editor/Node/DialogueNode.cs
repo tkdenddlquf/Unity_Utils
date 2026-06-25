@@ -40,12 +40,14 @@ namespace Yang.Dialogue.Editor
 
         private readonly VisualElement textsElement = new();
 
+        /// <summary>Creates the dialogue node, caching the window's tables and collections.</summary>
         public DialogueNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
             tables = window.Tables;
             collections = window.collections;
         }
 
+        /// <summary>Builds default data, input/output ports, preview text fields, and refreshes the preview.</summary>
         public override void SetPorts()
         {
             SetDefault();
@@ -61,8 +63,10 @@ namespace Yang.Dialogue.Editor
             SetPreview();
         }
 
+        /// <summary>Populates the extension container with the speaker/text table, entry, and message fields.</summary>
         protected override void BuildExtension() => SetOptions();
 
+        /// <summary>Seeds default option and port data, honoring any speaker/text table overrides on the asset.</summary>
         private void SetDefault()
         {
             if (portDatas.Count == 0)
@@ -133,6 +137,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Adds the speaker and text table/entry fields plus the message field to the extension.</summary>
         private void SetOptions()
         {
             AddTableField(true);
@@ -144,6 +149,7 @@ namespace Yang.Dialogue.Editor
             AddMessageField();
         }
 
+        /// <summary>Creates a read-only preview text field with the given title and name.</summary>
         private void AddTextField(string title, string name)
         {
             TextField field = new(title)
@@ -157,12 +163,14 @@ namespace Yang.Dialogue.Editor
             textsElement.Add(field);
         }
 
+        /// <summary>Refreshes both speaker and text preview fields from current option data.</summary>
         private void SetPreview()
         {
             SetPreviewField("Speaker Text", optionDatas[0].data, optionDatas[1].data);
             SetPreviewField("Text Text", optionDatas[2].data, optionDatas[3].data);
         }
 
+        /// <summary>Sets the named preview field to the localized text resolved from the given table and entry.</summary>
         private void SetPreviewField(string fieldName, List<GenericData> table, List<GenericData> entry)
         {
             TextField field = textsElement.Q<TextField>(fieldName);
@@ -172,6 +180,7 @@ namespace Yang.Dialogue.Editor
             field.value = ResolvePreview(table[0].ToString(), entry[0].ToString(), entry[1].GetLong());
         }
 
+        /// <summary>Looks up the localized text for a table name, key, and id; returns empty when unresolved.</summary>
         private string ResolvePreview(string tableName, string key, long id)
         {
             if (string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(key)) return "";
@@ -185,7 +194,7 @@ namespace Yang.Dialogue.Editor
             return "";
         }
 
-        #region Table
+        /// <summary>Adds a table popup field for the speaker or text table and syncs its option data.</summary>
         private void AddTableField(bool speaker)
         {
             List<EntryData> entries = speaker ? speakerEntries : textEntries;
@@ -212,6 +221,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Finds a collection index by table guid, falling back to name; returns -1 when not found.</summary>
         private int GetTableIndex(string value, System.Guid guid)
         {
             for (int i = 0; i < collections.Count; i++)
@@ -231,6 +241,7 @@ namespace Yang.Dialogue.Editor
             return -1;
         }
 
+        /// <summary>On Delete, clears the table field along with its paired entry, preview, and option data.</summary>
         private void OnTableKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
@@ -284,6 +295,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Handles a table selection change, resetting the paired entry/preview and updating option data.</summary>
         private void ChangedCallback(ChangeEvent<string> evt)
         {
             int index = tables.IndexOf(evt.newValue);
@@ -343,9 +355,7 @@ namespace Yang.Dialogue.Editor
                 window.SetUnsaved();
             }
         }
-        #endregion
-
-        #region Entry
+        /// <summary>Adds an entry popup field for the speaker or text entry and syncs its option data and preview.</summary>
         private void AddEntryField(bool speaker)
         {
             List<EntryData> entries = speaker ? speakerEntries : textEntries;
@@ -385,6 +395,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>On Delete, clears the entry field, its option data, and the matching preview text.</summary>
         private void OnEntryKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
@@ -424,6 +435,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Handles an entry selection change, updating option data and the matching preview text.</summary>
         private void ChangedCallback(ChangeEvent<EntryData> evt)
         {
             if (evt.target is PopupField<EntryData> target)
@@ -465,9 +477,7 @@ namespace Yang.Dialogue.Editor
                 }
             }
         }
-        #endregion
-
-        #region Message
+        /// <summary>Writes the edited choice message into option data and marks the asset unsaved.</summary>
         private void MessageChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
@@ -481,6 +491,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Adds the message text field bound to the current message option data.</summary>
         private void AddMessageField()
         {
             TextField field = new("Message") { value = optionDatas[4].data[0].ToString() };
@@ -491,6 +502,5 @@ namespace Yang.Dialogue.Editor
 
             extensionContainer.Add(field);
         }
-        #endregion
     }
 }

@@ -10,28 +10,22 @@ using UnityEngine.UIElements;
 namespace Yang.Dialogue.Editor
 {
     /// <summary>
-    /// Port Data (Common : Text Entries)
-    /// 0 : Key - string
-    /// 1 : ID - long
-    /// 2 : Hide - bool
-    /// N : Condition - string
-    /// N + 1 : Value - float, bool
-    /// N + 2 : CheckType - enum
-    /// 
-    /// Option Data (0 : Speaker Table)
-    /// 0 : Name - string
-    /// 1 : Guid - guid
-    /// 
-    /// Option Data (1 : Speaker Entry)
-    /// 0 : Key - string
-    /// 1 : ID - long
-    /// 
-    /// Option Data (2 : Text Table)
-    /// 0 : Name - string
-    /// 1 : Guid - guis
-    /// 
-    /// Option Data (3 : Message)
-    /// 0 : Text - string
+    /// Serialized layout for this node's data.
+    ///
+    /// One <c>portDatas</c> entry per output (choice) port. The first three slots are fixed;
+    /// each optional condition appends a 3-slot group, so a port holds 3 + 3*conditionCount slots:
+    ///   0     : Key       - string  (localization entry key)
+    ///   1     : ID        - long    (localization entry id)
+    ///   2     : Hide      - bool    (hide the option until its conditions pass)
+    ///   N     : Condition - string  (condition key)
+    ///   N + 1 : Value     - float | bool  (value to compare against)
+    ///   N + 2 : CheckType - enum    (comparison operator, e.g. Less)
+    ///
+    /// <c>optionDatas</c> is a fixed 4-slot list shared by the whole node:
+    ///   [0] Speaker Table  -> 0: Name (string), 1: Guid (guid)
+    ///   [1] Speaker Entry  -> 0: Key  (string), 1: ID   (long)
+    ///   [2] Text Table     -> 0: Name (string), 1: Guid (guid)
+    ///   [3] Message        -> 0: Text (string)
     /// </summary>
     public class ChoiceNode : BaseNode
     {
@@ -45,12 +39,14 @@ namespace Yang.Dialogue.Editor
 
         private readonly VisualElement textsElement = new();
 
+        /// <summary>Caches the table list and collections from the editor window.</summary>
         public ChoiceNode(DialogueEditorWindow window, string guid) : base(window, guid)
         {
             tables = window.Tables;
             collections = window.collections;
         }
 
+        /// <summary>Builds the input port, speaker preview, and option/choice fields.</summary>
         public override void SetPorts()
         {
             SetDefault();
@@ -64,6 +60,7 @@ namespace Yang.Dialogue.Editor
             SetOptions();
         }
 
+        /// <summary>Adds the right-click menu entry for creating a new choice port.</summary>
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             if (evt.target != this) return;
@@ -74,6 +71,7 @@ namespace Yang.Dialogue.Editor
             menu.AppendSeparator();
         }
 
+        /// <summary>Seeds the default option/port data slots when the node has none yet.</summary>
         private void SetDefault()
         {
             if (portDatas.Count == 0)
@@ -143,6 +141,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Builds the table/entry/message fields and rebuilds each choice port's condition rows from data.</summary>
         private void SetOptions()
         {
             window.GetKeysInto(window.SO.Conditions, conditions);
@@ -192,6 +191,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Creates a read-only preview text field and appends it to the texts element.</summary>
         private TextField AddTextField(string title, string name)
         {
             TextField field = new(title)
@@ -207,6 +207,7 @@ namespace Yang.Dialogue.Editor
             return field;
         }
 
+        /// <summary>Reorders two choice ports along with their preview fields and links.</summary>
         private void SwapPort(int a, int b)
         {
             DialogueSO so = window.SO;
@@ -218,12 +219,15 @@ namespace Yang.Dialogue.Editor
             textsElement.Insert(a + 1, textsElement[b + 1]);
             outputContainer.Insert(a, outputContainer[b]);
 
+            SwapPortLinks(a, b);
+
             EditorUtility.SetDirty(so);
 
             window.SetUnsaved();
         }
 
         #region Table
+        /// <summary>Adds the speaker or text table dropdown and syncs the chosen collection into option data.</summary>
         private void AddTableField(bool speaker)
         {
             List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
@@ -252,6 +256,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Finds a table collection's index by guid, falling back to name; returns -1 when missing.</summary>
         private int GetTableIndex(string value, System.Guid guid)
         {
             for (int i = 0; i < collections.Count; i++)
@@ -271,6 +276,7 @@ namespace Yang.Dialogue.Editor
             return -1;
         }
 
+        /// <summary>Clears the table selection and its dependent entries/previews when Delete is pressed.</summary>
         private void OnTableKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
@@ -336,6 +342,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Applies a table selection, resetting dependent entries/previews and storing the new collection.</summary>
         private void ChangedCallback(ChangeEvent<string> evt)
         {
             int index = tables.IndexOf(evt.newValue);
@@ -408,6 +415,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Entry
+        /// <summary>Adds the speaker entry dropdown and syncs the selected entry into option data and preview.</summary>
         private void AddSpeakerEntryField()
         {
             List<GenericData> optionData = optionDatas[1].data;
@@ -437,6 +445,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Clears the speaker or text entry selection and its preview when Delete is pressed.</summary>
         private void OnEntryKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
@@ -481,6 +490,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Applies a speaker entry selection to option data and updates the preview text.</summary>
         private void ChangedSpeakerCallback(ChangeEvent<EntryData> evt)
         {
             int index = speakerEntries.IndexOf(evt.newValue);
@@ -510,6 +520,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Text Entry
+        /// <summary>Creates a new choice port with its default text-entry data slots.</summary>
         private void CreateTextEntry()
         {
             DialogueSO so = window.SO;
@@ -533,11 +544,12 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a choice port's full row (entry dropdown, hide toggle, condition buttons, preview) and returns its item container.</summary>
         private VisualElement AddTextEntryField(List<GenericData> optionData)
         {
             int index = textEntries.IndexOf(new EntryData(optionData[1].GetLong(), optionData[0].ToString()));
 
-            Port port = CreateOutputPort();
+            Port port = CreateOutputPort(false);
 
             TextField textField = AddTextField("Text", "Text Text");
 
@@ -597,6 +609,8 @@ namespace Yang.Dialogue.Editor
             portElement.Add(groupContainer);
             portElement.Add(line);
 
+            RegisterPortJump(line, port);
+
             port.style.height = StyleKeyword.Auto;
             port.Q<Label>("type").style.display = DisplayStyle.None;
             port.Add(portElement);
@@ -614,6 +628,7 @@ namespace Yang.Dialogue.Editor
             return itemContainer;
         }
 
+        /// <summary>Removes a condition row from a choice port and its 3-slot data group, hiding the toggle when none remain.</summary>
         private void RemoveConditionField(VisualElement itemElement)
         {
             DialogueSO so = window.SO;
@@ -648,6 +663,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Clears a condition key selection when Delete is pressed.</summary>
         private void OnConditionKeyDownEvent(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Delete)
@@ -676,6 +692,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Persists the hide toggle value for a choice port.</summary>
         private void ChangedTextCallback(ChangeEvent<bool> evt)
         {
             DialogueSO so = window.SO;
@@ -693,6 +710,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Applies a text entry selection to a choice port's data and updates the preview.</summary>
         private void ChangedTextCallback(ChangeEvent<EntryData> evt)
         {
             int index = textEntries.IndexOf(evt.newValue);
@@ -724,6 +742,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>Persists a condition key change into the matching port data slot.</summary>
         private void ChangedConditionCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
@@ -745,6 +764,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Float
+        /// <summary>Adds a float condition row and its 3-slot data group to a choice port, revealing the hide toggle.</summary>
         private void CreateConditionFloatField(VisualElement itemContainer)
         {
             Port port = itemContainer.FindParent<Port>();
@@ -772,6 +792,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a float condition row (key dropdown, value, comparison enum, remove button).</summary>
         private VisualElement GetConditionFloatField(string key, float value, ValueCheckType type)
         {
             VisualElement itemElement = new() { name = "Item Element" };
@@ -808,6 +829,7 @@ namespace Yang.Dialogue.Editor
             return itemElement;
         }
 
+        /// <summary>Persists a float condition value change into its port data slot.</summary>
         private void ChangedCallback(ChangeEvent<float> evt)
         {
             DialogueSO so = window.SO;
@@ -827,6 +849,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Persists a comparison-type enum change into its port data slot.</summary>
         private void ChangedCallback(ChangeEvent<System.Enum> evt)
         {
             DialogueSO so = window.SO;
@@ -848,6 +871,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Bool
+        /// <summary>Adds a bool condition row and its 3-slot data group to a choice port, revealing the hide toggle.</summary>
         private void CreateConditionBoolField(VisualElement itemContainer)
         {
             Port port = itemContainer.FindParent<Port>();
@@ -875,6 +899,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Builds a bool condition row (key dropdown, toggle, remove button).</summary>
         private VisualElement GetConditionBoolField(string key, bool value)
         {
             VisualElement itemElement = new() { name = "Item Element" };
@@ -904,6 +929,7 @@ namespace Yang.Dialogue.Editor
             return itemElement;
         }
 
+        /// <summary>Persists a bool condition value change into its port data slot.</summary>
         private void ChangedCallback(ChangeEvent<bool> evt)
         {
             DialogueSO so = window.SO;
@@ -925,6 +951,7 @@ namespace Yang.Dialogue.Editor
         #endregion
 
         #region Message
+        /// <summary>Persists a change to the node's message text.</summary>
         private void MessageChangedCallback(ChangeEvent<string> evt)
         {
             DialogueSO so = window.SO;
@@ -938,6 +965,7 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
+        /// <summary>Adds the message text field bound to the node's message option data.</summary>
         private void AddMessageField()
         {
             DialogueSO so = window.SO;

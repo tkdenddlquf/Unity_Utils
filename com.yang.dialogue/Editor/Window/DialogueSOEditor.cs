@@ -6,12 +6,14 @@ using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
 {
+    /// <summary>Custom inspector for DialogueSO with marker pickers, edit, and CSV import/export.</summary>
     [CustomEditor(typeof(DialogueSO))]
     public class DialogueSOEditor : UnityEditor.Editor
     {
         private PopupField<string> eventPopup;
         private PopupField<string> conditionPopup;
 
+        /// <summary>Builds the inspector UI: marker popups, table overrides, edit and CSV buttons.</summary>
         public override VisualElement CreateInspectorGUI()
         {
             VisualElement root = new();
@@ -47,6 +49,7 @@ namespace Yang.Dialogue.Editor
             return root;
         }
 
+        /// <summary>Exports the dialogue to a user-chosen CSV file.</summary>
         private void ExportCsv()
         {
             DialogueSO so = target as DialogueSO;
@@ -64,6 +67,7 @@ namespace Yang.Dialogue.Editor
             EditorUtility.RevealInFinder(path);
         }
 
+        /// <summary>Imports a CSV after confirmation, replacing the dialogue and opening the editor.</summary>
         private void ImportCsv()
         {
             DialogueSO so = target as DialogueSO;
@@ -93,6 +97,7 @@ namespace Yang.Dialogue.Editor
             else EditorUtility.DisplayDialog("Import Failed", message, "OK");
         }
 
+        /// <summary>Opens the dialogue editor window for this asset.</summary>
         private void Open()
         {
             DialogueEditorWindow window = DialogueEditorWindow.Open();
@@ -100,6 +105,7 @@ namespace Yang.Dialogue.Editor
             window.SO = target as DialogueSO;
         }
 
+        /// <summary>Creates a bold section header label.</summary>
         private Label GetHeader(string text)
         {
             Label header = new(text);
@@ -112,6 +118,7 @@ namespace Yang.Dialogue.Editor
             return header;
         }
 
+        /// <summary>Builds a popup that selects the concrete marker type for a managed-reference property.</summary>
         private PopupField<string> GetMarkerPopup<T>(string propName)
         {
             List<Type> types = new();
@@ -171,6 +178,7 @@ namespace Yang.Dialogue.Editor
             return typePopup;
         }
 
+        /// <summary>Resolves the runtime Type of a managed-reference property's current value.</summary>
         private Type GetManagedReferenceType(SerializedProperty prop)
         {
             if (prop == null) return null;
@@ -181,6 +189,7 @@ namespace Yang.Dialogue.Editor
             return Type.GetType($"{split[1]}, {split[0]}");
         }
 
+        /// <summary>Creates a bound property field for the named serialized property.</summary>
         private PropertyField GetField(string propName)
         {
             SerializedProperty prop = serializedObject.FindProperty(propName);
