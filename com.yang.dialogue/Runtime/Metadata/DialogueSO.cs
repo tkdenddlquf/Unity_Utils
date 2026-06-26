@@ -74,7 +74,7 @@ namespace Yang.Dialogue
                 RunnerPort output = new(link.nodeGuid, link.outPortIndex);
                 RunnerPort input = new(link.targetGuid, -1);
 
-                links.Add(output, input);
+                links.TryAdd(output, input);
             }
         }
     }

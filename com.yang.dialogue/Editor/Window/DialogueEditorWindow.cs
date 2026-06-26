@@ -29,6 +29,8 @@ namespace Yang.Dialogue.Editor
 
         private string saveData;
 
+        private bool pendingRebuild;
+
         public IReadOnlyList<LocalizationTableCollection> collections;
 
         public LocaleIdentifier Language { get; private set; }
@@ -78,8 +80,8 @@ namespace Yang.Dialogue.Editor
 
             rootVisualElement.Add(graph);
 
-            Undo.undoRedoPerformed -= ResetView;
-            Undo.undoRedoPerformed += ResetView;
+            Undo.undoRedoPerformed -= RequestRebuild;
+            Undo.undoRedoPerformed += RequestRebuild;
 
             Undo.postprocessModifications -= OnPostprocessModifications;
             Undo.postprocessModifications += OnPostprocessModifications;
@@ -125,7 +127,7 @@ namespace Yang.Dialogue.Editor
         {
             rootVisualElement.Remove(graph);
 
-            Undo.undoRedoPerformed -= ResetView;
+            Undo.undoRedoPerformed -= RequestRebuild;
 
             Undo.postprocessModifications -= OnPostprocessModifications;
 
@@ -189,7 +191,7 @@ namespace Yang.Dialogue.Editor
             collections = LocalizationEditorSettings.GetStringTableCollections();
             collections.SetTables(Tables);
 
-            ResetView();
+            RequestRebuild();
         }
 
         /// <summary>Rebuilds the language selector bar from the available locales.</summary>
@@ -607,7 +609,7 @@ namespace Yang.Dialogue.Editor
 
                 if (current.target == SO && (path.StartsWith("conditions") || path.StartsWith("events")))
                 {
-                    ResetView();
+                    RequestRebuild();
 
                     break;
                 }
@@ -663,9 +665,31 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        /// <summary>
+        /// Rebuilds the graph immediately when the window is focused; otherwise defers the rebuild
+        /// until the window regains focus so background editor events don't force off-screen rebuilds.
+        /// </summary>
+        private void RequestRebuild()
+        {
+            if (hasFocus) ResetView();
+            else pendingRebuild = true;
+        }
+
+        /// <summary>Flushes any rebuild that was deferred while the window was unfocused.</summary>
+        private void OnFocus()
+        {
+            if (!pendingRebuild) return;
+
+            pendingRebuild = false;
+
+            ResetView();
+        }
+
         /// <summary>Clears caches, ensures a start node exists, and rebuilds the graph.</summary>
         private void ResetView()
         {
+            pendingRebuild = false;
+
             entryCache.Clear();
             keyCache.Clear();
 
