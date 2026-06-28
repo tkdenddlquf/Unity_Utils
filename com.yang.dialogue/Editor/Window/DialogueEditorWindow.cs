@@ -269,7 +269,19 @@ namespace Yang.Dialogue.Editor
             topRightBar.style.right = 8;
 
             topRightBar.style.flexDirection = FlexDirection.Column;
-            topRightBar.style.alignItems = Align.FlexEnd;
+            topRightBar.style.alignItems = Align.Stretch;
+
+            topRightBar.style.paddingLeft = 6;
+            topRightBar.style.paddingRight = 6;
+            topRightBar.style.paddingTop = 3;
+            topRightBar.style.paddingBottom = 3;
+
+            topRightBar.style.backgroundColor = new Color(0f, 0f, 0f, 0.35f);
+
+            topRightBar.style.borderTopLeftRadius = 4;
+            topRightBar.style.borderTopRightRadius = 4;
+            topRightBar.style.borderBottomLeftRadius = 4;
+            topRightBar.style.borderBottomRightRadius = 4;
 
             rootVisualElement.Add(topRightBar);
 
@@ -337,25 +349,35 @@ namespace Yang.Dialogue.Editor
             searchBar.Add(suggestions);
 
             topRightBar.Add(searchBar);
+
+            VisualElement repairBar = new();
+
+            StyleBar(repairBar);
+
+            repairBar.style.justifyContent = Justify.FlexEnd;
+            repairBar.style.marginTop = 6;
+
+            Button repairButton = new(RepairData)
+            {
+                text = "데이터 검사 / 복구",
+                tooltip = "끊어진 링크·중복·고아 노드 등 그래프 데이터와 뷰의 결함을 검사해 자동으로 정리합니다.",
+            };
+
+            repairButton.style.marginLeft = 0;
+            repairButton.style.marginRight = 0;
+            repairButton.style.marginTop = 0;
+            repairButton.style.marginBottom = 0;
+
+            repairBar.Add(repairButton);
+
+            topRightBar.Add(repairBar);
         }
 
-        /// <summary>Applies the shared dark, rounded toolbar styling to a bar element.</summary>
+        /// <summary>Lays a toolbar row out horizontally; the shared dark background is applied once on the container.</summary>
         private static void StyleBar(VisualElement bar)
         {
             bar.style.flexDirection = FlexDirection.Row;
             bar.style.alignItems = Align.Center;
-
-            bar.style.paddingLeft = 6;
-            bar.style.paddingRight = 6;
-            bar.style.paddingTop = 3;
-            bar.style.paddingBottom = 3;
-
-            bar.style.backgroundColor = new Color(0f, 0f, 0f, 0.35f);
-
-            bar.style.borderTopLeftRadius = 4;
-            bar.style.borderTopRightRadius = 4;
-            bar.style.borderBottomLeftRadius = 4;
-            bar.style.borderBottomRightRadius = 4;
         }
 
         private const int MAX_SUGGESTIONS = 10;
@@ -803,7 +825,87 @@ namespace Yang.Dialogue.Editor
                             break;
                         }
                     }
+
+                    for (int i = Links.Count - 1; i >= 0; i--)
+                    {
+                        if (Links[i].nodeGuid == node.GUID || Links[i].targetGuid == node.GUID) Links.RemoveAt(i);
+                    }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Scans the loaded graph for data/view defects and repairs them in place: drops empty/duplicate-guid nodes,
+        /// nodes colliding with the start node, and links that are empty, out of range, dangling, or duplicated.
+        /// Then rebuilds the view from the cleaned data and reports what changed.
+        /// </summary>
+        public void RepairData()
+        {
+            if (SO == null)
+            {
+                EditorUtility.DisplayDialog("데이터 복구", "검사할 Dialogue 에셋이 없습니다.", "확인");
+
+                return;
+            }
+
+            Undo.RecordObject(SO, "Repair Dialogue Data");
+
+            int removedNodes = 0;
+            int removedLinks = 0;
+
+            string startGuid = SO.StartGuid;
+
+            // Pass 1 — clean nodes and build the set of valid node guids.
+            HashSet<string> validGuids = new();
+
+            if (!string.IsNullOrEmpty(startGuid)) validGuids.Add(startGuid);
+
+            for (int i = Nodes.Count - 1; i >= 0; i--)
+            {
+                string guid = Nodes[i].guid;
+
+                if (string.IsNullOrEmpty(guid) || guid == startGuid || !validGuids.Add(guid))
+                {
+                    Nodes.RemoveAt(i);
+
+                    removedNodes++;
+                }
+            }
+
+            // Pass 2 — drop links that are empty, negative-port, dangling on either end, or duplicates.
+            HashSet<LinkData> seenLinks = new();
+
+            for (int i = Links.Count - 1; i >= 0; i--)
+            {
+                LinkData link = Links[i];
+
+                bool invalid = string.IsNullOrEmpty(link.nodeGuid) || string.IsNullOrEmpty(link.targetGuid) ||
+                               link.outPortIndex < 0 ||
+                               !validGuids.Contains(link.nodeGuid) || !validGuids.Contains(link.targetGuid) ||
+                               !seenLinks.Add(link);
+
+                if (invalid)
+                {
+                    Links.RemoveAt(i);
+
+                    removedLinks++;
+                }
+            }
+
+            EditorUtility.SetDirty(SO);
+
+            SetUnsaved();
+
+            // Rebuild the view so on-screen nodes/edges match the cleaned data.
+            graph.RebuildAll();
+
+            if (removedNodes == 0 && removedLinks == 0)
+            {
+                EditorUtility.DisplayDialog("데이터 복구", "결함이 발견되지 않았습니다.", "확인");
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("데이터 복구", $"복구를 완료했습니다.\n\n• 정리된 노드: {removedNodes}개\n• 정리된 링크: {removedLinks}개\n\n변경 사항을 저장(Ctrl+S)하세요.", "확인");
             }
         }
 
