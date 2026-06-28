@@ -1,0 +1,8 @@
+{
+  "name": "Yang.Input.Runtime",
+  "rootNamespace": "Yang.Input",
+  "references": [
+    "Unity.InputSystem"
+  ],
+  "autoReferenced": true
+}

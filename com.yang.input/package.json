@@ -1,0 +1,20 @@
+{
+  "name": "com.yang.input",
+  "version": "1.0.0",
+  "displayName": "Input Stack",
+  "description": "Unity New Input System 기반 스택형 입력 라우팅. 스택 최상단 수신자에게만 입력을 전달하여 특정 클래스로 입력을 제한한다.",
+  "unity": "2021.3",
+  "dependencies": {
+    "com.unity.inputsystem": "1.4.0"
+  },
+  "author": {
+    "name": "Yang Jaewan"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Usage",
+      "description": "대화창 입력 제한 예시",
+      "path": "Samples~/BasicUsage"
+    }
+  ]
+}

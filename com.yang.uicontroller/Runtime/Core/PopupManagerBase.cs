@@ -3,46 +3,25 @@ using UnityEngine;
 
 namespace Yang.UIController
 {
-    public abstract class PopupManagerBase<T, U> : MonoBehaviour where T : MonoBehaviour where U : System.Enum
+    public abstract class PopupManagerBase<TManager, TEnum> : SingletonBase<TManager> where TManager : MonoBehaviour where TEnum : System.Enum
     {
-        private static T instance;
-        public static T Instance
-        {
-            get
-            {
-                if (instance == null)
-                {
-                    instance = FindFirstObjectByType<T>();
+        public bool IsActive => activePopups.Count != 0;
 
-                    if (instance == null)
-                    {
-                        GameObject obj = new() { name = typeof(T).Name };
+        public bool Initialized { get; private set; }
 
-                        instance = obj.AddComponent<T>();
-                    }
-                }
+        protected readonly Dictionary<TEnum, UIBase<TEnum>> popupDict = new();
 
-                return instance;
-            }
-        }
-
-        public bool IsActive => activeUIs.Count != 0;
-
-        public bool Initialized { get; private set; } = false;
-
-        protected readonly Dictionary<U, UIBase<U>> popupDict = new();
-
-        protected readonly List<UIBase<U>> activeUIs = new();
+        protected readonly List<UIBase<TEnum>> activePopups = new();
 
         protected virtual void Awake() => Init();
 
         protected void Init()
         {
-            UIBase<U>[] popups = FindObjectsByType<UIBase<U>>(FindObjectsSortMode.None);
+            UIBase<TEnum>[] popups = FindObjectsByType<UIBase<TEnum>>(FindObjectsSortMode.None);
 
             popupDict.Clear();
 
-            foreach (UIBase<U> popup in popups)
+            foreach (UIBase<TEnum> popup in popups)
             {
                 popup.Init();
 
@@ -52,78 +31,78 @@ namespace Yang.UIController
             Initialized = true;
         }
 
-        public bool CheckActive(U type)
+        public bool IsPopupActive(TEnum type)
         {
-            if (popupDict.TryGetValue(type, out UIBase<U> popup)) return popup.IsActive;
+            if (popupDict.TryGetValue(type, out UIBase<TEnum> popup)) return popup.IsActive;
 
             return false;
         }
 
-        public bool CheckFocus(U type)
+        public bool IsPopupFocused(TEnum type)
         {
-            if (popupDict.TryGetValue(type, out UIBase<U> popup)) return popup == activeUIs[^1];
+            if (activePopups.Count != 0 && popupDict.TryGetValue(type, out UIBase<TEnum> popup)) return popup == activePopups[^1];
 
             return false;
         }
 
-        public void CloseAllPopup()
+        public void CloseAllPopups()
         {
-            while (activeUIs.Count != 0) InactivePopup(activeUIs[0].UIType);
+            while (activePopups.Count != 0) ClosePopup(activePopups[0].UIType);
         }
 
-        public void FocusPopup(U type)
+        public void FocusPopup(TEnum type)
         {
-            if (popupDict.TryGetValue(type, out UIBase<U> popup) && popup.IsActive)
+            if (popupDict.TryGetValue(type, out UIBase<TEnum> popup) && popup.IsActive)
             {
-                activeUIs.Remove(popup);
+                activePopups.Remove(popup);
 
                 popup.transform.SetAsLastSibling();
 
-                activeUIs.Add(popup);
+                activePopups.Add(popup);
             }
         }
 
-        public void ActivePopup(U type) => SetActivePopup(type, true);
+        public void OpenPopup(TEnum type) => SetActivePopup(type, true);
 
-        public void InactivePopup(U type) => SetActivePopup(type, false);
+        public void ClosePopup(TEnum type) => SetActivePopup(type, false);
 
-        protected void SetActivePopup(U type, bool active)
+        protected void SetActivePopup(TEnum type, bool active)
         {
-            if (popupDict.TryGetValue(type, out UIBase<U> popup))
+            if (popupDict.TryGetValue(type, out UIBase<TEnum> popup))
             {
                 if (popup.IsActive == active) return;
 
                 popup.SetActive(active);
 
                 if (active) FocusPopup(type);
-                else activeUIs.Remove(popup);
+                else activePopups.Remove(popup);
 
-                UIRaySystem.SetFocus(null);
+                UIRayUtility.SetFocus(null);
             }
         }
 
-        public void SetData<V>(U type, V dataMarker) where V : struct, IDataMarker
+        public void SetData<TData>(TEnum type, TData dataMarker) where TData : struct, IDataMarker
         {
-            if (popupDict.TryGetValue(type, out UIBase<U> popup)) popup.SetData(dataMarker);
+            if (popupDict.TryGetValue(type, out UIBase<TEnum> popup)) popup.SetData(dataMarker);
         }
 
-        public void SetData<V>(V dataMarker) where V : struct, IDataMarker
+        public void SetData<TData>(TData dataMarker) where TData : struct, IDataMarker
         {
-            if (activeUIs.Count != 0) activeUIs[^1].SetData(dataMarker);
+            if (activePopups.Count != 0) activePopups[^1].SetData(dataMarker);
         }
 
-        public bool GetData<V>(U type, string markerID, out V result)
+        public bool GetData<TData>(TEnum type, string markerID, out TData result) where TData : struct, IDataMarker
         {
-            if (popupDict.TryGetValue(type, out UIBase<U> popup)) return popup.GetData(markerID, out result);
+            if (popupDict.TryGetValue(type, out UIBase<TEnum> popup)) return popup.GetData(markerID, out result);
 
             result = default;
 
             return false;
         }
 
-        public bool GetData<V>(string markerID, out V result)
+        public bool GetData<TData>(string markerID, out TData result) where TData : struct, IDataMarker
         {
-            if (activeUIs.Count != 0) return activeUIs[^1].GetData(markerID, out result);
+            if (activePopups.Count != 0) return activePopups[^1].GetData(markerID, out result);
 
             result = default;
 

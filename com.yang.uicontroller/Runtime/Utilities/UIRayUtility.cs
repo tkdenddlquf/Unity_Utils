@@ -5,14 +5,14 @@ using UnityEngine.InputSystem;
 
 namespace Yang.UIController
 {
-    public static class UIRaySystem
+    public static class UIRayUtility
     {
         private static EventSystem eventSystem;
         private static PointerEventData pointerData;
 
         private static readonly List<RaycastResult> results = new();
 
-        static UIRaySystem() => Init();
+        static UIRayUtility() => Init();
 
         public static void Init()
         {
@@ -26,7 +26,10 @@ namespace Yang.UIController
             if (eventSystem != EventSystem.current) Init();
             if (eventSystem == null) return false;
 
-            pointerData.position = Mouse.current.position.ReadValue();
+            Pointer pointer = Pointer.current;
+            if (pointer == null) return false;
+
+            pointerData.position = pointer.position.ReadValue();
 
             eventSystem.RaycastAll(pointerData, results);
 
