@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -13,21 +12,8 @@ namespace Yang.Dialogue
         private RunnerEvent runnerEvent;
         private RunnerTrigger runnerTrigger;
 
-        private readonly List<RunnerChoiceText> choiceDatas = new();
-        private readonly List<UnityEngine.Object> objectDatas = new();
-
-        private readonly ReadOnlyCollection<RunnerChoiceText> choiceDatasView;
-        private readonly ReadOnlyCollection<UnityEngine.Object> objectDatasView;
-
         private readonly Dictionary<string, NodeData> nodes = new();
         private readonly Dictionary<RunnerPort, RunnerPort> links = new();
-
-        /// <summary>Initializes the read-only views exposed to dialogue Views.</summary>
-        public RunnerNode()
-        {
-            choiceDatasView = choiceDatas.AsReadOnly();
-            objectDatasView = objectDatas.AsReadOnly();
-        }
 
         /// <summary>Wires in the event dispatcher and trigger store this node runner uses while executing nodes.</summary>
         public void Init(RunnerEvent runnerEvent, RunnerTrigger runnerTrigger)
@@ -185,7 +171,7 @@ namespace Yang.Dialogue
                     {
                         checker.PointSave();
 
-                        choiceDatas.Clear();
+                        List<RunnerChoiceText> choiceDatas = new();
 
                         IReadOnlyList<DataWrapper> textEntries = nodeData.PortDatas;
 
@@ -263,7 +249,7 @@ namespace Yang.Dialogue
 
                         foreach (IDialogueView view in views)
                         {
-                            int result = await view.OnChoice(speaker, choiceDatasView, message[0].ToString(), token);
+                            int result = await view.OnChoice(speaker, choiceDatas, message[0].ToString(), token);
 
                             if (result != -1) index = result;
                         }
@@ -289,7 +275,7 @@ namespace Yang.Dialogue
                     {
                         checker.PointSave();
 
-                        objectDatas.Clear();
+                        List<UnityEngine.Object> objectDatas = new();
 
                         IReadOnlyList<DataWrapper> optionDatas = nodeData.OptionDatas;
 
@@ -300,7 +286,7 @@ namespace Yang.Dialogue
                             if (datas[0].TryGetObject(out UnityEngine.Object value)) objectDatas.Add(value);
                         }
 
-                        foreach (IDialogueView view in views) await view.OnObject(objectDatasView, token);
+                        foreach (IDialogueView view in views) await view.OnObject(objectDatas, token);
                     }
                     return 0;
             }
