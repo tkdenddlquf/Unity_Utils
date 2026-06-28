@@ -61,25 +61,6 @@ namespace Yang.Localize.Editor
             openButton.style.width = 20;
             // openButton.style.backgroundImage = EditorGUIUtility.IconContent("Folder Icon");
 
-            popup.RegisterValueChangedCallback(evt =>
-            {
-                int index = popup.index;
-
-                if (index >= 0 && index < collections.Count)
-                {
-                    LocalizationTableCollection collection = collections[index];
-
-                    tableKey.stringValue = collection.TableCollectionName;
-                    tableGuid.stringValue = collection.TableCollectionNameReference.TableCollectionNameGuid.ToString();
-
-                    collection.SetEntries(entries);
-
-                    property.serializedObject.ApplyModifiedProperties();
-
-                    EditorUtility.SetDirty(property.serializedObject.targetObject);
-                }
-            });
-
             tableRow.Add(popup);
             tableRow.Add(openButton);
 
@@ -100,35 +81,35 @@ namespace Yang.Localize.Editor
                 showFoldoutHeader = true,
                 showAddRemoveFooter = true,
                 itemsSource = Enumerable.Range(0, entryKeys.arraySize).ToList(),
-                makeItem = () => new PopupField<EntryData>(entries, 0),
-                bindItem = (element, index) =>
+                makeItem = () =>
                 {
-                    PopupField<EntryData> popup = (PopupField<EntryData>)element;
+                    PopupField<EntryData> entryPopup = new() { choices = entries };
 
-                    SerializedProperty idProp = entryIDs.GetArrayElementAtIndex(index);
-                    SerializedProperty nameProp = entryKeys.GetArrayElementAtIndex(index);
-
-                    EntryData entryData = new(idProp.longValue, nameProp.stringValue);
-
-                    popup.SetValueWithoutNotify(entryData);
-                    popup.RegisterValueChangedCallback(evt =>
+                    // 콜백은 요소 생성 시 한 번만 등록하고, 현재 행 인덱스는 bindItem에서 갱신한다.
+                    entryPopup.RegisterValueChangedCallback(evt =>
                     {
-                        EntryData newValue = evt.newValue;
+                        int index = (int)entryPopup.userData;
 
-                        PopupField<EntryData> target = FindParentInCurrent<PopupField<EntryData>>(evt.target);
-
-                        int targetIndex = target.parent.IndexOf(target);
-
-                        SerializedProperty idProp = entryIDs.GetArrayElementAtIndex(targetIndex);
-                        SerializedProperty nameProp = entryKeys.GetArrayElementAtIndex(targetIndex);
-
-                        idProp.longValue = newValue.id;
-                        nameProp.stringValue = newValue.key;
+                        entryIDs.GetArrayElementAtIndex(index).longValue = evt.newValue.id;
+                        entryKeys.GetArrayElementAtIndex(index).stringValue = evt.newValue.key;
 
                         property.serializedObject.ApplyModifiedProperties();
 
                         EditorUtility.SetDirty(property.serializedObject.targetObject);
                     });
+
+                    return entryPopup;
+                },
+                bindItem = (element, index) =>
+                {
+                    PopupField<EntryData> entryPopup = (PopupField<EntryData>)element;
+
+                    entryPopup.userData = index;
+
+                    SerializedProperty idProp = entryIDs.GetArrayElementAtIndex(index);
+                    SerializedProperty nameProp = entryKeys.GetArrayElementAtIndex(index);
+
+                    entryPopup.SetValueWithoutNotify(new EntryData(idProp.longValue, nameProp.stringValue));
                 }
             };
 
@@ -167,6 +148,32 @@ namespace Yang.Localize.Editor
 
             root.Add(listView);
 
+            // 테이블 전환 시: 선택 테이블 저장 + 항목 목록(entries) 교체 + 기존 항목 선택 비우기 + 드롭다운 갱신.
+            popup.RegisterValueChangedCallback(evt =>
+            {
+                int index = popup.index;
+
+                if (index < 0 || index >= collections.Count) return;
+
+                LocalizationTableCollection collection = collections[index];
+
+                tableKey.stringValue = collection.TableCollectionName;
+                tableGuid.stringValue = collection.TableCollectionNameReference.TableCollectionNameGuid.ToString();
+
+                collection.SetEntries(entries);
+
+                // 이전 테이블 소속 항목은 모두 무효이므로 싹 비운다.
+                entryIDs.ClearArray();
+                entryKeys.ClearArray();
+
+                property.serializedObject.ApplyModifiedProperties();
+
+                EditorUtility.SetDirty(property.serializedObject.targetObject);
+
+                listView.itemsSource = Enumerable.Range(0, entryKeys.arraySize).ToList();
+                listView.Rebuild();
+            });
+
             return root;
         }
 
@@ -184,20 +191,6 @@ namespace Yang.Localize.Editor
             collections.SetTables(tables);
 
             return true;
-        }
-
-        private T FindParentInCurrent<T>(IEventHandler handler) where T : VisualElement
-        {
-            VisualElement current = handler as VisualElement;
-
-            while (current != null)
-            {
-                if (current is T target) return target;
-
-                current = current.parent;
-            }
-
-            return null;
         }
     }
 }

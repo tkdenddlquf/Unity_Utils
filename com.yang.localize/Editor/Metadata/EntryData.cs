@@ -51,11 +51,11 @@ namespace Yang.Localize.Editor
         public override string ToString() => key;
 
         #region Equatable
-        public readonly bool Equals(EntryData other) => key == other.key || id == other.id;
+        public readonly bool Equals(EntryData other) => id == other.id;
 
         public readonly override bool Equals(object obj) => obj is EntryData other && Equals(other);
 
-        public readonly override int GetHashCode() => HashCode.Combine(key);
+        public readonly override int GetHashCode() => HashCode.Combine(id);
         #endregion
     }
 }

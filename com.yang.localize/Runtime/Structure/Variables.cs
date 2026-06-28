@@ -31,11 +31,11 @@ namespace Yang.Localize
 
         public bool Remove(T value)
         {
-            bool result = values.Remove(value);
+            if (!values.Remove(value)) return false;
 
             ValueChanged?.Invoke(this);
 
-            return result;
+            return true;
         }
 
         public void Remove(int index)
