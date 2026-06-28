@@ -786,7 +786,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        /// <summary>Adds link data for each new edge, avoiding duplicates.</summary>
+        /// <summary>Adds link data for each new edge, enforcing one connection per output port.</summary>
         public void CreateEdge(List<Edge> selectable)
         {
             Undo.RecordObject(SO, "Create Edge");
@@ -795,7 +795,17 @@ namespace Yang.Dialogue.Editor
             {
                 LinkData link = CreateLink(edge);
 
-                if (!Links.Contains(link)) Links.Add(link);
+                if (string.IsNullOrEmpty(link.nodeGuid) || string.IsNullOrEmpty(link.targetGuid)) continue;
+
+                // Output ports are Single-capacity, but virtualization can hide an existing edge so the
+                // port looks unconnected and GraphView lets a second edge be dragged. Drop any prior link
+                // from the same output port before adding the new one to keep one connection per port.
+                for (int i = Links.Count - 1; i >= 0; i--)
+                {
+                    if (Links[i].nodeGuid == link.nodeGuid && Links[i].outPortIndex == link.outPortIndex) Links.RemoveAt(i);
+                }
+
+                Links.Add(link);
             }
         }
 
@@ -872,8 +882,10 @@ namespace Yang.Dialogue.Editor
                 }
             }
 
-            // Pass 2 — drop links that are empty, negative-port, dangling on either end, or duplicates.
+            // Pass 2 — drop links that are empty, negative-port, dangling on either end, duplicates, or a
+            // second connection from an output port that is already linked (only one per Single-capacity port).
             HashSet<LinkData> seenLinks = new();
+            HashSet<(string, int)> seenPorts = new();
 
             for (int i = Links.Count - 1; i >= 0; i--)
             {
@@ -883,6 +895,9 @@ namespace Yang.Dialogue.Editor
                                link.outPortIndex < 0 ||
                                !validGuids.Contains(link.nodeGuid) || !validGuids.Contains(link.targetGuid) ||
                                !seenLinks.Add(link);
+
+                // Among otherwise-valid links, keep only the newest (highest-index) link per output port.
+                if (!invalid && !seenPorts.Add((link.nodeGuid, link.outPortIndex))) invalid = true;
 
                 if (invalid)
                 {
