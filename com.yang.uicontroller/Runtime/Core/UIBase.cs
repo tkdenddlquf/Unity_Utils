@@ -6,8 +6,6 @@ namespace Yang.UIController
 {
     public abstract class UIBase<TEnum> : MonoBehaviour where TEnum : Enum
     {
-        [SerializeField] protected CanvasGroup canvasGroup;
-
         public abstract TEnum UIType { get; }
 
         public bool IsActive { get; protected set; }
@@ -27,23 +25,7 @@ namespace Yang.UIController
 
         protected void Provide<TData>(string markerID, Func<TData> provider) where TData : struct, IDataMarker => getHandlers[markerID] = provider;
 
-        public virtual void SetActive(bool active)
-        {
-            if (active)
-            {
-                canvasGroup.alpha = 1;
-                canvasGroup.interactable = true;
-                canvasGroup.blocksRaycasts = true;
-            }
-            else
-            {
-                canvasGroup.alpha = 0;
-                canvasGroup.interactable = false;
-                canvasGroup.blocksRaycasts = false;
-            }
-
-            IsActive = active;
-        }
+        public virtual void SetActive(bool active) => IsActive = active;
 
         public void SetData<TData>(TData dataMarker) where TData : struct, IDataMarker
         {

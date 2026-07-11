@@ -25,7 +25,7 @@ namespace Yang.UIController
             {
                 popup.Init();
 
-                popupDict.Add(popup.UIType, popup);
+                popupDict[popup.UIType] = popup;
             }
 
             Initialized = true;

@@ -23,7 +23,7 @@ namespace Yang.UIController
             {
                 screen.Init();
 
-                screenDict.Add(screen.UIType, screen);
+                screenDict[screen.UIType] = screen;
             }
 
             ChangeScreen(type);
