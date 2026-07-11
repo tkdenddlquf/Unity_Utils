@@ -30,10 +30,14 @@ namespace Yang.Dialogue
         public virtual Task OnObject(IReadOnlyList<Object> target, IRunnerToken token) => Task.CompletedTask;
 
         /// <summary>
-        /// Fires when the conversation ends or signals a reason. Override to clean up UI; the runner awaits it.
+        /// Fires when the signals a reason. Override to clean up UI; the runner awaits it.
         /// Base returns immediately.
         /// </summary>
         public virtual Task OnMessage(string reason, IRunnerToken token) => Task.CompletedTask;
+
+        public virtual void OnStop() { }
+
+        public virtual void OnPause() { }
     }
 
     /// <summary>
@@ -61,5 +65,9 @@ namespace Yang.Dialogue
         /// Called when the conversation ends or emits a reason; use it to finalize the view.
         /// </summary>
         public Task OnMessage(string reason, IRunnerToken token);
+
+        public void OnStop();
+
+        public void OnPause();
     }
 }

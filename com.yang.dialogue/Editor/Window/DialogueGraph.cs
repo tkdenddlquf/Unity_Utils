@@ -311,7 +311,7 @@ namespace Yang.Dialogue.Editor
         /// <summary>Pans so a content-space rect (top-left plus size) is centered in the viewport.</summary>
         private void CenterOn(Vector2 topLeft, Vector2 size)
         {
-            Vector3 scale = viewTransform.scale;
+            Vector3 scale = style.scale.value.value;
 
             Vector2 viewCenter = layout.size * 0.5f;
             Vector2 nodeCenter = topLeft + size * 0.5f;

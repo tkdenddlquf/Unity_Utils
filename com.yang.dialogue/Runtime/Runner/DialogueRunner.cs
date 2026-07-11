@@ -124,16 +124,19 @@ namespace Yang.Dialogue
                     RunnerPort port = new(token.TargetNode, portIndex);
 
                     if (runnerNode.TryGetLink(port, out string result)) token.TargetNode = result;
-                    else
-                    {
-                        foreach (IDialogueView view in snapshot) await view.OnMessage("", token);
-
-                        break;
-                    }
+                    else break;
                 }
             }
 
-            if (token.IsStarted) tokens.Remove(key);
+            IReadOnlyList<IDialogueView> finalSnapshot = Snapshot(views);
+
+            if (token.IsStarted)
+            {
+                foreach (IDialogueView view in finalSnapshot) view.OnStop();
+
+                tokens.Remove(key);
+            }
+            else foreach (IDialogueView view in finalSnapshot) view.OnPause();
         }
 
         /// <summary>
@@ -168,6 +171,16 @@ namespace Yang.Dialogue
             if (tokens.TryGetValue(key, out RunnerToken token)) token.Pause();
         }
 
+        public void StopDialogue(string key)
+        {
+            if (tokens.TryGetValue(key, out RunnerToken token))
+            {
+                token.Pause();
+
+                tokens.Remove(key);
+            }
+        }
+
         /// <summary>
         /// Pauses every active conversation and clears all flows. Use it to fully stop dialogue, e.g. on scene exit.
         /// </summary>
@@ -176,6 +189,11 @@ namespace Yang.Dialogue
             foreach (RunnerToken token in tokens.Values) token.Pause();
 
             tokens.Clear();
+        }
+
+        public void RegisterEndedCallback(string key)
+        {
+
         }
 
         /// <summary>
@@ -259,8 +277,7 @@ namespace Yang.Dialogue
         {
             StopAllDialogue();
 
-            foreach (KeyValuePair<string, string> flow in Load(wrapper))
-                StartDialogue(flow.Key, flow.Value, views);
+            foreach (KeyValuePair<string, string> flow in Load(wrapper)) StartDialogue(flow.Key, flow.Value, views);
         }
 
         #region Event

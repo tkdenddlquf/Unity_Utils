@@ -38,11 +38,6 @@ namespace Yang.Dialogue
         public string JumpTarget { get; set; }
 
         /// <summary>
-        /// Raised when the flow is paused or stopped.
-        /// </summary>
-        public event Action OnStopCallback;
-
-        /// <summary>
         /// Creates a token positioned at the given node and starts it running.
         /// </summary>
         public RunnerToken(string targetNode)
@@ -83,8 +78,6 @@ namespace Yang.Dialogue
             cts.Cancel();
             cts.Dispose();
             cts = null;
-
-            OnStopCallback?.Invoke();
         }
 
         /// <summary>
@@ -120,11 +113,6 @@ namespace Yang.Dialogue
         /// Whether the flow is currently running.
         /// </summary>
         public bool IsStarted { get; }
-
-        /// <summary>
-        /// Raised when the flow is paused or stopped; subscribe to clean up view state.
-        /// </summary>
-        public event Action OnStopCallback;
 
         /// <summary>
         /// Pauses the flow from within a view callback.
