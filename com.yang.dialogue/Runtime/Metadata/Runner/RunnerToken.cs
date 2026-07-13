@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,6 +13,8 @@ namespace Yang.Dialogue
     {
         private CancellationTokenSource cts;
 
+        public TaskCompletionSource<bool> UsedTask { get; set; }
+
         /// <summary>
         /// The task that stays pending while the flow runs and is cancelled when it pauses.
         /// </summary>
@@ -20,64 +23,59 @@ namespace Yang.Dialogue
         /// <summary>
         /// Whether this flow is currently running.
         /// </summary>
-        public bool IsStarted { get; private set; }
-
-        /// <summary>
-        /// The node saved as the resume point for this flow.
-        /// </summary>
-        public string PointNode { get; private set; }
+        public TokenState State { get; private set; }
 
         /// <summary>
         /// The node the flow is currently positioned at.
         /// </summary>
         public string TargetNode { get; set; }
 
-        /// <summary>
-        /// A queued node to jump to next, or empty when no jump is pending.
-        /// </summary>
-        public string JumpTarget { get; set; }
+        private readonly List<IDialogueView> views = new();
+        public IReadOnlyList<IDialogueView> Views => views;
+
+        public RunnerToken()
+        {
+            State = TokenState.Paused;
+        }
 
         /// <summary>
         /// Creates a token positioned at the given node and starts it running.
         /// </summary>
-        public RunnerToken(string targetNode)
+        public RunnerToken(IReadOnlyList<IDialogueView> views)
         {
-            IsStarted = false;
-
-            PointNode = targetNode;
-            JumpTarget = "";
-
-            Resume(targetNode);
+            SetView(views);
+            SetState(TokenState.Running);
         }
 
-        /// <summary>
-        /// Marks the flow as running again, creating a fresh cancellation token and pending task at the given node.
-        /// </summary>
-        public void Resume(string targetNode)
+        public void SetView(IReadOnlyList<IDialogueView> views)
         {
-            if (IsStarted) return;
+            this.views.Clear();
 
-            IsStarted = true;
-
-            cts = new();
-
-            Task = Task.Delay(Timeout.Infinite, cts.Token);
-
-            TargetNode = targetNode;
+            for (int i = 0; i < views.Count; i++) this.views.Add(views[i]);
         }
 
-        /// <summary>
-        /// Stops the flow, cancels and disposes its task, and raises the stop callback.
-        /// </summary>
-        public void Pause()
+        public void SetState(TokenState state)
         {
-            if (!IsStarted) return;
+            if (State == state) return;
 
-            IsStarted = false;
+            State = state;
 
-            cts.Cancel();
-            cts.Dispose();
-            cts = null;
+            switch (state)
+            {
+                case TokenState.Running:
+                    cts = new();
+
+                    Task = Task.Delay(Timeout.Infinite, cts.Token);
+                    break;
+
+                case TokenState.Paused:
+                case TokenState.Stopped:
+                case TokenState.Ended:
+                    cts.Cancel();
+                    cts.Dispose();
+                    cts = null;
+                    break;
+            }
         }
 
         /// <summary>
@@ -85,17 +83,20 @@ namespace Yang.Dialogue
         /// </summary>
         public async Task Delay(float second)
         {
-            if (!IsStarted) return;
+            if (State != TokenState.Running) return;
 
             TimeSpan delay = TimeSpan.FromSeconds(second);
 
             await Task.Delay(delay, cts.Token);
         }
 
-        /// <summary>
-        /// Records the current target node as the resume point.
-        /// </summary>
-        public void PointSave() => PointNode = TargetNode;
+        public void RefreshView()
+        {
+            for (int i = views.Count - 1; i >= 0; i--)
+            {
+                if (views[i] == null) views.RemoveAt(i);
+            }
+        }
     }
 
     /// <summary>
@@ -112,12 +113,9 @@ namespace Yang.Dialogue
         /// <summary>
         /// Whether the flow is currently running.
         /// </summary>
-        public bool IsStarted { get; }
+        public TokenState State { get; }
 
-        /// <summary>
-        /// Pauses the flow from within a view callback.
-        /// </summary>
-        public void Pause();
+        public IReadOnlyList<IDialogueView> Views { get; }
 
         /// <summary>
         /// Awaits a delay that cancels with the flow, e.g. await token.Delay(0.5f) inside a view callback.
@@ -134,15 +132,13 @@ namespace Yang.Dialogue
         /// The node the flow is currently positioned at.
         /// </summary>
         public string TargetNode { get; }
+    }
 
-        /// <summary>
-        /// A queued node to jump to next, or empty when none is pending.
-        /// </summary>
-        public string JumpTarget { get; set; }
-
-        /// <summary>
-        /// Records the current target node as the resume point.
-        /// </summary>
-        public void PointSave();
+    public enum TokenState
+    {
+        Running,
+        Paused,
+        Stopped,
+        Ended,
     }
 }

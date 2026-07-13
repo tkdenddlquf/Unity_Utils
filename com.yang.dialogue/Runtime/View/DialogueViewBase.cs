@@ -11,6 +11,8 @@ namespace Yang.Dialogue
     /// </summary>
     public abstract class DialogueViewBase : MonoBehaviour, IDialogueView
     {
+        public abstract string ViewID { get; }
+
         /// <summary>
         /// Fires when a line of dialogue should be shown. Override and return a Task that completes once the
         /// player has finished reading; the runner awaits it before advancing. Base returns immediately.
@@ -35,9 +37,15 @@ namespace Yang.Dialogue
         /// </summary>
         public virtual Task OnMessage(string reason, IRunnerToken token) => Task.CompletedTask;
 
-        public virtual void OnStop() { }
+        public virtual void OnPaused() { }
 
-        public virtual void OnPause() { }
+        public virtual void OnStopped() { }
+
+        public virtual void OnEnded() { }
+
+        public virtual object CaptureView() => null;
+
+        public virtual void RestoreView(object data) { }
     }
 
     /// <summary>
@@ -46,6 +54,8 @@ namespace Yang.Dialogue
     /// </summary>
     public interface IDialogueView
     {
+        public string ViewID { get; }
+
         /// <summary>
         /// Called to display a line of dialogue; return a Task that completes when the line is done.
         /// </summary>
@@ -66,8 +76,14 @@ namespace Yang.Dialogue
         /// </summary>
         public Task OnMessage(string reason, IRunnerToken token);
 
-        public void OnStop();
+        public void OnPaused();
 
-        public void OnPause();
+        public void OnStopped();
+
+        public void OnEnded();
+
+        public object CaptureView();
+
+        public void RestoreView(object data);
     }
 }

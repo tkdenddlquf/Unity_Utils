@@ -31,7 +31,7 @@ namespace Yang.Dialogue
         }
 
         /// <summary>Executes the checker's current node by type, invoking Views as needed, and returns the chosen output port index (-1 if unhandled).</summary>
-        public async Task<int> NextNode(IReadOnlyList<IDialogueView> views, IRunnerNodeChecker checker, IRunnerToken token)
+        public async Task<int> NextNode(IRunnerNodeChecker checker, IRunnerToken token)
         {
             NodeData nodeData = nodes[checker.TargetNode];
 
@@ -42,8 +42,6 @@ namespace Yang.Dialogue
 
                 case NodeType.Dialogue:
                     {
-                        checker.PointSave();
-
                         IReadOnlyList<GenericData> speakerTable = nodeData.OptionDatas[0].data;
                         IReadOnlyList<GenericData> speakerEntry = nodeData.OptionDatas[1].data;
 
@@ -55,7 +53,7 @@ namespace Yang.Dialogue
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
                         RunnerText text = new(textTable[0].ToString(), textEntry[0].ToString());
 
-                        foreach (IDialogueView view in views) await view.OnDialogue(speaker, text, message[0].ToString(), token);
+                        foreach (IDialogueView view in token.Views) await view.OnDialogue(speaker, text, message[0].ToString(), token);
                     }
                     return 0;
 
@@ -169,8 +167,6 @@ namespace Yang.Dialogue
 
                 case NodeType.Choice:
                     {
-                        checker.PointSave();
-
                         List<RunnerChoiceText> choiceDatas = new();
 
                         IReadOnlyList<DataWrapper> textEntries = nodeData.PortDatas;
@@ -247,7 +243,7 @@ namespace Yang.Dialogue
 
                         int index = 0;
 
-                        foreach (IDialogueView view in views)
+                        foreach (IDialogueView view in token.Views)
                         {
                             int result = await view.OnChoice(speaker, choiceDatas, message[0].ToString(), token);
 
@@ -259,22 +255,18 @@ namespace Yang.Dialogue
 
                 case NodeType.Wait:
                     {
-                        checker.PointSave();
-
                         IReadOnlyList<GenericData> datas = nodeData.OptionDatas[0].data;
 
                         if (datas[1].TryGetFloat(out float second)) await token.Delay(second);
                         else
                         {
-                            foreach (IDialogueView view in views) await view.OnMessage(datas[1].ToString(), token);
+                            foreach (IDialogueView view in token.Views) await view.OnMessage(datas[1].ToString(), token);
                         }
                     }
                     return 0;
 
                 case NodeType.Object:
                     {
-                        checker.PointSave();
-
                         List<UnityEngine.Object> objectDatas = new();
 
                         IReadOnlyList<DataWrapper> optionDatas = nodeData.OptionDatas;
@@ -286,7 +278,7 @@ namespace Yang.Dialogue
                             if (datas[0].TryGetObject(out UnityEngine.Object value)) objectDatas.Add(value);
                         }
 
-                        foreach (IDialogueView view in views) await view.OnObject(objectDatas, token);
+                        foreach (IDialogueView view in token.Views) await view.OnObject(objectDatas, token);
                     }
                     return 0;
             }

@@ -13,6 +13,8 @@ namespace Yang.Dialogue
 
         [SerializeField] private List<DialogueViewBase> viewBases = new();
 
+        private DialogueSaveData saveData;
+
         private readonly List<IDialogueView> views = new();
 
         /// <summary>
@@ -51,19 +53,19 @@ namespace Yang.Dialogue
         {
             if (so == null) return;
 
-            bool isStarted = false;
+            bool isRunning = false;
 
             foreach (RunnerToken token in tokens.Values)
             {
-                if (token.IsStarted)
+                if (token.State == TokenState.Running)
                 {
-                    isStarted = true;
+                    isRunning = true;
 
                     break;
                 }
             }
 
-            if (isStarted) return;
+            if (isRunning) return;
 
             this.so = so;
 
@@ -81,128 +83,122 @@ namespace Yang.Dialogue
         {
             if (so == null) return;
 
-            string nextNode;
+            views ??= Views;
 
             if (tokens.TryGetValue(key, out RunnerToken token))
             {
-                if (!token.IsStarted)
+                if (token.State == TokenState.Running) return;
+                else
                 {
-                    if (runnerNode.CheckNode(nodeName)) nextNode = nodeName;
-                    else nextNode = token.TargetNode == "" ? so.StartGuid : token.TargetNode;
+                    if (runnerNode.CheckNode(nodeName)) token.TargetNode = nodeName;
+                    else token.TargetNode = token.TargetNode == "" ? so.StartGuid : token.TargetNode;
 
-                    token.Resume(nextNode);
+                    token.SetView(views);
+                    token.SetState(TokenState.Running);
                 }
-                else return;
             }
             else
             {
-                if (runnerNode.CheckNode(nodeName)) nextNode = nodeName;
-                else nextNode = so.StartGuid;
-
-                token = new(nextNode);
+                token = new(views)
+                {
+                    TargetNode = runnerNode.CheckNode(nodeName) ? nodeName : so.StartGuid
+                };
 
                 tokens.Add(key, token);
             }
 
-            views ??= Views;
+            token.UsedTask = new();
 
             while (true)
             {
-                IReadOnlyList<IDialogueView> snapshot = Snapshot(views);
+                token.RefreshView();
 
-                int portIndex = await runnerNode.NextNode(snapshot, token, token);
+                int portIndex = await runnerNode.NextNode(token, token);
 
-                if (!token.IsStarted) break;
+                if (token.State != TokenState.Running) break;
 
-                if (token.JumpTarget != "" && runnerNode.CheckNode(token.JumpTarget))
-                {
-                    token.TargetNode = token.JumpTarget;
-                    token.JumpTarget = "";
-                }
-                else
+                if (token.TargetNode != "" && runnerNode.CheckNode(token.TargetNode))
                 {
                     RunnerPort port = new(token.TargetNode, portIndex);
 
                     if (runnerNode.TryGetLink(port, out string result)) token.TargetNode = result;
-                    else break;
+                    else
+                    {
+                        token.SetState(TokenState.Ended);
+
+                        break;
+                    }
                 }
             }
 
-            IReadOnlyList<IDialogueView> finalSnapshot = Snapshot(views);
+            token.RefreshView();
 
-            if (token.IsStarted)
+            switch (token.State)
             {
-                foreach (IDialogueView view in finalSnapshot) view.OnStop();
+                case TokenState.Running:
+                    return;
 
-                tokens.Remove(key);
+                case TokenState.Paused:
+                    foreach (IDialogueView view in token.Views) view.OnPaused();
+                    break;
+
+                case TokenState.Stopped:
+                    foreach (IDialogueView view in token.Views) view.OnStopped();
+
+                    tokens.Remove(key);
+                    return;
+
+                case TokenState.Ended:
+                    foreach (IDialogueView view in token.Views) view.OnEnded();
+
+                    tokens.Remove(key);
+                    return;
             }
-            else foreach (IDialogueView view in finalSnapshot) view.OnPause();
+
+            token.UsedTask.SetResult(true);
         }
 
-        /// <summary>
-        /// Returns a defensive copy of the view list so iteration is unaffected if views are added or removed mid-flow.
-        /// </summary>
-        private static IReadOnlyList<IDialogueView> Snapshot(IReadOnlyList<IDialogueView> source)
+        public bool IsRunning(string key)
         {
-            IDialogueView[] copy = new IDialogueView[source.Count];
-
-            for (int i = 0; i < source.Count; i++) copy[i] = source[i];
-
-            return copy;
-        }
-
-        /// <summary>
-        /// Reports whether the conversation with the given key is currently running.
-        /// Use it to gate input, e.g. if (!runner.IsStarted("npc")) runner.StartDialogue("npc");
-        /// </summary>
-        public bool IsStarted(string key)
-        {
-            if (tokens.TryGetValue(key, out RunnerToken token)) return token.IsStarted;
+            if (tokens.TryGetValue(key, out RunnerToken token)) return token.State == TokenState.Running;
 
             return false;
         }
 
-        /// <summary>
-        /// Pauses the conversation with the given key while preserving its position so it can be resumed later.
-        /// Call runner.PauseDialogue("npc") to suspend a flow, e.g. when opening a menu.
-        /// </summary>
-        public void PauseDialogue(string key)
-        {
-            if (tokens.TryGetValue(key, out RunnerToken token)) token.Pause();
-        }
-
         public void StopDialogue(string key)
         {
-            if (tokens.TryGetValue(key, out RunnerToken token))
-            {
-                token.Pause();
-
-                tokens.Remove(key);
-            }
+            if (tokens.TryGetValue(key, out RunnerToken token)) token.SetState(TokenState.Stopped);
         }
 
-        /// <summary>
-        /// Pauses every active conversation and clears all flows. Use it to fully stop dialogue, e.g. on scene exit.
-        /// </summary>
+        public void PauseDialogue(string key)
+        {
+            if (tokens.TryGetValue(key, out RunnerToken token)) token.SetState(TokenState.Paused);
+        }
+
         public void StopAllDialogue()
         {
-            foreach (RunnerToken token in tokens.Values) token.Pause();
-
-            tokens.Clear();
+            foreach (RunnerToken token in tokens.Values) token.SetState(TokenState.Stopped);
         }
 
-        public void RegisterEndedCallback(string key)
+        public void PauseAllDialogue()
         {
-
+            foreach (RunnerToken token in tokens.Values) token.SetState(TokenState.Paused);
         }
 
         /// <summary>
         /// Queues a jump so the named flow continues at <paramref name="nodeName"/> after its current step.
         /// Call runner.JumpNode("npc", "Ending") to redirect a running conversation.
         /// </summary>
-        public void JumpNode(string key, string nodeName)
+        public async void JumpNode(string key, string nodeName)
         {
-            if (tokens.TryGetValue(key, out RunnerToken token)) token.JumpTarget = nodeName;
+            if (tokens.TryGetValue(key, out RunnerToken token))
+            {
+                token.SetState(TokenState.Paused);
+
+                await token.UsedTask.Task;
+
+                StartDialogue(key, nodeName, token.Views);
+            }
         }
 
         #region View
@@ -234,50 +230,65 @@ namespace Yang.Dialogue
         /// Captures the current flows and trigger values into a serializable wrapper for persistence.
         /// Call var data = runner.Save(); and serialize the result to store progress.
         /// </summary>
-        public DialogueWrapper Save()
+        public DialogueSaveData Save()
         {
             if (so == null) return null;
 
-            DialogueWrapper wrapper = new();
+            saveData ??= new();
 
-            wrapper.SetDatas(tokens, runnerTrigger.Values);
-
-            return wrapper;
-        }
-
-        /// <summary>
-        /// Restores trigger values immediately and returns the saved flows as (key, nodeId) pairs for the caller
-        /// to resume via StartDialogue. The trigger restore is eager so it runs even if the result is ignored.
-        /// </summary>
-        /// <remarks>Call StopAllDialogue() first if the runner already holds flows so the keys don't collide.</remarks>
-        public IEnumerable<KeyValuePair<string, string>> Load(DialogueWrapper wrapper)
-        {
-            if (wrapper == null) return System.Array.Empty<KeyValuePair<string, string>>();
-
-            runnerTrigger.SetDatas(wrapper.Values);
-
-            List<KeyValuePair<string, string>> flows = new();
-
-            if (so != null)
+            foreach (RunnerToken token in tokens.Values)
             {
-                IReadOnlyList<string> keys = wrapper.Keys;
-                IReadOnlyList<string> names = wrapper.Names;
+                IReadOnlyList<IDialogueView> views = token.Views;
 
-                for (int i = 0; i < keys.Count; i++) flows.Add(new(keys[i], names[i]));
+                for (int i = 0; i < views.Count; i++)
+                {
+                    IDialogueView view = views[i];
+
+                    object data = view.CaptureView();
+
+                    if (data == null) continue;
+
+                    ViewDataEntry entry = new()
+                    {
+                        viewID = view.ViewID,
+                        data = JsonUtility.ToJson(data)
+                    };
+
+                    saveData.viewDatas.Add(entry);
+                }
             }
 
-            return flows;
+            saveData.dialogueKeys = new(tokens.Keys);
+            saveData.triggerValues = new(runnerTrigger.Values);
+
+            return saveData;
         }
 
-        /// <summary>
-        /// One-shot restore that clears existing flows, restores trigger values, and resumes every saved flow at its node.
-        /// Use this instead of Load when you just want to apply a save: runner.LoadAndStart(data);
-        /// </summary>
-        public void LoadAndStart(DialogueWrapper wrapper, IReadOnlyList<IDialogueView> views = null)
+        public void Load(DialogueSaveData saveData)
         {
-            StopAllDialogue();
+            this.saveData = saveData;
 
-            foreach (KeyValuePair<string, string> flow in Load(wrapper)) StartDialogue(flow.Key, flow.Value, views);
+            List<string> dialogueKeys = saveData.dialogueKeys;
+
+            for (int i = 0; i < dialogueKeys.Count; i++) tokens.Add(dialogueKeys[i], new());
+
+            runnerTrigger.SetDatas(saveData.triggerValues);
+        }
+
+        public TData Get<TData>(IDialogueView view)
+        {
+            if (saveData == null) return default;
+
+            List<ViewDataEntry> viewDatas = saveData.viewDatas;
+
+            for (int i = 0; i < viewDatas.Count; i++)
+            {
+                ViewDataEntry viewData = viewDatas[i];
+
+                if (viewData.viewID == view.ViewID) return JsonUtility.FromJson<TData>(viewData.data);
+            }
+
+            return default;
         }
 
         #region Event
