@@ -44,8 +44,6 @@ namespace Yang.Dialogue
         public virtual void OnEnded() { }
 
         public virtual object CaptureView() => null;
-
-        public virtual void RestoreView(object data) { }
     }
 
     /// <summary>
@@ -83,7 +81,5 @@ namespace Yang.Dialogue
         public void OnEnded();
 
         public object CaptureView();
-
-        public void RestoreView(object data);
     }
 }
