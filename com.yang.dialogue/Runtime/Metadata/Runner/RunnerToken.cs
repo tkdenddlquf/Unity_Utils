@@ -23,7 +23,7 @@ namespace Yang.Dialogue
         /// <summary>
         /// Whether this flow is currently running.
         /// </summary>
-        public TokenState State { get; private set; }
+        public TokenState State { get; private set; } = TokenState.Paused;
 
         /// <summary>
         /// The node the flow is currently positioned at.
@@ -35,7 +35,7 @@ namespace Yang.Dialogue
 
         public RunnerToken()
         {
-            State = TokenState.Paused;
+
         }
 
         /// <summary>
