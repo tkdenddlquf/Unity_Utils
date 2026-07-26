@@ -303,6 +303,24 @@ foreach (var flow in runner.Load(data))
 - **`RunnerCondition`** — 선택지 조건 한 건. `key`, `isValid`, `type`(Float/Bool), `checkType`, `GetFloatValue()`/`GetBoolValue()`.
 - **`IRunnerToken`** — 진행 중 흐름 핸들. `State`, `Views`, `CancellationToken`, `Delay(seconds)`를 제공합니다. View 콜백에서 상태를 확인하고 흐름 중단과 연동되는 대기를 만들 때 사용합니다.
 
+외부 UI 입력이나 이벤트를 기다릴 때는 `WaitFor`를 사용하면 Pause/Stop/End 시 자동으로 취소됩니다.
+
+```csharp
+AwaitableCompletionSource<string> scanSource = new();
+
+try
+{
+    string result = await token.WaitFor(scanSource);
+}
+catch (System.OperationCanceledException)
+{
+    // 대화 흐름이 중단됨
+}
+
+// 외부 입력 완료 시
+scanSource.TrySetResult("result");
+```
+
 ---
 
 ## 6. CSV 내보내기 / 가져오기 (Localization)

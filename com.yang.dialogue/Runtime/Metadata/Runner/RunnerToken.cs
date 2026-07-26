@@ -93,6 +93,36 @@ namespace Yang.Dialogue
             }
         }
 
+        /// <summary>
+        /// Awaits an externally completed operation and cancels it when this dialogue flow pauses, stops, or ends.
+        /// </summary>
+        public async Awaitable WaitFor(AwaitableCompletionSource source)
+        {
+            CancellationToken cancellationToken = CancellationToken;
+
+            using CancellationTokenRegistration registration =
+                cancellationToken.Register(
+                    static state => ((AwaitableCompletionSource)state).TrySetCanceled(),
+                    source);
+
+            await source.Awaitable;
+        }
+
+        /// <summary>
+        /// Awaits an externally completed operation and returns its result, cancelling it with this dialogue flow.
+        /// </summary>
+        public async Awaitable<T> WaitFor<T>(AwaitableCompletionSource<T> source)
+        {
+            CancellationToken cancellationToken = CancellationToken;
+
+            using CancellationTokenRegistration registration =
+                cancellationToken.Register(
+                    static state => ((AwaitableCompletionSource<T>)state).TrySetCanceled(),
+                    source);
+
+            return await source.Awaitable;
+        }
+
         public void RefreshView()
         {
             for (int i = views.Count - 1; i >= 0; i--)
@@ -144,6 +174,16 @@ namespace Yang.Dialogue
         /// Awaits a delay that cancels with the flow, e.g. await token.Delay(0.5f) inside a view callback.
         /// </summary>
         public Awaitable Delay(float second);
+
+        /// <summary>
+        /// Awaits a completion source that is automatically cancelled with the current dialogue flow.
+        /// </summary>
+        public Awaitable WaitFor(AwaitableCompletionSource source);
+
+        /// <summary>
+        /// Awaits a completion source result that is automatically cancelled with the current dialogue flow.
+        /// </summary>
+        public Awaitable<T> WaitFor<T>(AwaitableCompletionSource<T> source);
     }
 
     /// <summary>
