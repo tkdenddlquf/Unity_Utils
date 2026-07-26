@@ -48,6 +48,10 @@ namespace Yang.Dialogue
 
         public T GetEnum<T>(string key, T fallback = default) where T : struct, System.Enum
             => TryGet(key, out GenericData value) && value.TryGetEnum(out T result) ? result : fallback;
+
+        /// <summary>Converts this command to its schema type using a cached field binding.</summary>
+        public bool TryConvert<T>(out T result) where T : class, new()
+            => DialogueCommandBinding<T>.TryConvert(this, out result);
     }
 
     /// <summary>A named, strongly tagged value passed to a dialogue command.</summary>
