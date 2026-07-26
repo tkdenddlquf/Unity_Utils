@@ -13,7 +13,9 @@ namespace Yang.Dialogue
         static DialogueCommandBinding()
         {
             Type type = typeof(T);
+
             DialogueSchemaAttribute schema = type.GetCustomAttribute<DialogueCommandAttribute>();
+
             schema ??= type.GetCustomAttribute<DialogueEventAttribute>();
 
             id = schema.ID;
@@ -38,8 +40,7 @@ namespace Yang.Dialogue
 
             foreach (RunnerArgument argument in command.Arguments)
             {
-                if (fields.TryGetValue(argument.Key, out FieldInfo field))
-                    field.SetValue(result, GetValue(field.FieldType, argument.Value));
+                if (fields.TryGetValue(argument.Key, out FieldInfo field)) field.SetValue(result, GetValue(field.FieldType, argument.Value));
             }
 
             return true;
@@ -55,8 +56,6 @@ namespace Yang.Dialogue
             return Enum.ToObject(type, int.Parse(data.ToString()));
         }
 
-        private static bool IsSupported(Type type)
-            => type == typeof(string) || type == typeof(int) || type == typeof(float) ||
-               type == typeof(bool) || type.IsEnum;
+        private static bool IsSupported(Type type) => type == typeof(string) || type == typeof(int) || type == typeof(float) || type == typeof(bool) || type.IsEnum;
     }
 }

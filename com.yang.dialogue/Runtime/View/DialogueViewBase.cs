@@ -16,37 +16,25 @@ namespace Yang.Dialogue
         /// Fires when a line of dialogue should be shown. Override and return an Awaitable that completes once the
         /// player has finished reading; the runner awaits it before advancing. Base returns immediately.
         /// </summary>
-        public virtual Awaitable OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token)
-            => Completed();
+        public virtual async Awaitable OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token) => await Awaitable.NextFrameAsync();
 
         /// <summary>
         /// Fires when the player must pick from choices. Override to present options and return the selected
         /// index (the runner awaits it to branch). Base returns -1, meaning no selection.
         /// </summary>
-        public virtual Awaitable<int> OnChoice(RunnerText speaker, RunnerChoiceCollection texts, string message, IRunnerToken token)
-            => Completed(-1);
+        public virtual async Awaitable<int> OnChoice(RunnerText speaker, RunnerChoiceCollection texts, string message, IRunnerToken token) => -1;
 
         /// <summary>
         /// Fires when the graph emits asset-independent commands. Override to dispatch command ids to
         /// game-specific handlers; the runner awaits the returned Awaitable. Base returns immediately.
         /// </summary>
-        public virtual Awaitable OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token)
-            => Completed();
+        public virtual async Awaitable OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token) => await Awaitable.NextFrameAsync();
 
         /// <summary>
         /// Fires when the signals a reason. Override to clean up UI; the runner awaits it.
         /// Base returns immediately.
         /// </summary>
-        public virtual Awaitable OnMessage(string reason, IRunnerToken token)
-            => Completed();
-
-        /// <summary>Returns an already-completed Awaitable for synchronous View implementations.</summary>
-#pragma warning disable CS1998
-        protected static async Awaitable Completed() { }
-
-        /// <summary>Returns an already-completed Awaitable containing a synchronous result.</summary>
-        protected static async Awaitable<T> Completed<T>(T result) => result;
-#pragma warning restore CS1998
+        public virtual async Awaitable OnMessage(string reason, IRunnerToken token) => await Awaitable.NextFrameAsync();
 
         public virtual void OnPaused() { }
 

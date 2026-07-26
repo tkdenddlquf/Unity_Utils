@@ -86,10 +86,8 @@ namespace Yang.Dialogue
             {
                 NodeData node = runtimeNodes[i];
 
-                if (node.type == NodeType.Command)
-                    commandCache[i] = CompileCommands(node.OptionDatas);
-                else if (node.type == NodeType.Event)
-                    eventCache[i] = CompileCommands(node.OptionDatas);
+                if (node.type == NodeType.Command) commandCache[i] = CompileCommands(node.OptionDatas);
+                else if (node.type == NodeType.Event) eventCache[i] = CompileCommands(node.OptionDatas);
             }
 
             nodes.Clear();
@@ -106,9 +104,10 @@ namespace Yang.Dialogue
 
                 if (datas.Count == 0 || !datas[0].TryGetString(out string id) || string.IsNullOrWhiteSpace(id)) continue;
 
-                int argumentCount = (datas.Count - 1) / 2;
-                RunnerArgument[] arguments = new RunnerArgument[argumentCount];
                 int writeIndex = 0;
+                int argumentCount = (datas.Count - 1) / 2;
+
+                RunnerArgument[] arguments = new RunnerArgument[argumentCount];
 
                 for (int j = 1; j + 1 < datas.Count; j += 2)
                 {
@@ -148,8 +147,7 @@ namespace Yang.Dialogue
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
                         RunnerText text = new(textTable[0].ToString(), textEntry[0].ToString());
 
-                        for (int i = 0; i < token.Views.Count; i++)
-                            await token.Views[i].OnDialogue(speaker, text, message[0].ToString(), token);
+                        for (int i = 0; i < token.Views.Count; i++) await token.Views[i].OnDialogue(speaker, text, message[0].ToString(), token);
                     }
                     return 0;
 
@@ -266,8 +264,10 @@ namespace Yang.Dialogue
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
 
                         string textTableKey = textTable[0].ToString();
+
                         RunnerToken runnerToken = (RunnerToken)token;
                         RunnerChoiceCollection choiceDatas = runnerToken.GetChoiceCache(nodeData.guid, textEntries);
+
                         int choiceIndex = 0;
 
                         for (int i = 0; i < textEntries.Count; i++)
@@ -326,6 +326,7 @@ namespace Yang.Dialogue
                         }
 
                         int index = 0;
+
                         choiceDatas.SetCount(choiceIndex);
 
                         foreach (IDialogueView view in token.Views)
@@ -345,8 +346,7 @@ namespace Yang.Dialogue
                         if (datas[1].TryGetFloat(out float second)) await token.Delay(second);
                         else
                         {
-                            for (int i = 0; i < token.Views.Count; i++)
-                                await token.Views[i].OnMessage(datas[1].ToString(), token);
+                            for (int i = 0; i < token.Views.Count; i++) await token.Views[i].OnMessage(datas[1].ToString(), token);
                         }
                     }
                     return 0;
@@ -355,8 +355,7 @@ namespace Yang.Dialogue
                     {
                         RunnerCommand[] commands = commandCache[checker.NodeIndex];
 
-                        for (int i = 0; i < token.Views.Count; i++)
-                            await token.Views[i].OnCommand(commands, token);
+                        for (int i = 0; i < token.Views.Count; i++) await token.Views[i].OnCommand(commands, token);
                     }
                     return 0;
             }
@@ -383,10 +382,12 @@ namespace Yang.Dialogue
             if ((uint)portIndex >= (uint)portLinks.Length)
             {
                 targetIndex = -1;
+
                 return false;
             }
 
             targetIndex = portLinks[portIndex];
+
             return targetIndex >= 0;
         }
 

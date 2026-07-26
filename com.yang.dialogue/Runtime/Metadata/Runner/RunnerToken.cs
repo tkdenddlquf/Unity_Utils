@@ -100,22 +100,17 @@ namespace Yang.Dialogue
         {
             CancellationToken cancellationToken = CancellationToken;
 
-            using CancellationTokenRegistration registration =
-                cancellationToken.Register(
-                    static state => ((AwaitableCompletionSource)state).TrySetCanceled(),
-                    source);
+            using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((AwaitableCompletionSource)state).TrySetCanceled(), source);
 
             try
             {
                 await source.Awaitable;
+
                 return new RunnerWaitResult(RunnerWaitStatus.Completed);
             }
             catch (OperationCanceledException)
             {
-                return new RunnerWaitResult(
-                    cancellationToken.IsCancellationRequested
-                        ? RunnerWaitStatus.TokenCanceled
-                        : RunnerWaitStatus.SourceCanceled);
+                return new RunnerWaitResult(cancellationToken.IsCancellationRequested ? RunnerWaitStatus.TokenCanceled : RunnerWaitStatus.SourceCanceled);
             }
         }
 
@@ -126,23 +121,17 @@ namespace Yang.Dialogue
         {
             CancellationToken cancellationToken = CancellationToken;
 
-            using CancellationTokenRegistration registration =
-                cancellationToken.Register(
-                    static state => ((AwaitableCompletionSource<T>)state).TrySetCanceled(),
-                    source);
+            using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((AwaitableCompletionSource<T>)state).TrySetCanceled(), source);
 
             try
             {
                 T value = await source.Awaitable;
+
                 return new RunnerWaitResult<T>(RunnerWaitStatus.Completed, value);
             }
             catch (OperationCanceledException)
             {
-                return new RunnerWaitResult<T>(
-                    cancellationToken.IsCancellationRequested
-                        ? RunnerWaitStatus.TokenCanceled
-                        : RunnerWaitStatus.SourceCanceled,
-                    default);
+                return new RunnerWaitResult<T>(cancellationToken.IsCancellationRequested ? RunnerWaitStatus.TokenCanceled : RunnerWaitStatus.SourceCanceled, default);
             }
         }
 
@@ -154,9 +143,7 @@ namespace Yang.Dialogue
             }
         }
 
-        internal RunnerChoiceCollection GetChoiceCache(
-            string nodeGuid,
-            IReadOnlyList<DataWrapper> textEntries)
+        internal RunnerChoiceCollection GetChoiceCache(string nodeGuid, IReadOnlyList<DataWrapper> textEntries)
         {
             if (choiceCaches.TryGetValue(nodeGuid, out RunnerChoiceCollection cache)) return cache;
 
@@ -164,7 +151,8 @@ namespace Yang.Dialogue
 
             for (int i = 0; i < textEntries.Count; i++)
             {
-                int conditionCount = System.Math.Max(0, (textEntries[i].data.Count - 3) / 3);
+                int conditionCount = Math.Max(0, (textEntries[i].data.Count - 3) / 3);
+
                 cache.ConditionBuffers[i] = new RunnerCondition[conditionCount];
             }
 

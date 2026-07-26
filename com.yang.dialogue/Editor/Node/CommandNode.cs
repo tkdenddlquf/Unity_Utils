@@ -135,28 +135,20 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private static bool IsSupported(Type type)
-            => type == typeof(string) || type == typeof(int) || type == typeof(float) ||
-               type == typeof(bool) || type.IsEnum;
+        private static bool IsSupported(Type type) => type == typeof(string) || type == typeof(int) || type == typeof(float) || type == typeof(bool) || type.IsEnum;
 
         private void EnsureDefaultData()
         {
             if (portDatas.Count == 0) portDatas.Add(new DataWrapper());
-
-            if (optionDatas.Count == 0)
-            {
-                optionDatas.Add(schemas.Count > 0
-                    ? CreateSchemaData(schemas[0], null)
-                    : new DataWrapper(new GenericData(GenericData.DataType.String)));
-            }
+            if (optionDatas.Count == 0) optionDatas.Add(schemas.Count > 0 ? CreateSchemaData(schemas[0], null) : new DataWrapper(new GenericData(GenericData.DataType.String)));
 
             for (int i = 0; i < optionDatas.Count; i++)
             {
                 List<GenericData> data = optionDatas[i].data;
+
                 string id = data != null && data.Count > 0 ? data[0].ToString() ?? "" : "";
 
-                if (schemasById.TryGetValue(id, out Schema schema))
-                    optionDatas[i] = CreateSchemaData(schema, data);
+                if (schemasById.TryGetValue(id, out Schema schema)) optionDatas[i] = CreateSchemaData(schema, data);
             }
         }
 
@@ -166,9 +158,7 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Create Command");
 
-            optionDatas.Add(schemas.Count > 0
-                ? CreateSchemaData(schemas[0], null)
-                : new DataWrapper(new GenericData(GenericData.DataType.String)));
+            optionDatas.Add(schemas.Count > 0 ? CreateSchemaData(schemas[0], null) : new DataWrapper(new GenericData(GenericData.DataType.String)));
 
             AddCommandElement();
             MarkChanged(so);
@@ -177,7 +167,9 @@ namespace Yang.Dialogue.Editor
         private void AddCommandElement()
         {
             VisualElement commandElement = new() { name = "Command Element" };
+
             commandElement.AddToClassList("dlg-command");
+
             extensionContainer.Add(commandElement);
 
             RebuildCommandElement(commandElement);
@@ -188,20 +180,25 @@ namespace Yang.Dialogue.Editor
             commandElement.Clear();
 
             int commandIndex = extensionContainer.IndexOf(commandElement);
+
             List<GenericData> data = optionDatas[commandIndex].data;
+
             string id = data.Count > 0 ? data[0].ToString() ?? "" : "";
 
             schemasById.TryGetValue(id, out Schema schema);
 
             VisualElement header = new();
+
             header.AddToClassList("dlg-row");
 
             List<string> choices = new();
+
             foreach (Schema item in schemas) choices.Add(item.label);
 
             if (schema == null) choices.Add(CUSTOM_LABEL);
 
             int selected = schema == null ? choices.Count - 1 : schemas.IndexOf(schema);
+
             PopupField<string> selector = new("Command", choices, selected);
             selector.userData = commandElement;
             selector.AddToClassList("dlg-grow");
@@ -217,22 +214,24 @@ namespace Yang.Dialogue.Editor
             if (schema == null)
             {
                 TextField customId = new("Command ID") { value = id };
+
                 customId.userData = commandElement;
                 customId.RegisterValueChangedCallback(OnCustomIdChanged);
+
                 commandElement.Add(customId);
 
                 Label warning = new("No matching dialogue schema. Existing arguments are preserved but cannot be edited here.");
+
                 warning.AddToClassList("dlg-warning");
                 commandElement.Add(warning);
+
                 return;
             }
 
             for (int i = 0; i < schema.fields.Length; i++)
             {
                 FieldInfo field = schema.fields[i];
-                GenericData value = FindArgument(data, field.Name, out GenericData found)
-                    ? found
-                    : DefaultValue(schema, field);
+                GenericData value = FindArgument(data, field.Name, out GenericData found) ? found : DefaultValue(schema, field);
 
                 commandElement.Add(CreateArgumentField(commandElement, field, value));
             }
@@ -276,6 +275,8 @@ namespace Yang.Dialogue.Editor
             ArgumentBinding binding = new() { commandElement = commandElement, key = field.Name };
             Type type = field.FieldType;
 
+            if (DialogueArgumentDrawerRegistry.TryCreate(field, label, value, changed => SetArgument(binding, changed), out VisualElement customField)) return customField;
+
             if (type == typeof(string))
             {
                 List<string> options = GetOptions(field);
@@ -288,46 +289,58 @@ namespace Yang.Dialogue.Editor
                     if (options.Count == 0) options.Add("");
 
                     PopupField<string> popup = new(label, options, Math.Max(0, options.IndexOf(current)));
+
                     popup.userData = binding;
                     popup.RegisterValueChangedCallback(evt => SetArgument((ArgumentBinding)popup.userData, new GenericData(evt.newValue)));
+
                     return popup;
                 }
 
                 TextField text = new(label) { value = value.TryGetString(out string stringValue) ? stringValue : "" };
+
                 text.userData = binding;
                 text.RegisterValueChangedCallback(evt => SetArgument((ArgumentBinding)text.userData, new GenericData(evt.newValue)));
+
                 return text;
             }
 
             if (type == typeof(int))
             {
                 IntegerField integer = new(label) { value = value.TryGetInt(out int intValue) ? intValue : 0 };
+
                 integer.userData = binding;
                 integer.RegisterValueChangedCallback(evt => SetArgument((ArgumentBinding)integer.userData, new GenericData(evt.newValue)));
+
                 return integer;
             }
 
             if (type == typeof(float))
             {
                 FloatField number = new(label) { value = value.TryGetFloat(out float floatValue) ? floatValue : 0f };
+
                 number.userData = binding;
                 number.RegisterValueChangedCallback(evt => SetArgument((ArgumentBinding)number.userData, new GenericData(evt.newValue)));
+
                 return number;
             }
 
             if (type == typeof(bool))
             {
                 Toggle toggle = new(label) { value = value.TryGetBool(out bool boolValue) && boolValue };
+
                 toggle.userData = binding;
                 toggle.RegisterValueChangedCallback(evt => SetArgument((ArgumentBinding)toggle.userData, new GenericData(evt.newValue)));
+
                 return toggle;
             }
 
-            int enumValue = 0;
-            int.TryParse(value.ToString(), out enumValue);
+            int.TryParse(value.ToString(), out int enumValue);
+
             EnumField enumField = new(label, (Enum)Enum.ToObject(type, enumValue));
+
             enumField.userData = binding;
             enumField.RegisterValueChangedCallback(evt => SetArgument((ArgumentBinding)enumField.userData, new GenericData(evt.newValue)));
+
             return enumField;
         }
 
@@ -339,15 +352,13 @@ namespace Yang.Dialogue.Editor
 
             try
             {
-                MethodInfo method = attribute.ProviderType?.GetMethod(attribute.MethodName,
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                MethodInfo method = attribute.ProviderType?.GetMethod(attribute.MethodName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
 
                 if (method == null || method.GetParameters().Length != 0) return new List<string>();
 
-                IEnumerable enumerable = method.Invoke(null, null) as IEnumerable;
                 List<string> values = new();
 
-                if (enumerable != null)
+                if (method.Invoke(null, null) is IEnumerable enumerable)
                 {
                     foreach (object item in enumerable)
                     {
@@ -360,6 +371,7 @@ namespace Yang.Dialogue.Editor
             catch (Exception exception)
             {
                 Debug.LogWarning($"Failed to load dialogue options for '{field.DeclaringType?.FullName}.{field.Name}'.\n{exception.Message}");
+
                 return new List<string>();
             }
         }
@@ -378,11 +390,13 @@ namespace Yang.Dialogue.Editor
 
                 data[i + 1] = value;
                 MarkChanged(so);
+
                 return;
             }
 
             data.Add(new GenericData(binding.key));
             data.Add(value);
+
             MarkChanged(so);
         }
 
@@ -393,10 +407,7 @@ namespace Yang.Dialogue.Editor
             for (int i = 0; i < schema.fields.Length; i++)
             {
                 FieldInfo field = schema.fields[i];
-                GenericData value = previous != null && FindArgument(previous, field.Name, out GenericData found) &&
-                                    MatchesType(found, field.FieldType)
-                    ? found
-                    : DefaultValue(schema, field);
+                GenericData value = previous != null && FindArgument(previous, field.Name, out GenericData found) && MatchesType(found, field.FieldType) ? found : DefaultValue(schema, field);
 
                 data.Add(new GenericData(field.Name));
                 data.Add(value);
@@ -412,19 +423,21 @@ namespace Yang.Dialogue.Editor
                 if (data[i].ToString() != key) continue;
 
                 value = data[i + 1];
+
                 return true;
             }
 
             value = default;
+
             return false;
         }
 
-        private static bool MatchesType(GenericData value, Type type)
-            => type == typeof(string) && value.Type == GenericData.DataType.String ||
-               type == typeof(int) && value.Type == GenericData.DataType.Int ||
-               type == typeof(float) && value.Type == GenericData.DataType.Float ||
-               type == typeof(bool) && value.Type == GenericData.DataType.Bool ||
-               type.IsEnum && value.Type == GenericData.DataType.Enum;
+        private static bool MatchesType(GenericData value, Type type) =>
+            type == typeof(string) && value.Type == GenericData.DataType.String ||
+            type == typeof(int) && value.Type == GenericData.DataType.Int ||
+            type == typeof(float) && value.Type == GenericData.DataType.Float ||
+            type == typeof(bool) && value.Type == GenericData.DataType.Bool ||
+            type.IsEnum && value.Type == GenericData.DataType.Enum;
 
         private static GenericData DefaultValue(Schema schema, FieldInfo field)
         {
