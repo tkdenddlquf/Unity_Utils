@@ -1,12 +1,11 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Yang.Dialogue
 {
     /// <summary>
     /// Base MonoBehaviour for dialogue views. Subclass it and override the callbacks to render dialogue,
-    /// choices, and objects in your own UI. The runner awaits each returned Task, so awaiting your UI
+    /// choices, and objects in your own UI. The runner awaits each returned Awaitable, so awaiting your UI
     /// (typewriter, button press, etc.) inside an override pauses the conversation until it completes.
     /// </summary>
     public abstract class DialogueViewBase : MonoBehaviour, IDialogueView
@@ -14,28 +13,40 @@ namespace Yang.Dialogue
         public abstract string ViewID { get; }
 
         /// <summary>
-        /// Fires when a line of dialogue should be shown. Override and return a Task that completes once the
+        /// Fires when a line of dialogue should be shown. Override and return an Awaitable that completes once the
         /// player has finished reading; the runner awaits it before advancing. Base returns immediately.
         /// </summary>
-        public virtual Task OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token) => Task.CompletedTask;
+        public virtual Awaitable OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token)
+            => Completed();
 
         /// <summary>
         /// Fires when the player must pick from choices. Override to present options and return the selected
         /// index (the runner awaits it to branch). Base returns -1, meaning no selection.
         /// </summary>
-        public virtual Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerChoiceText> texts, string message, IRunnerToken token) => Task.FromResult(-1);
+        public virtual Awaitable<int> OnChoice(RunnerText speaker, RunnerChoiceCollection texts, string message, IRunnerToken token)
+            => Completed(-1);
 
         /// <summary>
         /// Fires when the graph emits asset-independent commands. Override to dispatch command ids to
-        /// game-specific handlers; the runner awaits the returned Task. Base returns immediately.
+        /// game-specific handlers; the runner awaits the returned Awaitable. Base returns immediately.
         /// </summary>
-        public virtual Task OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token) => Task.CompletedTask;
+        public virtual Awaitable OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token)
+            => Completed();
 
         /// <summary>
         /// Fires when the signals a reason. Override to clean up UI; the runner awaits it.
         /// Base returns immediately.
         /// </summary>
-        public virtual Task OnMessage(string reason, IRunnerToken token) => Task.CompletedTask;
+        public virtual Awaitable OnMessage(string reason, IRunnerToken token)
+            => Completed();
+
+        /// <summary>Returns an already-completed Awaitable for synchronous View implementations.</summary>
+#pragma warning disable CS1998
+        protected static async Awaitable Completed() { }
+
+        /// <summary>Returns an already-completed Awaitable containing a synchronous result.</summary>
+        protected static async Awaitable<T> Completed<T>(T result) => result;
+#pragma warning restore CS1998
 
         public virtual void OnPaused() { }
 
@@ -55,24 +66,24 @@ namespace Yang.Dialogue
         public string ViewID { get; }
 
         /// <summary>
-        /// Called to display a line of dialogue; return a Task that completes when the line is done.
+        /// Called to display a line of dialogue; return an Awaitable that completes when the line is done.
         /// </summary>
-        public Task OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token);
+        public Awaitable OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token);
 
         /// <summary>
         /// Called to present choices; return the chosen index so the runner can branch.
         /// </summary>
-        public Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerChoiceText> texts, string message, IRunnerToken token);
+        public Awaitable<int> OnChoice(RunnerText speaker, RunnerChoiceCollection texts, string message, IRunnerToken token);
 
         /// <summary>
         /// Called to interpret asset-independent commands emitted by the current node.
         /// </summary>
-        public Task OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token);
+        public Awaitable OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token);
 
         /// <summary>
         /// Called when the conversation ends or emits a reason; use it to finalize the view.
         /// </summary>
-        public Task OnMessage(string reason, IRunnerToken token);
+        public Awaitable OnMessage(string reason, IRunnerToken token);
 
         public void OnPaused();
 

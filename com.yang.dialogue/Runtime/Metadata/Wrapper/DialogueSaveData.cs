@@ -9,10 +9,19 @@ namespace Yang.Dialogue
     [System.Serializable]
     public class DialogueSaveData
     {
-        public List<string> dialogueKeys;
-        public List<RunnerValue> triggerValues;
+        // Kept for compatibility with save files created before dialogueFlows was added.
+        public List<string> dialogueKeys = new();
+        public List<DialogueFlowData> dialogueFlows = new();
+        public List<RunnerValue> triggerValues = new();
 
         public List<ViewDataEntry> viewDatas = new();
+    }
+
+    [System.Serializable]
+    public class DialogueFlowData
+    {
+        public string key;
+        public string nodeGuid;
     }
 
     [System.Serializable]

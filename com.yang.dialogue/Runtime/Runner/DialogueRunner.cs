@@ -27,6 +27,7 @@ namespace Yang.Dialogue
         private readonly RunnerTrigger runnerTrigger = new();
 
         private readonly Dictionary<string, RunnerToken> tokens = new();
+        private readonly HashSet<string> capturedViewIDs = new();
 
         /// <summary>
         /// Unity lifecycle hook that initializes the runner when the GameObject awakes.
@@ -79,7 +80,16 @@ namespace Yang.Dialogue
         /// awaiting each view callback until the flow ends. Optionally start at a specific node and route to a custom view set.
         /// Typically called as runner.StartDialogue("npc_blacksmith"); the same key resumes a paused flow.
         /// </summary>
-        public async void StartDialogue(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null)
+        public void StartDialogue(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null)
+            => _ = StartDialogueAsync(key, nodeName, views);
+
+        /// <summary>
+        /// Starts or resumes a conversation and returns a task that completes when the flow pauses, stops, or ends.
+        /// </summary>
+        public async Awaitable StartDialogueAsync(
+            string key,
+            string nodeName = "",
+            IReadOnlyList<IDialogueView> views = null)
         {
             if (so == null) return;
 
@@ -93,6 +103,7 @@ namespace Yang.Dialogue
                     if (runnerNode.CheckNode(nodeName)) token.TargetNode = nodeName;
                     else token.TargetNode = token.TargetNode == "" ? so.StartGuid : token.TargetNode;
 
+                    token.NodeIndex = runnerNode.GetNodeIndex(token.TargetNode);
                     token.SetView(views);
                     token.SetState(TokenState.Running);
                 }
@@ -103,11 +114,12 @@ namespace Yang.Dialogue
                 {
                     TargetNode = runnerNode.CheckNode(nodeName) ? nodeName : so.StartGuid
                 };
+                token.NodeIndex = runnerNode.GetNodeIndex(token.TargetNode);
 
                 tokens.Add(key, token);
             }
 
-            token.UsedTask = new();
+            token.UsedTask = null;
 
             while (true)
             {
@@ -117,11 +129,13 @@ namespace Yang.Dialogue
 
                 if (token.State != TokenState.Running) break;
 
-                if (token.TargetNode != "" && runnerNode.CheckNode(token.TargetNode))
+                if (token.NodeIndex >= 0)
                 {
-                    RunnerPort port = new(token.TargetNode, portIndex);
-
-                    if (runnerNode.TryGetLink(port, out string result)) token.TargetNode = result;
+                    if (runnerNode.TryGetLink(token.NodeIndex, portIndex, out int targetIndex))
+                    {
+                        token.NodeIndex = targetIndex;
+                        token.TargetNode = runnerNode.GetNodeGuid(targetIndex);
+                    }
                     else
                     {
                         token.SetState(TokenState.Ended);
@@ -155,7 +169,7 @@ namespace Yang.Dialogue
                     return;
             }
 
-            token.UsedTask.SetResult(true);
+            token.UsedTask?.TrySetResult(true);
         }
 
         public bool IsRunning(string key)
@@ -189,15 +203,19 @@ namespace Yang.Dialogue
         /// Queues a jump so the named flow continues at <paramref name="nodeName"/> after its current step.
         /// Call runner.JumpNode("npc", "Ending") to redirect a running conversation.
         /// </summary>
-        public async void JumpNode(string key, string nodeName)
+        public void JumpNode(string key, string nodeName) => _ = JumpNodeAsync(key, nodeName);
+
+        /// <summary>Queues a jump and returns a task that completes after the redirected flow finishes.</summary>
+        public async Awaitable JumpNodeAsync(string key, string nodeName)
         {
             if (tokens.TryGetValue(key, out RunnerToken token))
             {
+                AwaitableCompletionSource<bool> completion = token.UsedTask ??= new();
                 token.SetState(TokenState.Paused);
 
-                await token.UsedTask.Task;
+                await completion.Awaitable;
 
-                StartDialogue(key, nodeName, token.Views);
+                await StartDialogueAsync(key, nodeName, token.Views);
             }
         }
 
@@ -235,14 +253,32 @@ namespace Yang.Dialogue
             if (so == null) return null;
 
             saveData ??= new();
+            saveData.viewDatas ??= new();
+            saveData.dialogueFlows ??= new();
+            saveData.viewDatas.Clear();
+            saveData.dialogueFlows.Clear();
 
-            foreach (RunnerToken token in tokens.Values)
+            capturedViewIDs.Clear();
+
+            foreach (KeyValuePair<string, RunnerToken> pair in tokens)
             {
+                RunnerToken token = pair.Value;
+
+                saveData.dialogueFlows.Add(new DialogueFlowData
+                {
+                    key = pair.Key,
+                    nodeGuid = token.TargetNode
+                });
+
                 IReadOnlyList<IDialogueView> views = token.Views;
 
                 for (int i = 0; i < views.Count; i++)
                 {
                     IDialogueView view = views[i];
+
+                    string viewID = view.ViewID;
+
+                    if (!capturedViewIDs.Add(viewID)) continue;
 
                     object data = view.CaptureView();
 
@@ -250,7 +286,7 @@ namespace Yang.Dialogue
 
                     ViewDataEntry entry = new()
                     {
-                        viewID = view.ViewID,
+                        viewID = viewID,
                         data = JsonUtility.ToJson(data)
                     };
 
@@ -266,13 +302,36 @@ namespace Yang.Dialogue
 
         public void Load(DialogueSaveData saveData)
         {
+            if (saveData == null) return;
+
             this.saveData = saveData;
+            tokens.Clear();
 
-            List<string> dialogueKeys = saveData.dialogueKeys;
+            if (saveData.dialogueFlows != null && saveData.dialogueFlows.Count > 0)
+            {
+                for (int i = 0; i < saveData.dialogueFlows.Count; i++)
+                {
+                    DialogueFlowData flow = saveData.dialogueFlows[i];
 
-            for (int i = 0; i < dialogueKeys.Count; i++) tokens.Add(dialogueKeys[i], new());
+                    if (string.IsNullOrWhiteSpace(flow.key) || tokens.ContainsKey(flow.key)) continue;
 
-            runnerTrigger.SetDatas(saveData.triggerValues);
+                    tokens.Add(flow.key, new RunnerToken { TargetNode = flow.nodeGuid });
+                }
+            }
+            else if (saveData.dialogueKeys != null)
+            {
+                // Old save files did not contain node positions and resume from the graph start.
+                for (int i = 0; i < saveData.dialogueKeys.Count; i++)
+                {
+                    string key = saveData.dialogueKeys[i];
+
+                    if (string.IsNullOrWhiteSpace(key) || tokens.ContainsKey(key)) continue;
+
+                    tokens.Add(key, new RunnerToken());
+                }
+            }
+
+            runnerTrigger.SetDatas(saveData.triggerValues ?? new List<RunnerValue>());
         }
 
         public TData Get<TData>(IDialogueView view)

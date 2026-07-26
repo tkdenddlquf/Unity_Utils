@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Yang.Dialogue
@@ -14,6 +13,11 @@ namespace Yang.Dialogue
 
         private readonly Dictionary<string, NodeData> nodes = new();
         private readonly Dictionary<RunnerPort, RunnerPort> links = new();
+        private readonly Dictionary<string, int> nodeIndices = new();
+        private NodeData[] runtimeNodes = System.Array.Empty<NodeData>();
+        private int[][] runtimeLinks = System.Array.Empty<int[]>();
+        private RunnerCommand[][] commandCache = System.Array.Empty<RunnerCommand[]>();
+        private RunnerCommand[][] eventCache = System.Array.Empty<RunnerCommand[]>();
 
         /// <summary>Wires in the event dispatcher and trigger store this node runner uses while executing nodes.</summary>
         public void Init(RunnerEvent runnerEvent, RunnerTrigger runnerTrigger)
@@ -28,12 +32,103 @@ namespace Yang.Dialogue
             if (so == null) return;
 
             so.GetDatas(nodes, links);
+
+            nodeIndices.Clear();
+
+            runtimeNodes = new NodeData[nodes.Count];
+            int nodeIndex = 0;
+
+            foreach (KeyValuePair<string, NodeData> pair in nodes)
+            {
+                nodeIndices.Add(pair.Key, nodeIndex);
+                runtimeNodes[nodeIndex++] = pair.Value;
+            }
+
+            int[] maxPortIndices = new int[runtimeNodes.Length];
+            System.Array.Fill(maxPortIndices, -1);
+
+            foreach (KeyValuePair<RunnerPort, RunnerPort> pair in links)
+            {
+                int sourceIndex = nodeIndices[pair.Key.guid];
+
+                if (pair.Key.portIndex > maxPortIndices[sourceIndex])
+                    maxPortIndices[sourceIndex] = pair.Key.portIndex;
+            }
+
+            runtimeLinks = new int[runtimeNodes.Length][];
+
+            for (int i = 0; i < runtimeLinks.Length; i++)
+            {
+                int portCount = maxPortIndices[i] + 1;
+
+                if (portCount == 0)
+                {
+                    runtimeLinks[i] = System.Array.Empty<int>();
+                    continue;
+                }
+
+                int[] targets = new int[portCount];
+                System.Array.Fill(targets, -1);
+                runtimeLinks[i] = targets;
+            }
+
+            commandCache = new RunnerCommand[runtimeNodes.Length][];
+            eventCache = new RunnerCommand[runtimeNodes.Length][];
+
+            foreach (KeyValuePair<RunnerPort, RunnerPort> pair in links)
+            {
+                int sourceIndex = nodeIndices[pair.Key.guid];
+                int targetIndex = nodeIndices[pair.Value.guid];
+                runtimeLinks[sourceIndex][pair.Key.portIndex] = targetIndex;
+            }
+
+            for (int i = 0; i < runtimeNodes.Length; i++)
+            {
+                NodeData node = runtimeNodes[i];
+
+                if (node.type == NodeType.Command)
+                    commandCache[i] = CompileCommands(node.OptionDatas);
+                else if (node.type == NodeType.Event)
+                    eventCache[i] = CompileCommands(node.OptionDatas);
+            }
+
+            nodes.Clear();
+            links.Clear();
+        }
+
+        private static RunnerCommand[] CompileCommands(IReadOnlyList<DataWrapper> optionDatas)
+        {
+            List<RunnerCommand> commands = new(optionDatas.Count);
+
+            for (int i = 0; i < optionDatas.Count; i++)
+            {
+                IReadOnlyList<GenericData> datas = optionDatas[i].data;
+
+                if (datas.Count == 0 || !datas[0].TryGetString(out string id) || string.IsNullOrWhiteSpace(id)) continue;
+
+                int argumentCount = (datas.Count - 1) / 2;
+                RunnerArgument[] arguments = new RunnerArgument[argumentCount];
+                int writeIndex = 0;
+
+                for (int j = 1; j + 1 < datas.Count; j += 2)
+                {
+                    if (!datas[j].TryGetString(out string key) || string.IsNullOrWhiteSpace(key)) continue;
+
+                    arguments[writeIndex++] = new RunnerArgument(key, datas[j + 1]);
+                }
+
+                if (writeIndex != arguments.Length) System.Array.Resize(ref arguments, writeIndex);
+
+                commands.Add(new RunnerCommand(id, arguments));
+            }
+
+            return commands.ToArray();
         }
 
         /// <summary>Executes the checker's current node by type, invoking Views as needed, and returns the chosen output port index (-1 if unhandled).</summary>
-        public async Task<int> NextNode(IRunnerNodeChecker checker, IRunnerToken token)
+        public async Awaitable<int> NextNode(IRunnerNodeChecker checker, IRunnerToken token)
         {
-            NodeData nodeData = nodes[checker.TargetNode];
+            NodeData nodeData = runtimeNodes[checker.NodeIndex];
 
             switch (nodeData.type)
             {
@@ -53,7 +148,8 @@ namespace Yang.Dialogue
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
                         RunnerText text = new(textTable[0].ToString(), textEntry[0].ToString());
 
-                        foreach (IDialogueView view in token.Views) await view.OnDialogue(speaker, text, message[0].ToString(), token);
+                        for (int i = 0; i < token.Views.Count; i++)
+                            await token.Views[i].OnDialogue(speaker, text, message[0].ToString(), token);
                     }
                     return 0;
 
@@ -150,32 +246,14 @@ namespace Yang.Dialogue
 
                 case NodeType.Event:
                     {
-                        IReadOnlyList<DataWrapper> optionDatas = nodeData.OptionDatas;
+                        RunnerCommand[] events = eventCache[checker.NodeIndex];
 
-                        for (int i = 0; i < optionDatas.Count; i++)
-                        {
-                            IReadOnlyList<GenericData> datas = optionDatas[i].data;
-
-                            if (datas.Count == 0 || !datas[0].TryGetString(out string id) || string.IsNullOrWhiteSpace(id)) continue;
-
-                            List<RunnerArgument> arguments = new();
-
-                            for (int j = 1; j + 1 < datas.Count; j += 2)
-                            {
-                                if (!datas[j].TryGetString(out string key) || string.IsNullOrWhiteSpace(key)) continue;
-
-                                arguments.Add(new RunnerArgument(key, datas[j + 1]));
-                            }
-
-                            runnerEvent.OnEvent(new RunnerCommand(id, arguments));
-                        }
+                        for (int i = 0; i < events.Length; i++) runnerEvent.OnEvent(events[i]);
                     }
                     return 0;
 
                 case NodeType.Choice:
                     {
-                        List<RunnerChoiceText> choiceDatas = new();
-
                         IReadOnlyList<DataWrapper> textEntries = nodeData.PortDatas;
 
                         IReadOnlyList<GenericData> speakerTable = nodeData.OptionDatas[0].data;
@@ -188,6 +266,9 @@ namespace Yang.Dialogue
                         RunnerText speaker = new(speakerTable[0].ToString(), speakerEntry[0].ToString());
 
                         string textTableKey = textTable[0].ToString();
+                        RunnerToken runnerToken = (RunnerToken)token;
+                        RunnerChoiceCollection choiceDatas = runnerToken.GetChoiceCache(nodeData.guid, textEntries);
+                        int choiceIndex = 0;
 
                         for (int i = 0; i < textEntries.Count; i++)
                         {
@@ -201,11 +282,9 @@ namespace Yang.Dialogue
 
                             string textEntryKey = textEntry[0].ToString();
 
-                            int conditionCount = (textEntry.Count - 3) / 3;
+                            RunnerCondition[] conditions = choiceDatas.ConditionBuffers[i];
 
-                            RunnerCondition[] conditions = new RunnerCondition[conditionCount];
-
-                            for (int j = 0; j < conditionCount; j++)
+                            for (int j = 0; j < conditions.Length; j++)
                             {
                                 int dataIndex = 3 + (j * 3);
 
@@ -233,7 +312,7 @@ namespace Yang.Dialogue
                                             bool value = runnerTrigger.GetBoolValue(key);
                                             bool checkValue = textEntry[dataIndex + 1].GetBool();
 
-                                            bool check = value != checkValue;
+                                            bool check = value == checkValue;
 
                                             if (!check) isValid = false;
 
@@ -243,12 +322,11 @@ namespace Yang.Dialogue
                                 }
                             }
 
-                            RunnerChoiceText data = new(i, textTableKey, textEntryKey, isValid, conditions);
-
-                            choiceDatas.Add(data);
+                            choiceDatas.Set(choiceIndex++, new RunnerChoiceText(i, textTableKey, textEntryKey, isValid, conditions));
                         }
 
                         int index = 0;
+                        choiceDatas.SetCount(choiceIndex);
 
                         foreach (IDialogueView view in token.Views)
                         {
@@ -267,36 +345,18 @@ namespace Yang.Dialogue
                         if (datas[1].TryGetFloat(out float second)) await token.Delay(second);
                         else
                         {
-                            foreach (IDialogueView view in token.Views) await view.OnMessage(datas[1].ToString(), token);
+                            for (int i = 0; i < token.Views.Count; i++)
+                                await token.Views[i].OnMessage(datas[1].ToString(), token);
                         }
                     }
                     return 0;
 
                 case NodeType.Command:
                     {
-                        List<RunnerCommand> commands = new();
+                        RunnerCommand[] commands = commandCache[checker.NodeIndex];
 
-                        IReadOnlyList<DataWrapper> optionDatas = nodeData.OptionDatas;
-
-                        for (int i = 0; i < optionDatas.Count; i++)
-                        {
-                            IReadOnlyList<GenericData> datas = optionDatas[i].data;
-
-                            if (datas.Count == 0 || !datas[0].TryGetString(out string id) || string.IsNullOrWhiteSpace(id)) continue;
-
-                            List<RunnerArgument> arguments = new();
-
-                            for (int j = 1; j + 1 < datas.Count; j += 2)
-                            {
-                                if (!datas[j].TryGetString(out string key) || string.IsNullOrWhiteSpace(key)) continue;
-
-                                arguments.Add(new RunnerArgument(key, datas[j + 1]));
-                            }
-
-                            commands.Add(new RunnerCommand(id, arguments));
-                        }
-
-                        foreach (IDialogueView view in token.Views) await view.OnCommand(commands, token);
+                        for (int i = 0; i < token.Views.Count; i++)
+                            await token.Views[i].OnCommand(commands, token);
                     }
                     return 0;
             }
@@ -307,24 +367,27 @@ namespace Yang.Dialogue
         /// <summary>Returns true if a node with the given name exists in the loaded graph.</summary>
         public bool CheckNode(string nodeName)
         {
-            if (nodeName == "" || !nodes.ContainsKey(nodeName)) return false;
+            if (nodeName == "" || !nodeIndices.ContainsKey(nodeName)) return false;
 
             return true;
         }
 
-        /// <summary>Resolves the node linked to the given output port; returns false with an empty name when no link exists.</summary>
-        public bool TryGetLink(RunnerPort port, out string nodeName)
-        {
-            if (links.TryGetValue(port, out RunnerPort targetPort))
-            {
-                nodeName = targetPort.guid;
+        public int GetNodeIndex(string nodeName) => nodeIndices.TryGetValue(nodeName, out int index) ? index : -1;
 
-                return true;
+        public string GetNodeGuid(int nodeIndex) => runtimeNodes[nodeIndex].guid;
+
+        public bool TryGetLink(int nodeIndex, int portIndex, out int targetIndex)
+        {
+            int[] portLinks = runtimeLinks[nodeIndex];
+
+            if ((uint)portIndex >= (uint)portLinks.Length)
+            {
+                targetIndex = -1;
+                return false;
             }
 
-            nodeName = "";
-
-            return false;
+            targetIndex = portLinks[portIndex];
+            return targetIndex >= 0;
         }
 
         /// <summary>Evaluates a float comparison between the current value and check value using the given operator.</summary>
@@ -333,7 +396,7 @@ namespace Yang.Dialogue
             switch (type)
             {
                 case ValueCheckType.Less:
-                    if (checkValue >= value) return false;
+                    if (value >= checkValue) return false;
                     break;
 
                 case ValueCheckType.Equal:
@@ -341,11 +404,11 @@ namespace Yang.Dialogue
                     break;
 
                 case ValueCheckType.LessEqual:
-                    if (checkValue > value) return false;
+                    if (value > checkValue) return false;
                     break;
 
                 case ValueCheckType.Greater:
-                    if (checkValue <= value) return false;
+                    if (value <= checkValue) return false;
                     break;
 
                 case ValueCheckType.NotEqual:
@@ -353,7 +416,7 @@ namespace Yang.Dialogue
                     break;
 
                 case ValueCheckType.GreaterEqual:
-                    if (checkValue < value) return false;
+                    if (value < checkValue) return false;
                     break;
             }
 

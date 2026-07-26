@@ -3,7 +3,7 @@
 Unity용 노드 기반 대화 시스템. 그래프 에디터로 대화 흐름을 작성하고, 런타임에서 `DialogueRunner`가 노드를 순회하며 `IDialogueView` 콜백으로 UI에 출력합니다. 텍스트는 Unity Localization(`com.unity.localization`)을 사용합니다.
 
 - **Namespace**: `Yang.Dialogue` (런타임), `Yang.Dialogue.Editor` (에디터)
-- **Unity**: 2021.3 이상
+- **Unity**: 2023.1 이상
 - **의존성**: `com.unity.localization` 1.5.3
 
 ---
@@ -138,18 +138,17 @@ public static class CharacterOptions
 
 ### 3-4. View 구현
 
-`DialogueViewBase`(MonoBehaviour)를 상속해 필요한 콜백만 override 합니다. 각 콜백은 `Task`를 반환하므로, 타이핑 연출·버튼 입력 대기 등을 `await` 로 처리하면 그동안 러너가 다음 노드로 진행하지 않고 기다립니다.
+`DialogueViewBase`(MonoBehaviour)를 상속해 필요한 콜백만 override 합니다. 각 콜백은 Unity `Awaitable`을 반환하므로, 타이핑 연출·버튼 입력 대기 등을 `await` 로 처리하면 그동안 러너가 다음 노드로 진행하지 않고 기다립니다.
 
 ```csharp
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Localization;
 using Yang.Dialogue;
 
 public class SampleDialogueView : DialogueViewBase
 {
-    public override async Task OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token)
+    public override async Awaitable OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token)
     {
         // RunnerText.table / RunnerText.entry 로 Localization 키를 받음
         string speakerName = await Localize(speaker);
@@ -158,14 +157,14 @@ public class SampleDialogueView : DialogueViewBase
         // UI 출력 + 클릭 대기 등...
     }
 
-    public override Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerChoiceText> texts, string message, IRunnerToken token)
+    public override async Awaitable<int> OnChoice(RunnerText speaker, RunnerChoiceCollection texts, string message, IRunnerToken token)
     {
         // texts[i].isValid 가 false 면 조건 미충족 선택지
         // 사용자가 고른 인덱스를 반환 (선택 안 하면 -1)
-        return Task.FromResult(0);
+        return 0;
     }
 
-    public override Task OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token)
+    public override async Awaitable OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token)
     {
         foreach (RunnerCommand command in commands)
         {
@@ -179,12 +178,11 @@ public class SampleDialogueView : DialogueViewBase
             }
         }
 
-        return Task.CompletedTask;
     }
 
-    public override Task OnMessage(string reason, IRunnerToken token) => Task.CompletedTask;   // 대화 종료/Wait 신호 등 알림
+    public override async Awaitable OnMessage(string reason, IRunnerToken token) { }   // Wait 신호 등 알림
 
-    private async Task<string> Localize(RunnerText t)
+    private async Awaitable<string> Localize(RunnerText t)
     {
         var table = await LocalizationSettings.StringDatabase.GetTableAsync(t.table).Task;
 
@@ -220,10 +218,14 @@ void Begin()
 
 ```csharp
 void StartDialogue(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null);
-bool IsStarted(string key);
+Awaitable StartDialogueAsync(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null);
+bool IsRunning(string key);
+void StopDialogue(string key);
 void PauseDialogue(string key);     // 특정 흐름 일시정지
-void StopAllDialogue();             // 모든 흐름 정지 + 초기화
+void StopAllDialogue();
+void PauseAllDialogue();
 void JumpNode(string key, string nodeName);   // 진행 중 흐름을 다른 노드로 점프
+Awaitable JumpNodeAsync(string key, string nodeName);
 void SetDialogue(DialogueSO so);    // 다른 그래프로 교체 (진행 중이면 무시)
 ```
 
@@ -299,7 +301,7 @@ foreach (var flow in runner.Load(data))
 - **`RunnerText`** — `table`, `entry` (Localization String Table 키). 화자/대사 텍스트.
 - **`RunnerChoiceText`** — 선택지. `portIndex`(분기 포트), `table`/`entry`, `isValid`(조건 충족 여부), `Conditions`.
 - **`RunnerCondition`** — 선택지 조건 한 건. `key`, `isValid`, `type`(Float/Bool), `checkType`, `GetFloatValue()`/`GetBoolValue()`.
-- **`IRunnerToken`** — 진행 중 흐름 핸들. `IsStarted`, `Pause()`, `Delay(seconds)`, `OnStopCallback`. View 콜백에서 흐름 상태 확인·제어에 사용.
+- **`IRunnerToken`** — 진행 중 흐름 핸들. `State`, `Views`, `CancellationToken`, `Delay(seconds)`를 제공합니다. View 콜백에서 상태를 확인하고 흐름 중단과 연동되는 대기를 만들 때 사용합니다.
 
 ---
 

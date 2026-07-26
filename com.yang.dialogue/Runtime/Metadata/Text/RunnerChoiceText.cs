@@ -1,5 +1,53 @@
+using System.Collections;
+using System.Collections.Generic;
+
 namespace Yang.Dialogue
 {
+    /// <summary>
+    /// Reusable, allocation-free view over the choices currently exposed by a Choice node.
+    /// Iterate the concrete type directly with foreach to use its struct enumerator without boxing.
+    /// </summary>
+    public sealed class RunnerChoiceCollection : IReadOnlyList<RunnerChoiceText>
+    {
+        private readonly RunnerChoiceText[] choices;
+        internal RunnerCondition[][] ConditionBuffers { get; }
+
+        public int Count { get; private set; }
+        public RunnerChoiceText this[int index] => choices[index];
+
+        internal RunnerChoiceCollection(int capacity)
+        {
+            choices = new RunnerChoiceText[capacity];
+            ConditionBuffers = new RunnerCondition[capacity][];
+        }
+
+        internal void Set(int index, RunnerChoiceText choice) => choices[index] = choice;
+        internal void SetCount(int count) => Count = count;
+
+        public Enumerator GetEnumerator() => new(this);
+        IEnumerator<RunnerChoiceText> IEnumerable<RunnerChoiceText>.GetEnumerator() => new Enumerator(this);
+        IEnumerator IEnumerable.GetEnumerator() => new Enumerator(this);
+
+        public struct Enumerator : IEnumerator<RunnerChoiceText>
+        {
+            private readonly RunnerChoiceCollection collection;
+            private int index;
+
+            internal Enumerator(RunnerChoiceCollection collection)
+            {
+                this.collection = collection;
+                index = -1;
+            }
+
+            public RunnerChoiceText Current => collection.choices[index];
+            object IEnumerator.Current => Current;
+
+            public bool MoveNext() => ++index < collection.Count;
+            public void Reset() => index = -1;
+            public void Dispose() { }
+        }
+    }
+
     /// <summary>
     /// Immutable data for a single selectable choice option, passed into the View's choice callback for display and selection.
     /// </summary>

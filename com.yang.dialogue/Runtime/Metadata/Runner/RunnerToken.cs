@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
+using UnityEngine;
 
 namespace Yang.Dialogue
 {
@@ -13,12 +13,7 @@ namespace Yang.Dialogue
     {
         private CancellationTokenSource cts;
 
-        public TaskCompletionSource<bool> UsedTask { get; set; }
-
-        /// <summary>
-        /// The task that stays pending while the flow runs and is cancelled when it pauses.
-        /// </summary>
-        public Task Task { get; private set; }
+        public AwaitableCompletionSource<bool> UsedTask { get; set; }
 
         /// <summary>
         /// Whether this flow is currently running.
@@ -29,9 +24,12 @@ namespace Yang.Dialogue
         /// The node the flow is currently positioned at.
         /// </summary>
         public string TargetNode { get; set; }
+        public int NodeIndex { get; set; } = -1;
 
         private readonly List<IDialogueView> views = new();
+        private readonly Dictionary<string, RunnerChoiceCollection> choiceCaches = new();
         public IReadOnlyList<IDialogueView> Views => views;
+        public CancellationToken CancellationToken => cts?.Token ?? default;
 
         public RunnerToken()
         {
@@ -49,6 +47,8 @@ namespace Yang.Dialogue
 
         public void SetView(IReadOnlyList<IDialogueView> views)
         {
+            if (ReferenceEquals(views, this.views)) return;
+
             this.views.Clear();
 
             for (int i = 0; i < views.Count; i++) this.views.Add(views[i]);
@@ -64,15 +64,13 @@ namespace Yang.Dialogue
             {
                 case TokenState.Running:
                     cts = new();
-
-                    Task = Task.Delay(Timeout.Infinite, cts.Token);
                     break;
 
                 case TokenState.Paused:
                 case TokenState.Stopped:
                 case TokenState.Ended:
-                    cts.Cancel();
-                    cts.Dispose();
+                    cts?.Cancel();
+                    cts?.Dispose();
                     cts = null;
                     break;
             }
@@ -81,13 +79,18 @@ namespace Yang.Dialogue
         /// <summary>
         /// Awaits the given number of seconds, cancelling early if the flow is paused.
         /// </summary>
-        public async Task Delay(float second)
+        public async Awaitable Delay(float second)
         {
             if (State != TokenState.Running) return;
 
-            TimeSpan delay = TimeSpan.FromSeconds(second);
-
-            await Task.Delay(delay, cts.Token);
+            try
+            {
+                await Awaitable.WaitForSecondsAsync(second, cts.Token);
+            }
+            catch (OperationCanceledException) when (State != TokenState.Running)
+            {
+                // Pause, stop, and end are normal control-flow transitions.
+            }
         }
 
         public void RefreshView()
@@ -97,6 +100,26 @@ namespace Yang.Dialogue
                 if (views[i] == null) views.RemoveAt(i);
             }
         }
+
+        internal RunnerChoiceCollection GetChoiceCache(
+            string nodeGuid,
+            IReadOnlyList<DataWrapper> textEntries)
+        {
+            if (choiceCaches.TryGetValue(nodeGuid, out RunnerChoiceCollection cache)) return cache;
+
+            cache = new RunnerChoiceCollection(textEntries.Count);
+
+            for (int i = 0; i < textEntries.Count; i++)
+            {
+                int conditionCount = System.Math.Max(0, (textEntries[i].data.Count - 3) / 3);
+                cache.ConditionBuffers[i] = new RunnerCondition[conditionCount];
+            }
+
+            choiceCaches.Add(nodeGuid, cache);
+
+            return cache;
+        }
+
     }
 
     /// <summary>
@@ -106,9 +129,9 @@ namespace Yang.Dialogue
     public interface IRunnerToken
     {
         /// <summary>
-        /// The task that stays pending while the flow runs.
+        /// Cancellation signal tied to the current run. It is cancelled when the flow pauses, stops, or ends.
         /// </summary>
-        public Task Task { get; }
+        public CancellationToken CancellationToken { get; }
 
         /// <summary>
         /// Whether the flow is currently running.
@@ -120,7 +143,7 @@ namespace Yang.Dialogue
         /// <summary>
         /// Awaits a delay that cancels with the flow, e.g. await token.Delay(0.5f) inside a view callback.
         /// </summary>
-        public Task Delay(float second);
+        public Awaitable Delay(float second);
     }
 
     /// <summary>
@@ -132,6 +155,7 @@ namespace Yang.Dialogue
         /// The node the flow is currently positioned at.
         /// </summary>
         public string TargetNode { get; }
+        public int NodeIndex { get; }
     }
 
     public enum TokenState
