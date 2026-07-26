@@ -308,13 +308,21 @@ foreach (var flow in runner.Load(data))
 ```csharp
 AwaitableCompletionSource<string> scanSource = new();
 
-try
+RunnerWaitResult<string> waitResult = await token.WaitFor(scanSource);
+
+switch (waitResult.Status)
 {
-    string result = await token.WaitFor(scanSource);
-}
-catch (System.OperationCanceledException)
-{
-    // 대화 흐름이 중단됨
+    case RunnerWaitStatus.Completed:
+        string result = waitResult.Value;
+        break;
+
+    case RunnerWaitStatus.TokenCanceled:
+        // 대화가 Pause/Stop/End됨
+        break;
+
+    case RunnerWaitStatus.SourceCanceled:
+        // scanSource 자체가 취소됨
+        break;
 }
 
 // 외부 입력 완료 시

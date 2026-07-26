@@ -96,7 +96,7 @@ namespace Yang.Dialogue
         /// <summary>
         /// Awaits an externally completed operation and cancels it when this dialogue flow pauses, stops, or ends.
         /// </summary>
-        public async Awaitable WaitFor(AwaitableCompletionSource source)
+        public async Awaitable<RunnerWaitResult> WaitFor(AwaitableCompletionSource source)
         {
             CancellationToken cancellationToken = CancellationToken;
 
@@ -105,13 +105,24 @@ namespace Yang.Dialogue
                     static state => ((AwaitableCompletionSource)state).TrySetCanceled(),
                     source);
 
-            await source.Awaitable;
+            try
+            {
+                await source.Awaitable;
+                return new RunnerWaitResult(RunnerWaitStatus.Completed);
+            }
+            catch (OperationCanceledException)
+            {
+                return new RunnerWaitResult(
+                    cancellationToken.IsCancellationRequested
+                        ? RunnerWaitStatus.TokenCanceled
+                        : RunnerWaitStatus.SourceCanceled);
+            }
         }
 
         /// <summary>
         /// Awaits an externally completed operation and returns its result, cancelling it with this dialogue flow.
         /// </summary>
-        public async Awaitable<T> WaitFor<T>(AwaitableCompletionSource<T> source)
+        public async Awaitable<RunnerWaitResult<T>> WaitFor<T>(AwaitableCompletionSource<T> source)
         {
             CancellationToken cancellationToken = CancellationToken;
 
@@ -120,7 +131,19 @@ namespace Yang.Dialogue
                     static state => ((AwaitableCompletionSource<T>)state).TrySetCanceled(),
                     source);
 
-            return await source.Awaitable;
+            try
+            {
+                T value = await source.Awaitable;
+                return new RunnerWaitResult<T>(RunnerWaitStatus.Completed, value);
+            }
+            catch (OperationCanceledException)
+            {
+                return new RunnerWaitResult<T>(
+                    cancellationToken.IsCancellationRequested
+                        ? RunnerWaitStatus.TokenCanceled
+                        : RunnerWaitStatus.SourceCanceled,
+                    default);
+            }
         }
 
         public void RefreshView()
@@ -178,12 +201,12 @@ namespace Yang.Dialogue
         /// <summary>
         /// Awaits a completion source that is automatically cancelled with the current dialogue flow.
         /// </summary>
-        public Awaitable WaitFor(AwaitableCompletionSource source);
+        public Awaitable<RunnerWaitResult> WaitFor(AwaitableCompletionSource source);
 
         /// <summary>
         /// Awaits a completion source result that is automatically cancelled with the current dialogue flow.
         /// </summary>
-        public Awaitable<T> WaitFor<T>(AwaitableCompletionSource<T> source);
+        public Awaitable<RunnerWaitResult<T>> WaitFor<T>(AwaitableCompletionSource<T> source);
     }
 
     /// <summary>
@@ -204,5 +227,36 @@ namespace Yang.Dialogue
         Paused,
         Stopped,
         Ended,
+    }
+
+    public enum RunnerWaitStatus
+    {
+        Completed,
+        TokenCanceled,
+        SourceCanceled,
+    }
+
+    public readonly struct RunnerWaitResult
+    {
+        public RunnerWaitStatus Status { get; }
+        public bool IsCompleted => Status == RunnerWaitStatus.Completed;
+
+        public RunnerWaitResult(RunnerWaitStatus status)
+        {
+            Status = status;
+        }
+    }
+
+    public readonly struct RunnerWaitResult<T>
+    {
+        public RunnerWaitStatus Status { get; }
+        public bool IsCompleted => Status == RunnerWaitStatus.Completed;
+        public T Value { get; }
+
+        public RunnerWaitResult(RunnerWaitStatus status, T value)
+        {
+            Status = status;
+            Value = value;
+        }
     }
 }
