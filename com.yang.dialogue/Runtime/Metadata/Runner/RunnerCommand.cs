@@ -43,8 +43,17 @@ namespace Yang.Dialogue
         public int GetInt(string key, int fallback = 0)
             => TryGet(key, out GenericData value) && value.TryGetInt(out int result) ? result : fallback;
 
+        public long GetLong(string key, long fallback = 0)
+            => TryGet(key, out GenericData value) && value.TryGetLong(out long result) ? result : fallback;
+
         public bool GetBool(string key, bool fallback = false)
             => TryGet(key, out GenericData value) && value.TryGetBool(out bool result) ? result : fallback;
+
+        public UnityEngine.Color32 GetColor(string key, UnityEngine.Color32 fallback = default)
+            => TryGet(key, out GenericData value) && value.TryGetColor(out UnityEngine.Color32 result) ? result : fallback;
+
+        public System.Guid GetGuid(string key, System.Guid fallback = default)
+            => TryGet(key, out GenericData value) && value.TryGetGuid(out System.Guid result) ? result : fallback;
 
         public T GetEnum<T>(string key, T fallback = default) where T : struct, System.Enum
             => TryGet(key, out GenericData value) && value.TryGetEnum(out T result) ? result : fallback;

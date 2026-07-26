@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using UnityEngine;
 
 namespace Yang.Dialogue
 {
@@ -51,11 +52,17 @@ namespace Yang.Dialogue
             if (type == typeof(string)) return data.GetString();
             if (type == typeof(int)) return data.GetInt();
             if (type == typeof(float)) return data.GetFloat();
+            if (type == typeof(long)) return data.GetLong();
             if (type == typeof(bool)) return data.GetBool();
+            if (type == typeof(Color32)) return data.GetColor();
+            if (type == typeof(Guid)) return data.GetGuid();
 
             return Enum.ToObject(type, int.Parse(data.ToString()));
         }
 
-        private static bool IsSupported(Type type) => type == typeof(string) || type == typeof(int) || type == typeof(float) || type == typeof(bool) || type.IsEnum;
+        private static bool IsSupported(Type type) =>
+            type == typeof(string) || type == typeof(int) || type == typeof(float) ||
+            type == typeof(long) || type == typeof(bool) || type == typeof(Color32) ||
+            type == typeof(Guid) || type.IsEnum;
     }
 }

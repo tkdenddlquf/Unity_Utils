@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -135,7 +136,10 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private static bool IsSupported(Type type) => type == typeof(string) || type == typeof(int) || type == typeof(float) || type == typeof(bool) || type.IsEnum;
+        private static bool IsSupported(Type type) =>
+            type == typeof(string) || type == typeof(int) || type == typeof(float) ||
+            type == typeof(long) || type == typeof(bool) || type == typeof(Color32) ||
+            type == typeof(Guid) || type.IsEnum;
 
         private void EnsureDefaultData()
         {
@@ -324,6 +328,16 @@ namespace Yang.Dialogue.Editor
                 return number;
             }
 
+            if (type == typeof(long))
+            {
+                LongField number = new(label) { value = value.TryGetLong(out long longValue) ? longValue : 0 };
+
+                number.userData = binding;
+                number.RegisterValueChangedCallback(evt => SetArgument((ArgumentBinding)number.userData, new GenericData(evt.newValue)));
+
+                return number;
+            }
+
             if (type == typeof(bool))
             {
                 Toggle toggle = new(label) { value = value.TryGetBool(out bool boolValue) && boolValue };
@@ -332,6 +346,34 @@ namespace Yang.Dialogue.Editor
                 toggle.RegisterValueChangedCallback(evt => SetArgument((ArgumentBinding)toggle.userData, new GenericData(evt.newValue)));
 
                 return toggle;
+            }
+
+            if (type == typeof(Color32))
+            {
+                ColorField color = new(label) { value = value.TryGetColor(out Color32 colorValue) ? colorValue : default };
+
+                color.userData = binding;
+                color.RegisterValueChangedCallback(evt => SetArgument((ArgumentBinding)color.userData, new GenericData((Color32)evt.newValue)));
+
+                return color;
+            }
+
+            if (type == typeof(Guid))
+            {
+                TextField guid = new(label)
+                {
+                    value = value.TryGetGuid(out Guid guidValue) ? guidValue.ToString() : "",
+                    isDelayed = true
+                };
+
+                guid.userData = binding;
+                guid.RegisterValueChangedCallback(evt =>
+                {
+                    if (Guid.TryParse(evt.newValue, out Guid parsed))
+                        SetArgument((ArgumentBinding)guid.userData, new GenericData(parsed));
+                });
+
+                return guid;
             }
 
             int.TryParse(value.ToString(), out int enumValue);
@@ -436,7 +478,10 @@ namespace Yang.Dialogue.Editor
             type == typeof(string) && value.Type == GenericData.DataType.String ||
             type == typeof(int) && value.Type == GenericData.DataType.Int ||
             type == typeof(float) && value.Type == GenericData.DataType.Float ||
+            type == typeof(long) && value.Type == GenericData.DataType.Long ||
             type == typeof(bool) && value.Type == GenericData.DataType.Bool ||
+            type == typeof(Color32) && value.Type == GenericData.DataType.Color ||
+            type == typeof(Guid) && value.Type == GenericData.DataType.Guid ||
             type.IsEnum && value.Type == GenericData.DataType.Enum;
 
         private static GenericData DefaultValue(Schema schema, FieldInfo field)
@@ -446,7 +491,10 @@ namespace Yang.Dialogue.Editor
             if (field.FieldType == typeof(string)) return new GenericData((string)value ?? "");
             if (field.FieldType == typeof(int)) return new GenericData(value == null ? 0 : (int)value);
             if (field.FieldType == typeof(float)) return new GenericData(value == null ? 0f : (float)value);
+            if (field.FieldType == typeof(long)) return new GenericData(value == null ? 0L : (long)value);
             if (field.FieldType == typeof(bool)) return new GenericData(value != null && (bool)value);
+            if (field.FieldType == typeof(Color32)) return new GenericData(value == null ? default : (Color32)value);
+            if (field.FieldType == typeof(Guid)) return new GenericData(value == null ? Guid.Empty : (Guid)value);
             if (field.FieldType.IsEnum) return new GenericData((Enum)(value ?? Enum.ToObject(field.FieldType, 0)));
 
             return default;
@@ -465,13 +513,19 @@ namespace Yang.Dialogue.Editor
                 {
                     GenericData.DataType.Int => "int",
                     GenericData.DataType.Float => "float",
+                    GenericData.DataType.Long => "long",
                     GenericData.DataType.Bool => "bool",
+                    GenericData.DataType.Color => "color",
+                    GenericData.DataType.Guid => "guid",
                     GenericData.DataType.Enum => "enum",
                     _ => "string",
                 };
 
                 string serializedKey = escape ? Uri.EscapeDataString(key) : key;
-                string serializedValue = escape ? Uri.EscapeDataString(value.ToString()) : value.ToString();
+                string rawValue = value.Type == GenericData.DataType.Color
+                    ? $"#{ColorUtility.ToHtmlStringRGBA(value.GetColor())}"
+                    : value.ToString();
+                string serializedValue = escape ? Uri.EscapeDataString(rawValue) : rawValue;
 
                 values.Add($"{serializedKey}:{type}={serializedValue}");
             }

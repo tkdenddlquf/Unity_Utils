@@ -132,9 +132,61 @@ public static class CharacterOptions
 }
 ```
 
-지원 필드 타입은 `string`, `int`, `float`, `bool`, `enum`입니다.
+지원 필드 타입은 `string`, `int`, `float`, `long`, `bool`, `Color32`, `Guid`, `enum`입니다.
 `DialogueOptions`의 공급 메서드는 매개변수가 없는 static 메서드여야 하며
 `IEnumerable<string>`을 반환해야 합니다.
+
+필드에 전용 Attribute가 있으면 기본 입력 필드보다 먼저 적용되는 커스텀 Drawer를 등록할 수 있습니다.
+Attribute는 런타임 코드에, Drawer는 Editor 어셈블리에 선언합니다.
+
+```csharp
+using System;
+
+[AttributeUsage(AttributeTargets.Field)]
+public sealed class DialogueRangeAttribute : Attribute
+{
+    public float Min { get; }
+    public float Max { get; }
+
+    public DialogueRangeAttribute(float min, float max)
+    {
+        Min = min;
+        Max = max;
+    }
+}
+```
+
+```csharp
+using System;
+using System.Reflection;
+using UnityEngine.UIElements;
+using Yang.Dialogue;
+using Yang.Dialogue.Editor;
+
+[DialogueArgumentDrawer(typeof(DialogueRangeAttribute))]
+public sealed class DialogueRangeDrawer : DialogueArgumentDrawer
+{
+    public override VisualElement CreateField(
+        FieldInfo field,
+        Attribute attribute,
+        string label,
+        GenericData value,
+        Action<GenericData> onChanged)
+    {
+        DialogueRangeAttribute range = (DialogueRangeAttribute)attribute;
+        Slider slider = new(label, range.Min, range.Max) { value = value.GetFloat() };
+
+        slider.RegisterValueChangedCallback(evt => onChanged(new GenericData(evt.newValue)));
+
+        return slider;
+    }
+}
+```
+
+```csharp
+[DialogueRange(0f, 10f)]
+public float duration = 0.5f;
+```
 
 ### 3-4. View 구현
 
@@ -168,13 +220,10 @@ public class SampleDialogueView : DialogueViewBase
     {
         foreach (RunnerCommand command in commands)
         {
-            if (command.ID == "character.move")
+            if (command.TryConvert(out MoveCharacterCommand move))
             {
-                string target = command.GetString("target");
-                float x = command.GetFloat("x");
-                float duration = command.GetFloat("duration");
-
                 // 게임 측 캐릭터 시스템에 명령 전달
+                MoveCharacter(move.target, move.x, move.y, move.duration);
             }
         }
 
@@ -337,6 +386,7 @@ scanSource.TrySetResult("result");
 
 - 컬럼: `ID, Type, Next, Message, Data` + 로케일별 `Speaker[code]` / `Text[code]`
 - Choice 옵션, Condition 분기, Object 참조는 소유 노드 아래 하위 행으로 표현됩니다.
+- Command/Event 인자는 `string`, `int`, `float`, `long`, `bool`, `color`, `guid`, `enum` 타입 태그로 왕복하며, 색상은 `#RRGGBBAA` 형식으로 저장됩니다.
 - 가져올 때 노드 ID가 **비어 있거나 중복**되면 노드마다 확인창이 떠서 *새 ID 생성 / 건너뛰기 / 모두 생성* 을 고를 수 있습니다.
 - 가리키는 노드가 없거나 건너뛴 링크는 가져오기 후 경고 메시지로 모아 알려줍니다.
 

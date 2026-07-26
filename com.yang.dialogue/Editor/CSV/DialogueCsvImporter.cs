@@ -962,8 +962,20 @@ namespace Yang.Dialogue.Editor
                         parsed = new GenericData(floatValue);
                         break;
 
+                    case "long" when long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long longValue):
+                        parsed = new GenericData(longValue);
+                        break;
+
                     case "bool" when bool.TryParse(value, out bool boolValue):
                         parsed = new GenericData(boolValue);
+                        break;
+
+                    case "color" when ColorUtility.TryParseHtmlString(value, out Color colorValue):
+                        parsed = new GenericData((Color32)colorValue);
+                        break;
+
+                    case "guid" when System.Guid.TryParse(value, out System.Guid guidValue):
+                        parsed = new GenericData(guidValue);
                         break;
 
                     case "enum" when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int enumValue):

@@ -22,7 +22,12 @@ namespace Yang.Dialogue
         /// Fires when the player must pick from choices. Override to present options and return the selected
         /// index (the runner awaits it to branch). Base returns -1, meaning no selection.
         /// </summary>
-        public virtual async Awaitable<int> OnChoice(RunnerText speaker, RunnerChoiceCollection texts, string message, IRunnerToken token) => -1;
+        public virtual async Awaitable<int> OnChoice(RunnerText speaker, RunnerChoiceCollection texts, string message, IRunnerToken token)
+        {
+            await Awaitable.NextFrameAsync();
+
+            return -1;
+        }
 
         /// <summary>
         /// Fires when the graph emits asset-independent commands. Override to dispatch command ids to
