@@ -25,7 +25,6 @@ namespace Yang.Dialogue.Editor
         private readonly List<Locale> locales = new();
 
         private readonly Dictionary<string, List<EntryData>> entryCache = new();
-        private readonly Dictionary<object, List<string>> keyCache = new();
 
         private string saveData;
 
@@ -546,25 +545,6 @@ namespace Yang.Dialogue.Editor
             target.AddRange(cached);
         }
 
-        /// <summary>Fills the target list with the marker's keys, caching per marker.</summary>
-        public void GetKeysInto(object marker, List<string> target)
-        {
-            target.Clear();
-
-            if (marker == null) return;
-
-            if (!keyCache.TryGetValue(marker, out List<string> cached))
-            {
-                cached = new List<string>();
-
-                KeyConverter.GetKeys(marker, cached);
-
-                keyCache[marker] = cached;
-            }
-
-            target.AddRange(cached);
-        }
-
         /// <summary>Saves changes on Ctrl+S.</summary>
         private void OnKeyDownEvent(KeyDownEvent evt)
         {
@@ -713,7 +693,6 @@ namespace Yang.Dialogue.Editor
             pendingRebuild = false;
 
             entryCache.Clear();
-            keyCache.Clear();
 
             if (SO != null)
             {

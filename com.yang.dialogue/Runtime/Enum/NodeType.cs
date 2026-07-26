@@ -18,7 +18,7 @@ namespace Yang.Dialogue
         Choice,
         /// <summary>Pauses the flow for a duration or until a signal.</summary>
         Wait,
-        /// <summary>References or acts on a scene object.</summary>
-        Object,
+        /// <summary>Emits asset-independent commands for views to interpret.</summary>
+        Command,
     }
 }

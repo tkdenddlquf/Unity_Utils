@@ -26,10 +26,10 @@ namespace Yang.Dialogue
         public virtual Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerChoiceText> texts, string message, IRunnerToken token) => Task.FromResult(-1);
 
         /// <summary>
-        /// Fires when associated objects (sprites, audio, etc.) should be applied. Override to handle them;
-        /// the runner awaits the returned Task. Base returns immediately.
+        /// Fires when the graph emits asset-independent commands. Override to dispatch command ids to
+        /// game-specific handlers; the runner awaits the returned Task. Base returns immediately.
         /// </summary>
-        public virtual Task OnObject(IReadOnlyList<Object> target, IRunnerToken token) => Task.CompletedTask;
+        public virtual Task OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token) => Task.CompletedTask;
 
         /// <summary>
         /// Fires when the signals a reason. Override to clean up UI; the runner awaits it.
@@ -65,9 +65,9 @@ namespace Yang.Dialogue
         public Task<int> OnChoice(RunnerText speaker, IReadOnlyList<RunnerChoiceText> texts, string message, IRunnerToken token);
 
         /// <summary>
-        /// Called to apply associated objects such as sprites or audio for the current node.
+        /// Called to interpret asset-independent commands emitted by the current node.
         /// </summary>
-        public Task OnObject(IReadOnlyList<Object> target, IRunnerToken token);
+        public Task OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token);
 
         /// <summary>
         /// Called when the conversation ends or emits a reason; use it to finalize the view.

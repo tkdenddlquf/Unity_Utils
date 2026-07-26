@@ -6,15 +6,15 @@ namespace Yang.Dialogue.Editor
 {
     /// <summary>
     /// Exports a <see cref="DialogueSO"/> to CSV (one row per node; Choice options, Condition
-    /// branches and Object references are emitted as sub-rows below their owner).
+    /// branches and Command instructions are emitted as sub-rows below their owner).
     ///
     /// Columns: ID, Type, Next, Message, Data, then Speaker[code] / Text[code] per project locale.
     ///
     /// Data column encodings:
     ///   Trigger : "key+10" (plus) / "key-5" (minus) / "key=10" (set float) / "key=true" (bool); joined by "; "
-    ///   Event   : "id1; id2"
+    ///   Event   : one "Instruction" sub-row per event; id in Message and typed arguments in Data
     ///   Wait    : "2.5" (seconds) or "notify" / "notify:reason"
-    ///   Object  : one "Asset" sub-row per slot, object name in Message
+    ///   Command : one "Instruction" sub-row per command; id in Message and typed arguments in Data
     ///   Option  : optional "hide" + conditions, e.g. "hide; gold>=10; flag==true"
     ///   Branch  : conditions, e.g. "gold>=10; hasKey==true"
     /// </summary>
@@ -126,28 +126,40 @@ namespace Yang.Dialogue.Editor
                     break;
 
                 case NodeType.Event:
-                    rows.Add(MakeRow(node.guid, "Event", Next(linkMap, node.guid, 0), "", EventToString(node.OptionDatas), "", "", "", "", px, py, localeCount));
+                    {
+                        rows.Add(MakeRow(node.guid, "Event", Next(linkMap, node.guid, 0), "", "", "", "", "", "", px, py, localeCount));
+
+                        IReadOnlyList<DataWrapper> events = node.OptionDatas;
+
+                        for (int i = 0; i < events.Count; i++)
+                        {
+                            IReadOnlyList<GenericData> data = events[i].data;
+                            string id = data.Count > 0 ? data[0].ToString() : "";
+                            string arguments = CommandNode.ArgumentsToString(data, true);
+
+                            rows.Add(MakeRow("", "Instruction", "", id, arguments, "", "", "", "", "", "", localeCount));
+                        }
+                    }
                     break;
 
                 case NodeType.Wait:
                     rows.Add(MakeRow(node.guid, "Wait", Next(linkMap, node.guid, 0), "", WaitToString(node.OptionDatas), "", "", "", "", px, py, localeCount));
                     break;
 
-                case NodeType.Object:
+                case NodeType.Command:
                     {
-                        rows.Add(MakeRow(node.guid, "Object", Next(linkMap, node.guid, 0), "", "", "", "", "", "", px, py, localeCount));
+                        rows.Add(MakeRow(node.guid, "Command", Next(linkMap, node.guid, 0), "", "", "", "", "", "", px, py, localeCount));
 
-                        IReadOnlyList<DataWrapper> objs = node.OptionDatas;
+                        IReadOnlyList<DataWrapper> commands = node.OptionDatas;
 
-                        for (int i = 0; i < objs.Count; i++)
+                        for (int i = 0; i < commands.Count; i++)
                         {
-                            IReadOnlyList<GenericData> data = objs[i].data;
+                            IReadOnlyList<GenericData> data = commands[i].data;
 
-                            string name = "";
+                            string id = data.Count > 0 ? data[0].ToString() : "";
+                            string arguments = CommandNode.ArgumentsToString(data, true);
 
-                            if (data.Count > 0 && data[0].TryGetObject(out UnityEngine.Object obj) && obj != null) name = obj.name;
-
-                            rows.Add(MakeRow("", "Asset", "", name, "", "", "", "", "", "", "", localeCount));
+                            rows.Add(MakeRow("", "Instruction", "", id, arguments, "", "", "", "", "", "", localeCount));
                         }
                     }
                     break;
@@ -252,21 +264,6 @@ namespace Yang.Dialogue.Editor
                         parts.Add($"{key}={(data[1].GetBool() ? "true" : "false")}");
                         break;
                 }
-            }
-
-            return string.Join("; ", parts);
-        }
-
-        /// <summary>Encodes an Event node's ids into the "; "-joined Data string.</summary>
-        private static string EventToString(IReadOnlyList<DataWrapper> optionDatas)
-        {
-            List<string> parts = new();
-
-            for (int i = 0; i < optionDatas.Count; i++)
-            {
-                string value = optionDatas[i].data[0].ToString();
-
-                if (!string.IsNullOrEmpty(value)) parts.Add(value);
             }
 
             return string.Join("; ", parts);

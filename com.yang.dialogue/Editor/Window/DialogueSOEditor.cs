@@ -1,27 +1,19 @@
-using System;
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine.UIElements;
 
 namespace Yang.Dialogue.Editor
 {
-    /// <summary>Custom inspector for DialogueSO with marker pickers, edit, and CSV import/export.</summary>
+    /// <summary>Custom inspector for DialogueSO with localization, edit, and CSV controls.</summary>
     [CustomEditor(typeof(DialogueSO))]
     public class DialogueSOEditor : UnityEditor.Editor
     {
-        private PopupField<string> eventPopup;
-        private PopupField<string> conditionPopup;
-
-        /// <summary>Builds the inspector UI: marker popups, table overrides, edit and CSV buttons.</summary>
+        /// <summary>Builds the inspector UI with table overrides, edit, and CSV buttons.</summary>
         public override VisualElement CreateInspectorGUI()
         {
             VisualElement root = new();
 
             serializedObject.Update();
-
-            eventPopup = GetMarkerPopup<IEventMarker>("events");
-            conditionPopup = GetMarkerPopup<IConditionMarker>("conditions");
 
             Button button = new(Open) { text = "Edit" };
 
@@ -30,9 +22,6 @@ namespace Yang.Dialogue.Editor
             Button importButton = new(ImportCsv) { text = "Import CSV" };
 
             root.Bind(serializedObject);
-
-            root.Add(eventPopup);
-            root.Add(conditionPopup);
 
             root.Add(GetHeader("Override Settings"));
             root.Add(GetField("speakerTable"));
@@ -116,77 +105,6 @@ namespace Yang.Dialogue.Editor
             header.style.marginBottom = 4;
 
             return header;
-        }
-
-        /// <summary>Builds a popup that selects the concrete marker type for a managed-reference property.</summary>
-        private PopupField<string> GetMarkerPopup<T>(string propName)
-        {
-            List<Type> types = new();
-
-            SerializedProperty containerProp = serializedObject.FindProperty(propName);
-
-            TypeCache.TypeCollection rawTypes = TypeCache.GetTypesDerivedFrom<T>();
-
-            for (int i = 0; i < rawTypes.Count; i++)
-            {
-                Type t = rawTypes[i];
-
-                if (t.IsAbstract) continue;
-                if (t.IsGenericType) continue;
-                if (!t.IsClass) continue;
-
-                types.Add(t);
-            }
-
-            List<string> typeNames = new(types.Count);
-
-            for (int i = 0; i < types.Count; i++) typeNames.Add(types[i].Name);
-
-            Type currentType = GetManagedReferenceType(containerProp);
-
-            int currentIndex = -1;
-
-            for (int i = 0; i < types.Count; i++)
-            {
-                if (types[i] == currentType)
-                {
-                    currentIndex = i;
-
-                    break;
-                }
-            }
-
-            PopupField<string> typePopup = new(containerProp.displayName, typeNames, currentIndex);
-
-            typePopup.TrackPropertyValue(containerProp, _ =>
-            {
-                typePopup.SetValueWithoutNotify(_.managedReferenceValue.ToString());
-            });
-            typePopup.RegisterValueChangedCallback(evt =>
-            {
-                int newIndex = typeNames.IndexOf(evt.newValue);
-
-                if (newIndex < 0) return;
-
-                Undo.RecordObject(target, $"Changed {propName}");
-
-                containerProp.managedReferenceValue = Activator.CreateInstance(types[newIndex]);
-
-                serializedObject.ApplyModifiedProperties();
-            });
-
-            return typePopup;
-        }
-
-        /// <summary>Resolves the runtime Type of a managed-reference property's current value.</summary>
-        private Type GetManagedReferenceType(SerializedProperty prop)
-        {
-            if (prop == null) return null;
-            if (string.IsNullOrEmpty(prop.managedReferenceFullTypename)) return null;
-
-            string[] split = prop.managedReferenceFullTypename.Split(' ');
-
-            return Type.GetType($"{split[1]}, {split[0]}");
         }
 
         /// <summary>Creates a bound property field for the named serialized property.</summary>

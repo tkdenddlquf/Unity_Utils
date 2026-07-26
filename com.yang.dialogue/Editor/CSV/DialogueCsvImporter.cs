@@ -60,13 +60,12 @@ namespace Yang.Dialogue.Editor
             public readonly List<Row> children = new();
         }
 
-        /// <summary>Shared import state: known collections, resolved tables, warnings, and existing object slots.</summary>
+        /// <summary>Shared import state: known collections, resolved tables, and warnings.</summary>
         private class Ctx
         {
             public IReadOnlyList<StringTableCollection> collections;
             public readonly Dictionary<string, StringTableCollection> resolvedTables = new();
             public readonly List<string> warnings = new();
-            public readonly Dictionary<string, List<DataWrapper>> existingObjects = new();
         }
 
         /// <summary>Parses the CSV and rebuilds the SO's nodes, links and localized text; returns false on abort.</summary>
@@ -93,11 +92,6 @@ namespace Yang.Dialogue.Editor
             {
                 collections = LocalizationEditorSettings.GetStringTableCollections(),
             };
-
-            foreach (NodeData node in so.EditorNodes)
-            {
-                if (node.type == NodeType.Object) ctx.existingObjects[node.guid] = node.EditorOptionDatas;
-            }
 
             if (!ResolveTables(so, nodes, ctx, out message)) return false;
 
@@ -161,7 +155,7 @@ namespace Yang.Dialogue.Editor
             return true;
         }
 
-        /// <summary>Parses data rows into node rows, attaching Option/Branch/Asset rows as children of the prior node.</summary>
+        /// <summary>Parses data rows into node rows, attaching supported sub-rows to the prior node.</summary>
         private static List<Row> ParseRows(List<List<string>> rows, List<LocaleColumn> localeColumns)
         {
             List<Row> nodes = new();
@@ -176,7 +170,7 @@ namespace Yang.Dialogue.Editor
 
                 Row row = ReadRow(cells, localeColumns);
 
-                if (row.type == "Option" || row.type == "Branch" || row.type == "Asset")
+                if (row.type == "Option" || row.type == "Branch" || row.type == "Instruction" || row.type == "Asset")
                 {
                     current?.children.Add(row);
                 }
@@ -465,7 +459,18 @@ namespace Yang.Dialogue.Editor
                     break;
 
                 case NodeType.Event:
-                    AppendEvent(options, row.data);
+                    for (int i = 0; i < row.children.Count; i++)
+                    {
+                        Row instruction = row.children[i];
+                        if (instruction.type != "Instruction") continue;
+
+                        List<GenericData> eventData = new() { new GenericData(instruction.message) };
+                        AppendCommandArguments(eventData, instruction.data, ctx, row.id);
+                        options.Add(new DataWrapper(eventData));
+                    }
+
+                    if (options.Count == 0)
+                        options.Add(new DataWrapper(new GenericData(GenericData.DataType.String)));
 
                     ports.Add(new DataWrapper());
 
@@ -499,19 +504,23 @@ namespace Yang.Dialogue.Editor
                     }
                     break;
 
-                case NodeType.Object:
-                    if (ctx.existingObjects.TryGetValue(row.id, out List<DataWrapper> existing) && existing.Count > 0)
+                case NodeType.Command:
+                    for (int i = 0; i < row.children.Count; i++)
                     {
-                        foreach (DataWrapper slot in existing) options.Add(new DataWrapper(slot));
-                    }
-                    else
-                    {
-                        int slotCount = row.children.Count > 0 ? row.children.Count : 1;
+                        Row instruction = row.children[i];
 
-                        for (int i = 0; i < slotCount; i++) options.Add(new DataWrapper(new GenericData(GenericData.DataType.Object)));
+                        if (instruction.type != "Instruction") continue;
 
-                        ctx.warnings.Add($"'{row.id}': new Object node imported with {slotCount} empty slot(s) — assign objects in the editor.");
+                        List<GenericData> command = new()
+                        {
+                            new GenericData(instruction.message)
+                        };
+
+                        AppendCommandArguments(command, instruction.data, ctx, row.id);
+                        options.Add(new DataWrapper(command));
                     }
+                    if (options.Count == 0)
+                        options.Add(new DataWrapper(new GenericData(GenericData.DataType.String)));
 
                     ports.Add(new DataWrapper());
 
@@ -844,7 +853,8 @@ namespace Yang.Dialogue.Editor
             "Event" => NodeType.Event,
             "Wait" => NodeType.Wait,
             "Condition" => NodeType.Condition,
-            "Object" => NodeType.Object,
+            "Command" => NodeType.Command,
+            "Object" => NodeType.Command,
             _ => NodeType.Dialogue,
         };
 
@@ -917,17 +927,63 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        /// <summary>Parses the encoded event ids into Event option wrappers, adding an empty slot if none.</summary>
-        private static void AppendEvent(List<DataWrapper> options, string data)
+        /// <summary>Parses "key:type=value" command arguments into key/value pairs.</summary>
+        private static void AppendCommandArguments(List<GenericData> command, string data, Ctx ctx, string nodeId)
         {
             foreach (string part in SplitData(data))
             {
-                options.Add(new DataWrapper(new GenericData(part)));
-            }
+                int colon = part.IndexOf(':');
+                int equals = part.IndexOf('=');
 
-            if (options.Count == 0)
-            {
-                options.Add(new DataWrapper(new GenericData(GenericData.DataType.String)));
+                if (colon <= 0 || equals <= colon + 1)
+                {
+                    ctx.warnings.Add($"'{nodeId}': ignored invalid command argument '{part}'.");
+                    continue;
+                }
+
+                string key = System.Uri.UnescapeDataString(part.Substring(0, colon).Trim());
+                string type = part.Substring(colon + 1, equals - colon - 1).Trim().ToLowerInvariant();
+                string value = System.Uri.UnescapeDataString(part.Substring(equals + 1).Trim());
+
+                GenericData parsed;
+                bool valid = true;
+
+                switch (type)
+                {
+                    case "string":
+                        parsed = new GenericData(value);
+                        break;
+
+                    case "int" when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue):
+                        parsed = new GenericData(intValue);
+                        break;
+
+                    case "float" when float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue):
+                        parsed = new GenericData(floatValue);
+                        break;
+
+                    case "bool" when bool.TryParse(value, out bool boolValue):
+                        parsed = new GenericData(boolValue);
+                        break;
+
+                    case "enum" when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int enumValue):
+                        parsed = GenericData.FromEnumValue(enumValue);
+                        break;
+
+                    default:
+                        parsed = default;
+                        valid = false;
+                        break;
+                }
+
+                if (!valid || key.Length == 0)
+                {
+                    ctx.warnings.Add($"'{nodeId}': ignored command argument '{part}' with an invalid key, type, or value.");
+                    continue;
+                }
+
+                command.Add(new GenericData(key));
+                command.Add(parsed);
             }
         }
 

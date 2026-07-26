@@ -41,7 +41,7 @@ https://github.com/tkdenddlquf/Unity_Utils.git?path=/com.yang.dialogue
 | `DialogueSO` | 대화 그래프를 담는 ScriptableObject 에셋 |
 | `DialogueRunner` | 그래프를 실행하는 MonoBehaviour. 시작/일시정지/저장/트리거 등을 제어 |
 | `IDialogueView` / `DialogueViewBase` | 노드 출력(대사·선택지 등)을 받는 UI 측 인터페이스 |
-| `IEventMarker` / `IConditionMarker` | 에디터에서 이벤트 ID·조건 키 목록을 제공하는 마커 클래스 |
+| Attribute 스키마 | Command, Event, Trigger/Condition 입력 UI와 타입 정의 |
 
 ### 노드 타입 (`NodeType`)
 
@@ -54,7 +54,7 @@ https://github.com/tkdenddlquf/Unity_Utils.git?path=/com.yang.dialogue
 | Trigger | 트리거 값을 설정/증감 | — |
 | Event | 등록된 이벤트 콜백 실행 | — |
 | Wait | 초 단위 대기 또는 외부 신호 대기 | (신호 대기 시) `OnMessage` |
-| Object | UnityEngine.Object 참조 전달 | `OnObject` |
+| Command | 문자열 ID와 타입화된 인자를 View에 전달 | `OnCommand` |
 
 ---
 
@@ -73,27 +73,70 @@ https://github.com/tkdenddlquf/Unity_Utils.git?path=/com.yang.dialogue
 - **연결 노드로 이동** — 포트의 막대를 더블클릭하면 연결된 노드로 화면이 이동합니다. 입력 포트에 여러 개가 연결돼 있으면 더블클릭할 때마다 순환합니다.
 - **ID 검색** — 우측 상단(언어 선택 아래) 검색창에 노드 ID 일부를 입력하면 자동완성 목록에서 골라 해당 노드로 이동할 수 있습니다.
 
-### 3-2. 마커 클래스 (선택)
+### 3-2. Event와 Variable 스키마
 
-Event 노드의 이벤트 ID와 Condition/Choice의 조건 키를 에디터 드롭다운에 노출하려면 마커 인터페이스를 구현한 클래스를 만들고, 상수(`const string`)로 값을 정의한 뒤 `DialogueSO`에 지정합니다.
+Event는 Command와 마찬가지로 ID와 인자를 선언합니다.
 
 ```csharp
-using Yang.Dialogue;
-
-public class Events_Chapter_01 : IEventMarker
+[DialogueEvent("door.open", Menu = "Door/Open")]
+public class OpenDoorEvent
 {
-    public const string OpenDoor = "OpenDoor";
-    public const string PlaySfx  = "PlaySfx";
-}
-
-public class Conditions_Chapter_01 : IConditionMarker
-{
-    public const string Gold     = "Gold";
-    public const string HasKey   = "HasKey";
+    public string doorId;
+    public bool animated = true;
 }
 ```
 
-### 3-3. View 구현
+Trigger, Condition, Choice가 공유하는 변수는 하나의 스키마에 선언합니다.
+현재 지원 변수 타입은 `float`, `bool`입니다.
+
+```csharp
+[DialogueVariableSchema]
+public class GameDialogueVariables
+{
+    [DialogueVariable("Affection", Order = 0)]
+    public float affection;
+
+    [DialogueVariable("Has Key", Order = 1)]
+    public bool hasKey;
+}
+```
+
+### 3-3. Command 스키마
+
+Command 노드의 ID와 인자를 직접 입력하지 않으려면 게임 코드에 스키마 클래스를 선언합니다.
+공개 인스턴스 필드는 에디터에서 타입에 맞는 입력 필드로 자동 표시되며, 실제 그래프에는
+Command ID와 직렬화 가능한 값만 저장됩니다.
+
+```csharp
+[DialogueCommand("character.move", Menu = "Character/Move")]
+public class MoveCharacterCommand
+{
+    [DialogueArgument("Target", Order = 0)]
+    [DialogueOptions(typeof(CharacterOptions), nameof(CharacterOptions.GetIDs))]
+    public string target;
+
+    [DialogueArgument("Position X", Order = 1)]
+    public float x;
+
+    [DialogueArgument("Position Y", Order = 2)]
+    public float y;
+
+    [DialogueArgument("Duration", Order = 3)]
+    public float duration = 0.5f;
+}
+
+public static class CharacterOptions
+{
+    public static IReadOnlyList<string> GetIDs()
+        => new[] { "alice", "bob", "shopkeeper" };
+}
+```
+
+지원 필드 타입은 `string`, `int`, `float`, `bool`, `enum`입니다.
+`DialogueOptions`의 공급 메서드는 매개변수가 없는 static 메서드여야 하며
+`IEnumerable<string>`을 반환해야 합니다.
+
+### 3-4. View 구현
 
 `DialogueViewBase`(MonoBehaviour)를 상속해 필요한 콜백만 override 합니다. 각 콜백은 `Task`를 반환하므로, 타이핑 연출·버튼 입력 대기 등을 `await` 로 처리하면 그동안 러너가 다음 노드로 진행하지 않고 기다립니다.
 
@@ -122,7 +165,22 @@ public class SampleDialogueView : DialogueViewBase
         return Task.FromResult(0);
     }
 
-    public override Task OnObject(IReadOnlyList<Object> target, IRunnerToken token) => Task.CompletedTask;   // Object 노드가 넘긴 에셋 처리
+    public override Task OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token)
+    {
+        foreach (RunnerCommand command in commands)
+        {
+            if (command.ID == "character.move")
+            {
+                string target = command.GetString("target");
+                float x = command.GetFloat("x");
+                float duration = command.GetFloat("duration");
+
+                // 게임 측 캐릭터 시스템에 명령 전달
+            }
+        }
+
+        return Task.CompletedTask;
+    }
 
     public override Task OnMessage(string reason, IRunnerToken token) => Task.CompletedTask;   // 대화 종료/Wait 신호 등 알림
 
@@ -135,7 +193,7 @@ public class SampleDialogueView : DialogueViewBase
 }
 ```
 
-### 3-4. 러너 설정 & 실행
+### 3-5. 러너 설정 & 실행
 
 1. 씬의 GameObject에 `DialogueRunner` 컴포넌트를 추가합니다.
 2. 인스펙터에서 `so`(DialogueSO)와 `viewBases`(위에서 만든 View들)를 할당합니다.
@@ -206,15 +264,15 @@ void ClearTriggerCallbacks();
 Event 노드가 실행될 때 호출할 콜백을 ID로 등록합니다.
 
 ```csharp
-void EventRegisterCallback(string id, System.Action callback);
-void EventUnregisterCallback(string id, System.Action callback);
+void EventRegisterCallback(string id, System.Action<RunnerCommand> callback);
+void EventUnregisterCallback(string id, System.Action<RunnerCommand> callback);
 void ClearEventCallbacks();
 ```
 
 ```csharp
-runner.EventRegisterCallback(Events_Chapter_01.OpenDoor, () => door.Open());
-runner.SetValue(Conditions_Chapter_01.Gold, 100f);
-runner.SetValue(Conditions_Chapter_01.HasKey, true);
+runner.EventRegisterCallback("door.open", data => door.Open(data.GetString("doorId")));
+runner.SetValue("affection", 100f);
+runner.SetValue("hasKey", true);
 ```
 
 ### 저장 / 불러오기

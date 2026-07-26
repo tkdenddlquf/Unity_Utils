@@ -299,14 +299,14 @@ namespace Yang.Dialogue
 
         /// <summary>
         /// Subscribes a callback that fires when the dialogue graph reaches the event node with the given id.
-        /// Call runner.EventRegisterCallback("playSound", () => audio.Play());
+        /// Call runner.EventRegisterCallback("playSound", data => audio.Play());
         /// </summary>
-        public void EventRegisterCallback(string id, System.Action callback) => runnerEvent.RegisterCallback(id, callback);
+        public void EventRegisterCallback(string id, System.Action<RunnerCommand> callback) => runnerEvent.RegisterCallback(id, callback);
 
         /// <summary>
         /// Unsubscribes a previously registered event callback for the given id.
         /// </summary>
-        public void EventUnregisterCallback(string id, System.Action callback) => runnerEvent.UnregisterCallback(id, callback);
+        public void EventUnregisterCallback(string id, System.Action<RunnerCommand> callback) => runnerEvent.UnregisterCallback(id, callback);
         #endregion
 
         #region Trigger

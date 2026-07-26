@@ -429,7 +429,7 @@ namespace Yang.Dialogue.Editor
             menu.AppendSeparator();
             menu.AppendAction("Add Trigger", _ => AddNode(NodeType.Trigger, nodePos));
             menu.AppendAction("Add Event", _ => AddNode(NodeType.Event, nodePos));
-            menu.AppendAction("Add Object", _ => AddNode(NodeType.Object, nodePos));
+            menu.AppendAction("Add Command", _ => AddNode(NodeType.Command, nodePos));
             menu.AppendSeparator();
             menu.AppendAction("Add Condition", _ => AddNode(NodeType.Condition, nodePos));
             menu.AppendSeparator();
@@ -516,7 +516,7 @@ namespace Yang.Dialogue.Editor
                 NodeType.Event => new EventNode(window, guid),
                 NodeType.Choice => new ChoiceNode(window, guid),
                 NodeType.Wait => new WaitNode(window, guid),
-                NodeType.Object => new ObjectNode(window, guid),
+                NodeType.Command => new CommandNode(window, guid),
                 _ => null,
             };
 

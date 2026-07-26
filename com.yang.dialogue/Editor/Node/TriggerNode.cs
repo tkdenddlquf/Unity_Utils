@@ -38,16 +38,35 @@ namespace Yang.Dialogue.Editor
             SetOptions();
         }
 
-        /// <summary>Adds "Add Float Trigger" and "Add Bool Trigger" entries to the context menu.</summary>
+        /// <summary>Adds schema-declared variables to the context menu.</summary>
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             if (evt.target != this) return;
 
             DropdownMenu menu = evt.menu;
 
-            menu.AppendAction("Add Float Trigger", _ => CreateFloatField());
-            menu.AppendAction("Add Bool Trigger", _ => CreateBoolField());
+            List<DialogueVariableSchemaUtility.VariableInfo> variables = DialogueVariableSchemaUtility.GetVariables();
+
+            if (variables.Count == 0)
+            {
+                menu.AppendAction("Add Variable/No schema variables", _ => { }, DropdownMenuAction.Status.Disabled);
+            }
+            else
+            {
+                foreach (DialogueVariableSchemaUtility.VariableInfo variable in variables)
+                {
+                    DialogueVariableSchemaUtility.VariableInfo captured = variable;
+                    menu.AppendAction($"Add Variable/{captured.label}",
+                        _ => CreateVariableField(captured.key, captured.type));
+                }
+            }
             menu.AppendSeparator();
+        }
+
+        private void CreateVariableField(string key, System.Type type)
+        {
+            if (type == typeof(float)) CreateFloatField(key);
+            else if (type == typeof(bool)) CreateBoolField(key);
         }
 
         /// <summary>Seeds default option and port data when none exist.</summary>
@@ -69,7 +88,7 @@ namespace Yang.Dialogue.Editor
         /// <summary>Loads condition keys and builds a float or bool field per option entry by its data type.</summary>
         private void SetOptions()
         {
-            window.GetKeysInto(window.SO.Conditions, conditions);
+            conditions.Clear();
 
             for (int i = 0; i < optionDatas.Count; i++)
             {
@@ -144,27 +163,61 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Change Trigger Option");
 
-            optionDatas[optionIndex].data[0] = new(evt.newValue);
+            System.Type selectedType = DialogueVariableSchemaUtility.GetValueType(evt.newValue);
+            GenericData.DataType currentType = optionDatas[optionIndex].data[1].Type;
+
+            if (selectedType == typeof(float) && currentType != GenericData.DataType.Float)
+            {
+                optionDatas[optionIndex] = new DataWrapper(
+                    new GenericData(evt.newValue),
+                    new GenericData(0f),
+                    new GenericData(ValueSetterType.Plus));
+
+                ReplaceRow(itemElement, optionIndex, true, evt.newValue);
+            }
+            else if (selectedType == typeof(bool) && currentType != GenericData.DataType.Bool)
+            {
+                optionDatas[optionIndex] = new DataWrapper(
+                    new GenericData(evt.newValue),
+                    new GenericData(false));
+
+                ReplaceRow(itemElement, optionIndex, false, evt.newValue);
+            }
+            else
+            {
+                optionDatas[optionIndex].data[0] = new(evt.newValue);
+            }
 
             EditorUtility.SetDirty(so);
 
             window.SetUnsaved();
         }
 
+        private void ReplaceRow(VisualElement oldRow, int index, bool isFloat, string key)
+        {
+            extensionContainer.Remove(oldRow);
+
+            if (isFloat) AddFloatField(key, 0f, ValueSetterType.Plus);
+            else AddBoolField(key, false);
+
+            VisualElement newRow = extensionContainer[extensionContainer.childCount - 1];
+            extensionContainer.Insert(index, newRow);
+        }
+
         /// <summary>Appends a new float trigger field and its option data with undo support.</summary>
-        private void CreateFloatField()
+        private void CreateFloatField(string key = "")
         {
             DialogueSO so = window.SO;
 
             Undo.RecordObject(so, "Create Float Trigger");
 
             DataWrapper optionData = new(
-                new(GenericData.DataType.String),
+                new(key),
                 new(GenericData.DataType.Float),
                 new(GenericData.DataType.Enum)
             );
 
-            AddFloatField("", 0, ValueSetterType.Plus);
+            AddFloatField(key, 0, ValueSetterType.Plus);
 
             optionDatas.Add(optionData);
 
@@ -180,11 +233,11 @@ namespace Yang.Dialogue.Editor
 
             container.AddToClassList("dlg-row");
 
-            window.GetKeysInto(window.SO.Conditions, conditions);
+            DialogueVariableSchemaUtility.GetKeys(conditions);
 
             int index = conditions.IndexOf(key);
 
-            PopupField<string> field = new("Float Trigger", conditions, index);
+            PopupField<string> field = new("Variable", conditions, index);
 
             field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedCallback);
@@ -270,18 +323,18 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
         /// <summary>Appends a new bool trigger field and its option data with undo support.</summary>
-        private void CreateBoolField()
+        private void CreateBoolField(string key = "")
         {
             DialogueSO so = window.SO;
 
             Undo.RecordObject(so, "Create Bool Trigger");
 
             DataWrapper optionData = new(
-                new(GenericData.DataType.String),
+                new(key),
                 new(GenericData.DataType.Bool)
             );
 
-            AddBoolField("", false);
+            AddBoolField(key, false);
 
             optionDatas.Add(optionData);
 
@@ -297,11 +350,11 @@ namespace Yang.Dialogue.Editor
 
             container.AddToClassList("dlg-row");
 
-            window.GetKeysInto(window.SO.Conditions, conditions);
+            DialogueVariableSchemaUtility.GetKeys(conditions);
 
             int index = conditions.IndexOf(key);
 
-            PopupField<string> field = new("Bool Trigger", conditions, index);
+            PopupField<string> field = new("Variable", conditions, index);
 
             field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedCallback);

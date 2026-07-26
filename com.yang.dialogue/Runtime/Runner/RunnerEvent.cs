@@ -7,19 +7,19 @@ namespace Yang.Dialogue
     /// </summary>
     internal class RunnerEvent
     {
-        private readonly Dictionary<string, System.Action> callbacks = new();
+        private readonly Dictionary<string, System.Action<RunnerCommand>> callbacks = new();
 
         /// <summary>Invokes the callback registered under the given event id, if any.</summary>
-        public void OnEvent(string id)
+        public void OnEvent(RunnerCommand data)
         {
-            if (callbacks.TryGetValue(id, out System.Action callback)) callback?.Invoke();
+            if (callbacks.TryGetValue(data.ID, out System.Action<RunnerCommand> callback)) callback?.Invoke(data);
         }
 
         /// <summary>Removes all registered event callbacks.</summary>
         public void ClearCallbacks() => callbacks.Clear();
 
         /// <summary>Registers a callback for an event id, ensuring it is subscribed exactly once.</summary>
-        public void RegisterCallback(string id, System.Action callback)
+        public void RegisterCallback(string id, System.Action<RunnerCommand> callback)
         {
             if (callbacks.ContainsKey(id))
             {
@@ -30,7 +30,7 @@ namespace Yang.Dialogue
         }
 
         /// <summary>Unregisters a callback from an event id; returns false if the id was not registered.</summary>
-        public bool UnregisterCallback(string id, System.Action callback)
+        public bool UnregisterCallback(string id, System.Action<RunnerCommand> callback)
         {
             if (callbacks.ContainsKey(id))
             {

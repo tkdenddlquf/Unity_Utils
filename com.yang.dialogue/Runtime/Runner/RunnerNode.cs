@@ -156,11 +156,18 @@ namespace Yang.Dialogue
                         {
                             IReadOnlyList<GenericData> datas = optionDatas[i].data;
 
-                            string value = datas[0].ToString();
+                            if (datas.Count == 0 || !datas[0].TryGetString(out string id) || string.IsNullOrWhiteSpace(id)) continue;
 
-                            if (value == "") continue;
+                            List<RunnerArgument> arguments = new();
 
-                            runnerEvent.OnEvent(value);
+                            for (int j = 1; j + 1 < datas.Count; j += 2)
+                            {
+                                if (!datas[j].TryGetString(out string key) || string.IsNullOrWhiteSpace(key)) continue;
+
+                                arguments.Add(new RunnerArgument(key, datas[j + 1]));
+                            }
+
+                            runnerEvent.OnEvent(new RunnerCommand(id, arguments));
                         }
                     }
                     return 0;
@@ -265,9 +272,9 @@ namespace Yang.Dialogue
                     }
                     return 0;
 
-                case NodeType.Object:
+                case NodeType.Command:
                     {
-                        List<UnityEngine.Object> objectDatas = new();
+                        List<RunnerCommand> commands = new();
 
                         IReadOnlyList<DataWrapper> optionDatas = nodeData.OptionDatas;
 
@@ -275,10 +282,21 @@ namespace Yang.Dialogue
                         {
                             IReadOnlyList<GenericData> datas = optionDatas[i].data;
 
-                            if (datas[0].TryGetObject(out UnityEngine.Object value)) objectDatas.Add(value);
+                            if (datas.Count == 0 || !datas[0].TryGetString(out string id) || string.IsNullOrWhiteSpace(id)) continue;
+
+                            List<RunnerArgument> arguments = new();
+
+                            for (int j = 1; j + 1 < datas.Count; j += 2)
+                            {
+                                if (!datas[j].TryGetString(out string key) || string.IsNullOrWhiteSpace(key)) continue;
+
+                                arguments.Add(new RunnerArgument(key, datas[j + 1]));
+                            }
+
+                            commands.Add(new RunnerCommand(id, arguments));
                         }
 
-                        foreach (IDialogueView view in token.Views) await view.OnObject(objectDatas, token);
+                        foreach (IDialogueView view in token.Views) await view.OnCommand(commands, token);
                     }
                     return 0;
             }

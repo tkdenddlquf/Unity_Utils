@@ -15,15 +15,14 @@ namespace Yang.Dialogue
         /// </summary>
         public enum DataType : byte
         {
-            Int,
-            Float,
-            Long,
-            Bool,
-            Color,
-            Guid,
-            Enum,
-            Object,
-            String
+            Int = 0,
+            Float = 1,
+            Long = 2,
+            Bool = 3,
+            Color = 4,
+            Guid = 5,
+            Enum = 6,
+            String = 8,
         }
 
         [SerializeField] private DataType type;
@@ -33,7 +32,6 @@ namespace Yang.Dialogue
         [SerializeField] private long longValue;
         [SerializeField] private Color32 colorValue;
 
-        [SerializeField] private UnityEngine.Object objectValue;
         [SerializeField] private string stringValue;
 
         /// <summary>
@@ -196,16 +194,15 @@ namespace Yang.Dialogue
             intValue = System.Convert.ToInt32(value);
         }
 
-        /// <summary>
-        /// Creates a value holding a Unity object reference.
-        /// </summary>
-        public GenericData(UnityEngine.Object value)
+        /// <summary>Creates an enum-tagged value from its serialized underlying integer.</summary>
+        public static GenericData FromEnumValue(int value)
         {
-            this = default;
+            GenericData result = new(DataType.Enum)
+            {
+                intValue = value
+            };
 
-            type = DataType.Object;
-
-            objectValue = value;
+            return result;
         }
 
         /// <summary>
@@ -335,23 +332,6 @@ namespace Yang.Dialogue
         }
 
         /// <summary>
-        /// Outputs the stored Unity object and returns true only when the value is of object type.
-        /// </summary>
-        public readonly bool TryGetObject(out UnityEngine.Object value)
-        {
-            if (type == DataType.Object)
-            {
-                value = objectValue;
-
-                return true;
-            }
-
-            value = default;
-
-            return false;
-        }
-
-        /// <summary>
         /// Outputs the stored string and returns true only when the value is of string type.
         /// </summary>
         public readonly bool TryGetString(out string value)
@@ -404,11 +384,6 @@ namespace Yang.Dialogue
         public readonly T GetEnum<T>() where T : struct, Enum => type == DataType.Enum ? (T)Enum.ToObject(typeof(T), intValue) : default;
 
         /// <summary>
-        /// Returns the stored Unity object, or default if not an object.
-        /// </summary>
-        public readonly UnityEngine.Object GetObject() => type == DataType.Object ? objectValue : default;
-
-        /// <summary>
         /// Returns the stored string, or default if not a string.
         /// </summary>
         public readonly string GetString() => type == DataType.String ? stringValue : default;
@@ -425,10 +400,9 @@ namespace Yang.Dialogue
                 DataType.Long => longValue.ToString(),
                 DataType.Bool => (intValue == 1).ToString(),
                 DataType.Color => colorValue.ToString(),
-                DataType.Guid => stringValue,
+                DataType.Guid => stringValue ?? "",
                 DataType.Enum => intValue.ToString(),
-                DataType.Object => objectValue == null ? "" : objectValue.ToString(),
-                DataType.String => stringValue,
+                DataType.String => stringValue ?? "",
                 _ => ""
             };
         }

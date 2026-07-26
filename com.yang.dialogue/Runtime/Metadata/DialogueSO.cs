@@ -5,7 +5,7 @@ using UnityEngine.Localization;
 namespace Yang.Dialogue
 {
     /// <summary>
-    /// Serialized dialogue asset created via the Dialogue/Node menu; assign it to a DialogueRunner as the dialogue to play, and configure its event/condition markers and localization tables here.
+    /// Serialized dialogue graph asset assigned to a DialogueRunner.
     /// </summary>
     [System.Serializable, CreateAssetMenu(fileName = "NewDialogue", menuName = "Dialogue/Node")]
     public class DialogueSO : ScriptableObject
@@ -16,20 +16,6 @@ namespace Yang.Dialogue
         /// GUID of the entry node where playback begins.
         /// </summary>
         public string StartGuid => startNode.guid;
-
-        [SerializeReference] private IEventMarker events;
-
-        /// <summary>
-        /// Marker resolving event tokens raised by this dialogue.
-        /// </summary>
-        public IEventMarker Events => events;
-
-        [SerializeReference] private IConditionMarker conditions;
-
-        /// <summary>
-        /// Marker evaluating condition tokens used by this dialogue.
-        /// </summary>
-        public IConditionMarker Conditions => conditions;
 
         [SerializeField] private LocalizedStringTable speakerTable;
 
