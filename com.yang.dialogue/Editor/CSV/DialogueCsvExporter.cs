@@ -241,9 +241,9 @@ namespace Yang.Dialogue.Editor
             {
                 IReadOnlyList<GenericData> data = optionDatas[i].data;
 
-                string key = data[0].ToString();
+                int fieldId = data[0].GetInt();
 
-                if (string.IsNullOrEmpty(key)) continue;
+                if (fieldId <= 0) continue;
 
                 switch (data[1].Type)
                 {
@@ -256,12 +256,12 @@ namespace Yang.Dialogue.Editor
                                 _ => "=",
                             };
 
-                            parts.Add($"{key}{op}{data[1].GetFloat()}");
+                            parts.Add($"{fieldId}{op}{data[1].GetFloat()}");
                         }
                         break;
 
                     case GenericData.DataType.Bool:
-                        parts.Add($"{key}={(data[1].GetBool() ? "true" : "false")}");
+                        parts.Add($"{fieldId}={(data[1].GetBool() ? "true" : "false")}");
                         break;
                 }
             }
@@ -288,9 +288,9 @@ namespace Yang.Dialogue.Editor
 
             for (int j = start; j + 2 < data.Count; j += 3)
             {
-                string key = data[j].ToString();
+                int fieldId = data[j].GetInt();
 
-                if (string.IsNullOrEmpty(key)) continue;
+                if (fieldId <= 0) continue;
 
                 switch (data[j + 1].Type)
                 {
@@ -307,12 +307,12 @@ namespace Yang.Dialogue.Editor
                                 _ => "==",
                             };
 
-                            parts.Add($"{key}{op}{data[j + 1].GetFloat()}");
+                            parts.Add($"{fieldId}{op}{data[j + 1].GetFloat()}");
                         }
                         break;
 
                     case GenericData.DataType.Bool:
-                        parts.Add($"{key}=={(data[j + 1].GetBool() ? "true" : "false")}");
+                        parts.Add($"{fieldId}=={(data[j + 1].GetBool() ? "true" : "false")}");
                         break;
                 }
             }

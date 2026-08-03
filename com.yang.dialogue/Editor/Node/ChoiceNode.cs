@@ -17,7 +17,7 @@ namespace Yang.Dialogue.Editor
     ///   0     : Key       - string  (localization entry key)
     ///   1     : ID        - long    (localization entry id)
     ///   2     : Hide      - bool    (hide the option until its conditions pass)
-    ///   N     : Condition - string  (condition key)
+    ///   N     : Condition - int     (variable FieldId)
     ///   N + 1 : Value     - float | bool  (value to compare against)
     ///   N + 2 : CheckType - enum    (comparison operator, e.g. Less)
     ///
@@ -166,7 +166,7 @@ namespace Yang.Dialogue.Editor
 
                 for (int j = 3; j < portOptions.Count; j += 3)
                 {
-                    string key = portOptions[j].ToString();
+                    int fieldId = portOptions[j].GetInt();
 
                     switch (portOptions[j + 1].Type)
                     {
@@ -175,7 +175,7 @@ namespace Yang.Dialogue.Editor
                                 float value = portOptions[j + 1].GetFloat();
                                 ValueCheckType type = portOptions[j + 2].GetEnum<ValueCheckType>();
 
-                                itemContainer.Add(GetConditionFloatField(key, value, type));
+                                itemContainer.Add(GetConditionFloatField(fieldId, value, type));
                             }
                             break;
 
@@ -183,7 +183,7 @@ namespace Yang.Dialogue.Editor
                             {
                                 bool value = portOptions[j + 1].GetBool();
 
-                                itemContainer.Add(GetConditionBoolField(key, value));
+                                itemContainer.Add(GetConditionBoolField(fieldId, value));
                             }
                             break;
                     }
@@ -587,8 +587,8 @@ namespace Yang.Dialogue.Editor
             hide.RegisterValueChangedCallback(ChangedTextCallback);
 
             Button createVariableButton = new(() =>
-                DialogueVariableSchemaUtility.ShowMenu((key, type) =>
-                    CreateConditionField(itemContainer, key, type))) { text = "+" };
+                DialogueVariableSchemaUtility.ShowMenu((fieldId, type) =>
+                    CreateConditionField(itemContainer, fieldId, type))) { text = "+" };
             Button removeButton = new(() =>
             {
                 if (RemovePort(port)) textsElement.Remove(textField);
@@ -628,10 +628,10 @@ namespace Yang.Dialogue.Editor
             return itemContainer;
         }
 
-        private void CreateConditionField(VisualElement itemContainer, string key, System.Type type)
+        private void CreateConditionField(VisualElement itemContainer, int fieldId, System.Type type)
         {
-            if (type == typeof(float)) CreateConditionFloatField(itemContainer, key);
-            else if (type == typeof(bool)) CreateConditionBoolField(itemContainer, key);
+            if (type == typeof(float)) CreateConditionFloatField(itemContainer, fieldId);
+            else if (type == typeof(bool)) CreateConditionBoolField(itemContainer, fieldId);
         }
 
         /// <summary>Removes a condition row from a choice port and its 3-slot data group, hiding the toggle when none remain.</summary>
@@ -688,9 +688,9 @@ namespace Yang.Dialogue.Editor
                 field.value = "";
 
                 int portIndex = port.parent.IndexOf(port);
-                int itemIndex = 3 + itemElement.parent.IndexOf(itemElement);
+                int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3;
 
-                portDatas[portIndex].data[itemIndex] = new(GenericData.DataType.String);
+                portDatas[portIndex].data[itemIndex] = new(GenericData.DataType.Int);
 
                 EditorUtility.SetDirty(so);
 
@@ -762,30 +762,31 @@ namespace Yang.Dialogue.Editor
             Undo.RecordObject(so, "Change Condition Option");
 
             List<GenericData> data = portDatas[portIndex].data;
-            System.Type selectedType = DialogueVariableSchemaUtility.GetValueType(evt.newValue);
+            int fieldId = DialogueVariableSchemaUtility.GetFieldId(evt.newValue);
+            System.Type selectedType = DialogueVariableSchemaUtility.GetValueType(fieldId);
             GenericData.DataType currentType = data[itemIndex + 1].Type;
 
             if (selectedType == typeof(float) && currentType != GenericData.DataType.Float)
             {
-                data[itemIndex] = new GenericData(evt.newValue);
+                data[itemIndex] = new GenericData(fieldId);
                 data[itemIndex + 1] = new GenericData(0f);
                 data[itemIndex + 2] = new GenericData(ValueCheckType.Less);
 
                 ReplaceConditionRow(itemElement, (itemIndex - 3) / 3,
-                    GetConditionFloatField(evt.newValue, 0f, ValueCheckType.Less));
+                    GetConditionFloatField(fieldId, 0f, ValueCheckType.Less));
             }
             else if (selectedType == typeof(bool) && currentType != GenericData.DataType.Bool)
             {
-                data[itemIndex] = new GenericData(evt.newValue);
+                data[itemIndex] = new GenericData(fieldId);
                 data[itemIndex + 1] = new GenericData(false);
                 data[itemIndex + 2] = new GenericData(GenericData.DataType.Enum);
 
                 ReplaceConditionRow(itemElement, (itemIndex - 3) / 3,
-                    GetConditionBoolField(evt.newValue, false));
+                    GetConditionBoolField(fieldId, false));
             }
             else
             {
-                data[itemIndex] = new(evt.newValue);
+                data[itemIndex] = new(fieldId);
             }
 
             EditorUtility.SetDirty(so);
@@ -803,7 +804,7 @@ namespace Yang.Dialogue.Editor
 
         #region Float
         /// <summary>Adds a float condition row and its 3-slot data group to a choice port, revealing the hide toggle.</summary>
-        private void CreateConditionFloatField(VisualElement itemContainer, string key)
+        private void CreateConditionFloatField(VisualElement itemContainer, int fieldId)
         {
             Port port = itemContainer.FindParent<Port>();
 
@@ -815,9 +816,9 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Add Condition Float Field");
 
-            itemContainer.Add(GetConditionFloatField(key, 0, ValueCheckType.Less));
+            itemContainer.Add(GetConditionFloatField(fieldId, 0, ValueCheckType.Less));
 
-            portData.Add(new(key));
+            portData.Add(new(fieldId));
             portData.Add(new(GenericData.DataType.Float));
             portData.Add(new(GenericData.DataType.Enum));
 
@@ -831,7 +832,7 @@ namespace Yang.Dialogue.Editor
         }
 
         /// <summary>Builds a float condition row (key dropdown, value, comparison enum, remove button).</summary>
-        private VisualElement GetConditionFloatField(string key, float value, ValueCheckType type)
+        private VisualElement GetConditionFloatField(int fieldId, float value, ValueCheckType type)
         {
             VisualElement itemElement = new() { name = "Item Element" };
 
@@ -839,7 +840,7 @@ namespace Yang.Dialogue.Editor
 
             DialogueVariableSchemaUtility.GetKeys(conditions);
 
-            int index = conditions.IndexOf(key);
+            int index = conditions.IndexOf(DialogueVariableSchemaUtility.GetLabel(fieldId));
 
             PopupField<string> field = new("Variable", conditions, index);
 
@@ -910,7 +911,7 @@ namespace Yang.Dialogue.Editor
 
         #region Bool
         /// <summary>Adds a bool condition row and its 3-slot data group to a choice port, revealing the hide toggle.</summary>
-        private void CreateConditionBoolField(VisualElement itemContainer, string key)
+        private void CreateConditionBoolField(VisualElement itemContainer, int fieldId)
         {
             Port port = itemContainer.FindParent<Port>();
 
@@ -922,9 +923,9 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Add Condition Bool Field");
 
-            itemContainer.Add(GetConditionBoolField(key, false));
+            itemContainer.Add(GetConditionBoolField(fieldId, false));
 
-            portData.Add(new(key));
+            portData.Add(new(fieldId));
             portData.Add(new(GenericData.DataType.Bool));
             portData.Add(new(GenericData.DataType.Enum));
 
@@ -938,7 +939,7 @@ namespace Yang.Dialogue.Editor
         }
 
         /// <summary>Builds a bool condition row (key dropdown, toggle, remove button).</summary>
-        private VisualElement GetConditionBoolField(string key, bool value)
+        private VisualElement GetConditionBoolField(int fieldId, bool value)
         {
             VisualElement itemElement = new() { name = "Item Element" };
 
@@ -946,7 +947,7 @@ namespace Yang.Dialogue.Editor
 
             DialogueVariableSchemaUtility.GetKeys(conditions);
 
-            int index = conditions.IndexOf(key);
+            int index = conditions.IndexOf(DialogueVariableSchemaUtility.GetLabel(fieldId));
 
             PopupField<string> field = new("Variable", conditions, index);
 

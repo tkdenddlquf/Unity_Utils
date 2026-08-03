@@ -78,25 +78,42 @@ https://github.com/tkdenddlquf/Unity_Utils.git?path=/com.yang.dialogue
 Event는 Command와 마찬가지로 ID와 인자를 선언합니다.
 
 ```csharp
-[DialogueEvent("door.open", Menu = "Door/Open")]
-public class OpenDoorEvent
+[DialogueEvent(OpenDoorEvent.ID, Menu = "Door/Open")]
+public class OpenDoorEvent : IDialogueInstruction
 {
+    public const string ID = "door.open";
+    public const int DoorIdField = 10;
+    public const int AnimatedField = 20;
+
+    [DialogueArgument(DoorIdField, "Door ID")]
     public string doorId;
+
+    [DialogueArgument(AnimatedField, "Animated")]
     public bool animated = true;
+
+    public void ReadFrom(RunnerCommand command)
+    {
+        doorId = command.GetString(DoorIdField);
+        animated = command.GetBool(AnimatedField, true);
+    }
 }
 ```
 
 Trigger, Condition, Choice가 공유하는 변수는 하나의 스키마에 선언합니다.
 현재 지원 변수 타입은 `float`, `bool`입니다.
+각 변수의 양수 `FieldId`는 저장 식별자와 표시 순서를 겸하며 전체 Variable 스키마에서 고유해야 합니다.
 
 ```csharp
 [DialogueVariableSchema]
 public class GameDialogueVariables
 {
-    [DialogueVariable("Affection", Order = 0)]
+    public const int AffectionField = 10;
+    public const int HasKeyField = 20;
+
+    [DialogueVariable(AffectionField, "Affection")]
     public float affection;
 
-    [DialogueVariable("Has Key", Order = 1)]
+    [DialogueVariable(HasKeyField, "Has Key")]
     public bool hasKey;
 }
 ```
@@ -108,21 +125,35 @@ Command 노드의 ID와 인자를 직접 입력하지 않으려면 게임 코드
 Command ID와 직렬화 가능한 값만 저장됩니다.
 
 ```csharp
-[DialogueCommand("character.move", Menu = "Character/Move")]
-public class MoveCharacterCommand
+[DialogueCommand(MoveCharacterCommand.ID, Menu = "Character/Move")]
+public class MoveCharacterCommand : IDialogueInstruction
 {
-    [DialogueArgument("Target", Order = 0)]
+    public const string ID = "character.move";
+    public const int TargetField = 10;
+    public const int PositionXField = 20;
+    public const int PositionYField = 30;
+    public const int DurationField = 40;
+
+    [DialogueArgument(TargetField, "Target")]
     [DialogueOptions(typeof(CharacterOptions), nameof(CharacterOptions.GetIDs))]
     public string target;
 
-    [DialogueArgument("Position X", Order = 1)]
+    [DialogueArgument(PositionXField, "Position X")]
     public float x;
 
-    [DialogueArgument("Position Y", Order = 2)]
+    [DialogueArgument(PositionYField, "Position Y")]
     public float y;
 
-    [DialogueArgument("Duration", Order = 3)]
+    [DialogueArgument(DurationField, "Duration")]
     public float duration = 0.5f;
+
+    public void ReadFrom(RunnerCommand command)
+    {
+        target = command.GetString(TargetField);
+        x = command.GetFloat(PositionXField);
+        y = command.GetFloat(PositionYField);
+        duration = command.GetFloat(DurationField, 0.5f);
+    }
 }
 
 public static class CharacterOptions
@@ -135,6 +166,11 @@ public static class CharacterOptions
 지원 필드 타입은 `string`, `int`, `float`, `long`, `bool`, `Color32`, `Guid`, `enum`입니다.
 `DialogueOptions`의 공급 메서드는 매개변수가 없는 static 메서드여야 하며
 `IEnumerable<string>`을 반환해야 합니다.
+스키마는 `IDialogueInstruction`을 구현하고 `ReadFrom`에서 필요한 인자를 직접 읽습니다.
+이 변환 과정은 런타임 리플렉션을 사용하지 않습니다.
+`DialogueArgument`의 양수 `FieldId`는 저장 식별자와 표시 순서를 겸하며 스키마 안에서 고유해야 합니다.
+변수명은 자유롭게 바꿀 수 있지만 한번 사용한 `FieldId`는 변경하거나 재사용하지 않는 것을 권장합니다.
+조건부 입력은 기준 필드의 ID를 사용합니다. 예: `[DialogueShowIf(AnimatedField, true)]`.
 
 필드에 전용 Attribute가 있으면 기본 입력 필드보다 먼저 적용되는 커스텀 Drawer를 등록할 수 있습니다.
 Attribute는 런타임 코드에, Drawer는 Editor 어셈블리에 선언합니다.
@@ -220,7 +256,7 @@ public class SampleDialogueView : DialogueViewBase
     {
         foreach (RunnerCommand command in commands)
         {
-            if (command.TryConvert(out MoveCharacterCommand move))
+            if (command.TryConvert(MoveCharacterCommand.ID, out MoveCharacterCommand move))
             {
                 // 게임 측 캐릭터 시스템에 명령 전달
                 MoveCharacter(move.target, move.x, move.y, move.duration);
@@ -295,17 +331,17 @@ IReadOnlyList<IDialogueView> Views { get; }
 조건 분기와 선택지 조건에 쓰이는 float/bool 값입니다.
 
 ```csharp
-void  SetValue(string key, float value);
-void  SetValue(string key, bool value);
-float GetFloatValue(string key);
-bool  GetBoolValue(string key);
-bool  ContainsKey(string key);
-bool  RemoveValue(string key);
+void  SetValue(int fieldId, float value);
+void  SetValue(int fieldId, bool value);
+float GetFloatValue(int fieldId);
+bool  GetBoolValue(int fieldId);
+bool  ContainsKey(int fieldId);
+bool  RemoveValue(int fieldId);
 void  ClearTriggerValues();
 
 // 값 변경 콜백
-void TriggerRegisterCallback(System.Action<string> callback);          // 모든 키
-void TriggerRegisterCallback(string key, System.Action callback);      // 특정 키
+void TriggerRegisterCallback(System.Action<int> callback);             // 모든 FieldId
+void TriggerRegisterCallback(int fieldId, System.Action callback);     // 특정 FieldId
 void TriggerUnregisterCallback(...);   // 위 두 형태의 해제
 void ClearTriggerCallbacks();
 ```
@@ -321,9 +357,9 @@ void ClearEventCallbacks();
 ```
 
 ```csharp
-runner.EventRegisterCallback("door.open", data => door.Open(data.GetString("doorId")));
-runner.SetValue("affection", 100f);
-runner.SetValue("hasKey", true);
+runner.EventRegisterCallback(OpenDoorEvent.ID, data => door.Open(data.GetString(OpenDoorEvent.DoorIdField)));
+runner.SetValue(GameDialogueVariables.AffectionField, 100f);
+runner.SetValue(GameDialogueVariables.HasKeyField, true);
 ```
 
 ### 저장 / 불러오기
@@ -349,7 +385,7 @@ foreach (var flow in runner.Load(data))
 
 - **`RunnerText`** — `table`, `entry` (Localization String Table 키). 화자/대사 텍스트.
 - **`RunnerChoiceText`** — 선택지. `portIndex`(분기 포트), `table`/`entry`, `isValid`(조건 충족 여부), `Conditions`.
-- **`RunnerCondition`** — 선택지 조건 한 건. `key`, `isValid`, `type`(Float/Bool), `checkType`, `GetFloatValue()`/`GetBoolValue()`.
+- **`RunnerCondition`** — 선택지 조건 한 건. `fieldId`, `isValid`, `type`(Float/Bool), `checkType`, `GetFloatValue()`/`GetBoolValue()`.
 - **`IRunnerToken`** — 진행 중 흐름 핸들. `State`, `Views`, `CancellationToken`, `Delay(seconds)`를 제공합니다. View 콜백에서 상태를 확인하고 흐름 중단과 연동되는 대기를 만들 때 사용합니다.
 
 외부 UI 입력이나 이벤트를 기다릴 때는 `WaitFor`를 사용하면 Pause/Stop/End 시 자동으로 취소됩니다.
@@ -385,8 +421,8 @@ scanSource.TrySetResult("result");
 `DialogueSO`의 텍스트를 번역용 CSV로 주고받을 수 있습니다 (`Yang.Dialogue.Editor`의 `DialogueCsvExporter` / `DialogueCsvImporter`).
 
 - 컬럼: `ID, Type, Next, Message, Data` + 로케일별 `Speaker[code]` / `Text[code]`
-- Choice 옵션, Condition 분기, Object 참조는 소유 노드 아래 하위 행으로 표현됩니다.
-- Command/Event 인자는 `string`, `int`, `float`, `long`, `bool`, `color`, `guid`, `enum` 타입 태그로 왕복하며, 색상은 `#RRGGBBAA` 형식으로 저장됩니다.
+- Choice 옵션, Condition 분기, Command/Event 명령은 소유 노드 아래 하위 행으로 표현됩니다.
+- Command/Event 인자는 `fieldId:type=value` 형식으로 왕복합니다. 지원 타입은 `string`, `int`, `float`, `long`, `bool`, `color`, `guid`, `enum`이며, 색상은 `#RRGGBBAA` 형식으로 저장됩니다.
 - 가져올 때 노드 ID가 **비어 있거나 중복**되면 노드마다 확인창이 떠서 *새 ID 생성 / 건너뛰기 / 모두 생성* 을 고를 수 있습니다.
 - 가리키는 노드가 없거나 건너뛴 링크는 가져오기 후 경고 메시지로 모아 알려줍니다.
 

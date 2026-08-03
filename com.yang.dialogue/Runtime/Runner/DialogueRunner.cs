@@ -294,7 +294,6 @@ namespace Yang.Dialogue
                 }
             }
 
-            saveData.dialogueKeys = new(tokens.Keys);
             saveData.triggerValues = new(runnerTrigger.Values);
 
             return saveData;
@@ -307,7 +306,7 @@ namespace Yang.Dialogue
             this.saveData = saveData;
             tokens.Clear();
 
-            if (saveData.dialogueFlows != null && saveData.dialogueFlows.Count > 0)
+            if (saveData.dialogueFlows != null)
             {
                 for (int i = 0; i < saveData.dialogueFlows.Count; i++)
                 {
@@ -316,18 +315,6 @@ namespace Yang.Dialogue
                     if (string.IsNullOrWhiteSpace(flow.key) || tokens.ContainsKey(flow.key)) continue;
 
                     tokens.Add(flow.key, new RunnerToken { TargetNode = flow.nodeGuid });
-                }
-            }
-            else if (saveData.dialogueKeys != null)
-            {
-                // Old save files did not contain node positions and resume from the graph start.
-                for (int i = 0; i < saveData.dialogueKeys.Count; i++)
-                {
-                    string key = saveData.dialogueKeys[i];
-
-                    if (string.IsNullOrWhiteSpace(key) || tokens.ContainsKey(key)) continue;
-
-                    tokens.Add(key, new RunnerToken());
                 }
             }
 
@@ -380,56 +367,55 @@ namespace Yang.Dialogue
         public void ClearTriggerCallbacks() => runnerTrigger.ClearCallbacks();
 
         /// <summary>
-        /// Returns whether a trigger variable with the given key currently has a value.
+        /// Returns whether a trigger variable with the given FieldId currently has a value.
         /// </summary>
-        public bool ContainsKey(string key) => runnerTrigger.ContainsKey(key);
+        public bool ContainsKey(int fieldId) => runnerTrigger.ContainsKey(fieldId);
 
         /// <summary>
-        /// Removes the trigger variable with the given key; returns true if it existed.
+        /// Removes the trigger variable with the given FieldId.
         /// </summary>
-        public bool RemoveValue(string key) => runnerTrigger.RemoveValue(key);
+        public bool RemoveValue(int fieldId) => runnerTrigger.RemoveValue(fieldId);
 
         /// <summary>
-        /// Sets a float trigger variable used by graph conditions, e.g. runner.SetValue("affection", 5f).
+        /// Sets a float trigger variable used by graph conditions.
         /// </summary>
-        public void SetValue(string key, float value) => runnerTrigger.SetValue(key, value);
+        public void SetValue(int fieldId, float value) => runnerTrigger.SetValue(fieldId, value);
 
         /// <summary>
-        /// Sets a bool trigger variable used by graph conditions, e.g. runner.SetValue("hasKey", true).
+        /// Sets a bool trigger variable used by graph conditions.
         /// </summary>
-        public void SetValue(string key, bool value) => runnerTrigger.SetValue(key, value);
+        public void SetValue(int fieldId, bool value) => runnerTrigger.SetValue(fieldId, value);
 
         /// <summary>
-        /// Gets the float value of a trigger variable, e.g. float a = runner.GetFloatValue("affection").
+        /// Gets the float value of a trigger variable.
         /// </summary>
-        public float GetFloatValue(string key) => runnerTrigger.GetFloatValue(key);
+        public float GetFloatValue(int fieldId) => runnerTrigger.GetFloatValue(fieldId);
 
         /// <summary>
-        /// Gets the bool value of a trigger variable, e.g. bool b = runner.GetBoolValue("hasKey").
+        /// Gets the bool value of a trigger variable.
         /// </summary>
-        public bool GetBoolValue(string key) => runnerTrigger.GetBoolValue(key);
+        public bool GetBoolValue(int fieldId) => runnerTrigger.GetBoolValue(fieldId);
 
         /// <summary>
-        /// Subscribes a callback that fires for any trigger value change, receiving the changed key.
-        /// Call runner.TriggerRegisterCallback(key => Refresh(key)) to observe all variables.
+        /// Subscribes a callback that receives the changed FieldId for any trigger value change.
         /// </summary>
-        public void TriggerRegisterCallback(System.Action<string> callback) => runnerTrigger.OnAnyValueChanged += callback;
+        public void TriggerRegisterCallback(System.Action<int> callback) => runnerTrigger.OnAnyValueChanged += callback;
 
         /// <summary>
         /// Unsubscribes a callback previously registered for any trigger value change.
         /// </summary>
-        public void TriggerUnregisterCallback(System.Action<string> callback) => runnerTrigger.OnAnyValueChanged -= callback;
+        public void TriggerUnregisterCallback(System.Action<int> callback) => runnerTrigger.OnAnyValueChanged -= callback;
 
         /// <summary>
         /// Subscribes a callback that fires when the specific trigger variable changes.
         /// Call runner.TriggerRegisterCallback("hasKey", () => UpdateDoor());
         /// </summary>
-        public void TriggerRegisterCallback(string key, System.Action callback) => runnerTrigger.RegisterCallback(key, callback);
+        public void TriggerRegisterCallback(int fieldId, System.Action callback) => runnerTrigger.RegisterCallback(fieldId, callback);
 
         /// <summary>
         /// Unsubscribes a callback previously registered for the specific trigger variable.
         /// </summary>
-        public void TriggerUnregisterCallback(string key, System.Action callback) => runnerTrigger.UnregisterCallback(key, callback);
+        public void TriggerUnregisterCallback(int fieldId, System.Action callback) => runnerTrigger.UnregisterCallback(fieldId, callback);
         #endregion
     }
 }

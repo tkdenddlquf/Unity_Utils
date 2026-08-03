@@ -3,15 +3,15 @@ using System.Collections.Generic;
 namespace Yang.Dialogue
 {
     /// <summary>
-    /// Stores and mutates the dialogue's named runtime variables, raising change notifications and per-key callbacks.
+    /// Stores and mutates stable-id dialogue variables, raising change notifications and per-field callbacks.
     /// </summary>
     internal class RunnerTrigger
     {
-        /// <summary>Raised with the variable key whenever any stored value is added, changed, or removed.</summary>
-        public event System.Action<string> OnAnyValueChanged;
+        /// <summary>Raised with the variable FieldId whenever any stored value is added, changed, or removed.</summary>
+        public event System.Action<int> OnAnyValueChanged;
 
-        private readonly Dictionary<string, RunnerValue> values = new();
-        private readonly Dictionary<string, System.Action> callbacks = new();
+        private readonly Dictionary<int, RunnerValue> values = new();
+        private readonly Dictionary<int, System.Action> callbacks = new();
 
         /// <summary>All currently stored variables.</summary>
         public IReadOnlyCollection<RunnerValue> Values => values.Values;
@@ -21,7 +21,7 @@ namespace Yang.Dialogue
         {
             ClearValues();
 
-            foreach (RunnerValue value in values) this.values.Add(value.Key, value);
+            foreach (RunnerValue value in values) this.values.Add(value.FieldId, value);
         }
 
         /// <summary>Removes all stored variables.</summary>
@@ -30,77 +30,77 @@ namespace Yang.Dialogue
         /// <summary>Removes all registered value-change callbacks.</summary>
         public void ClearCallbacks() => callbacks.Clear();
 
-        /// <summary>Returns true if a variable with the given key exists.</summary>
-        public bool ContainsKey(string key) => values.ContainsKey(key);
+        /// <summary>Returns true if a variable with the given FieldId exists.</summary>
+        public bool ContainsKey(int fieldId) => values.ContainsKey(fieldId);
 
-        /// <summary>Removes a variable, firing its callback and the change event; returns false if the key was absent.</summary>
-        public bool RemoveValue(string key)
+        /// <summary>Removes a variable, firing its callback and the change event.</summary>
+        public bool RemoveValue(int fieldId)
         {
-            if (!values.Remove(key)) return false;
+            if (!values.Remove(fieldId)) return false;
 
-            if (callbacks.TryGetValue(key, out System.Action callback)) callback?.Invoke();
+            if (callbacks.TryGetValue(fieldId, out System.Action callback)) callback?.Invoke();
 
-            OnAnyValueChanged?.Invoke(key);
+            OnAnyValueChanged?.Invoke(fieldId);
 
             return true;
         }
 
         #region Get Set
-        /// <summary>Returns the float value for the key, or 0 if the key is missing.</summary>
-        public float GetFloatValue(string key)
+        /// <summary>Returns the float value for the FieldId, or 0 if it is missing.</summary>
+        public float GetFloatValue(int fieldId)
         {
-            if (values.TryGetValue(key, out RunnerValue value)) return value.GetFloatValue();
+            if (values.TryGetValue(fieldId, out RunnerValue value)) return value.GetFloatValue();
 
             return 0;
         }
 
-        /// <summary>Returns the bool value for the key, or false if the key is missing.</summary>
-        public bool GetBoolValue(string key)
+        /// <summary>Returns the bool value for the FieldId, or false if it is missing.</summary>
+        public bool GetBoolValue(int fieldId)
         {
-            if (values.TryGetValue(key, out RunnerValue value)) return value.GetBoolValue();
+            if (values.TryGetValue(fieldId, out RunnerValue value)) return value.GetBoolValue();
 
             return false;
         }
 
         /// <summary>Sets a float variable, firing its callback and the change event.</summary>
-        public void SetValue(string key, float value)
+        public void SetValue(int fieldId, float value)
         {
-            values[key] = new(key, value);
+            values[fieldId] = new(fieldId, value);
 
-            if (callbacks.TryGetValue(key, out System.Action callback)) callback?.Invoke();
+            if (callbacks.TryGetValue(fieldId, out System.Action callback)) callback?.Invoke();
 
-            OnAnyValueChanged?.Invoke(key);
+            OnAnyValueChanged?.Invoke(fieldId);
         }
 
         /// <summary>Sets a bool variable, firing its callback and the change event.</summary>
-        public void SetValue(string key, bool value)
+        public void SetValue(int fieldId, bool value)
         {
-            values[key] = new(key, value);
+            values[fieldId] = new(fieldId, value);
 
-            if (callbacks.TryGetValue(key, out System.Action callback)) callback?.Invoke();
+            if (callbacks.TryGetValue(fieldId, out System.Action callback)) callback?.Invoke();
 
-            OnAnyValueChanged?.Invoke(key);
+            OnAnyValueChanged?.Invoke(fieldId);
         }
         #endregion
 
         #region Callback
-        /// <summary>Registers a callback fired when the given variable key changes, ensuring it is subscribed once.</summary>
-        public void RegisterCallback(string key, System.Action callback)
+        /// <summary>Registers a callback fired when the given variable FieldId changes.</summary>
+        public void RegisterCallback(int fieldId, System.Action callback)
         {
-            if (callbacks.ContainsKey(key))
+            if (callbacks.ContainsKey(fieldId))
             {
-                callbacks[key] -= callback;
-                callbacks[key] += callback;
+                callbacks[fieldId] -= callback;
+                callbacks[fieldId] += callback;
             }
-            else callbacks.Add(key, callback);
+            else callbacks.Add(fieldId, callback);
         }
 
-        /// <summary>Unregisters a callback from a variable key; returns false if the key had no callbacks.</summary>
-        public bool UnregisterCallback(string key, System.Action callback)
+        /// <summary>Unregisters a callback from a variable FieldId.</summary>
+        public bool UnregisterCallback(int fieldId, System.Action callback)
         {
-            if (callbacks.ContainsKey(key))
+            if (callbacks.ContainsKey(fieldId))
             {
-                callbacks[key] -= callback;
+                callbacks[fieldId] -= callback;
 
                 return true;
             }

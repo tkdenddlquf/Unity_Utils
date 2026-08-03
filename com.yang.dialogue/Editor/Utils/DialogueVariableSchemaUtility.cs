@@ -9,13 +9,13 @@ namespace Yang.Dialogue.Editor
     {
         internal readonly struct VariableInfo
         {
-            public readonly string key;
+            public readonly int fieldId;
             public readonly string label;
             public readonly Type type;
 
-            public VariableInfo(string key, string label, Type type)
+            public VariableInfo(int fieldId, string label, Type type)
             {
-                this.key = key;
+                this.fieldId = fieldId;
                 this.label = label;
                 this.type = type;
             }
@@ -23,20 +23,21 @@ namespace Yang.Dialogue.Editor
 
         private sealed class Variable
         {
-            public string key;
+            public int fieldId;
             public string label;
             public Type type;
-            public int order;
         }
 
         private static List<Variable> variables;
+
+        public static void Invalidate() => variables = null;
 
         private static void Ensure()
         {
             if (variables != null) return;
 
             variables = new List<Variable>();
-            HashSet<string> keys = new();
+            HashSet<int> fieldIds = new();
 
             foreach (Type type in TypeCache.GetTypesWithAttribute<DialogueVariableSchemaAttribute>())
             {
@@ -46,29 +47,24 @@ namespace Yang.Dialogue.Editor
 
                     DialogueVariableAttribute attribute = field.GetCustomAttribute<DialogueVariableAttribute>();
 
-                    if (!keys.Add(field.Name))
+                    if (attribute == null || attribute.FieldId <= 0 || !fieldIds.Add(attribute.FieldId))
                     {
-                        UnityEngine.Debug.LogWarning($"Duplicate dialogue variable '{field.Name}' on {type.FullName}; it was ignored.");
+                        UnityEngine.Debug.LogWarning($"Dialogue variable '{type.FullName}.{field.Name}' has a missing, invalid, or duplicate FieldId; it was ignored.");
                         continue;
                     }
 
                     variables.Add(new Variable
                     {
-                        key = field.Name,
-                        label = string.IsNullOrWhiteSpace(attribute?.DisplayName)
+                        fieldId = attribute.FieldId,
+                        label = string.IsNullOrWhiteSpace(attribute.DisplayName)
                             ? ObjectNames.NicifyVariableName(field.Name)
                             : attribute.DisplayName,
                         type = field.FieldType,
-                        order = attribute?.Order ?? 0,
                     });
                 }
             }
 
-            variables.Sort((a, b) =>
-            {
-                int order = a.order.CompareTo(b.order);
-                return order != 0 ? order : string.Compare(a.label, b.label, StringComparison.Ordinal);
-            });
+            variables.Sort((a, b) => a.fieldId.CompareTo(b.fieldId));
         }
 
         public static void GetKeys(List<string> target, Type valueType)
@@ -79,7 +75,7 @@ namespace Yang.Dialogue.Editor
 
             foreach (Variable variable in variables)
             {
-                if (variable.type == valueType) target.Add(variable.key);
+                if (variable.type == valueType) target.Add(GetDisplayLabel(variable));
             }
         }
 
@@ -89,16 +85,16 @@ namespace Yang.Dialogue.Editor
             target.Clear();
             target.Add("");
 
-            foreach (Variable variable in variables) target.Add(variable.key);
+            foreach (Variable variable in variables) target.Add(GetDisplayLabel(variable));
         }
 
-        public static Type GetValueType(string key)
+        public static Type GetValueType(int fieldId)
         {
             Ensure();
 
             foreach (Variable variable in variables)
             {
-                if (variable.key == key) return variable.type;
+                if (variable.fieldId == fieldId) return variable.type;
             }
 
             return null;
@@ -111,12 +107,38 @@ namespace Yang.Dialogue.Editor
             List<VariableInfo> result = new(variables.Count);
 
             foreach (Variable variable in variables)
-                result.Add(new VariableInfo(variable.key, variable.label, variable.type));
+                result.Add(new VariableInfo(variable.fieldId, GetDisplayLabel(variable), variable.type));
 
             return result;
         }
 
-        public static void ShowMenu(Action<string, Type> onSelected)
+        public static int GetFieldId(string displayLabel)
+        {
+            Ensure();
+
+            foreach (Variable variable in variables)
+            {
+                if (GetDisplayLabel(variable) == displayLabel) return variable.fieldId;
+            }
+
+            return 0;
+        }
+
+        public static string GetLabel(int fieldId)
+        {
+            Ensure();
+
+            foreach (Variable variable in variables)
+            {
+                if (variable.fieldId == fieldId) return GetDisplayLabel(variable);
+            }
+
+            return "";
+        }
+
+        private static string GetDisplayLabel(Variable variable) => $"{variable.label}  [{variable.fieldId}]";
+
+        public static void ShowMenu(Action<int, Type> onSelected)
         {
             GenericMenu menu = new();
             List<VariableInfo> items = GetVariables();
@@ -131,7 +153,7 @@ namespace Yang.Dialogue.Editor
                 {
                     VariableInfo captured = item;
                     menu.AddItem(new UnityEngine.GUIContent(item.label), false,
-                        () => onSelected(captured.key, captured.type));
+                        () => onSelected(captured.fieldId, captured.type));
                 }
             }
 

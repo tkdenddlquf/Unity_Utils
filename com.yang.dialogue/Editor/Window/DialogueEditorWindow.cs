@@ -12,11 +12,32 @@ namespace Yang.Dialogue.Editor
     /// <summary>Editor window hosting the dialogue graph, localization controls, and node search.</summary>
     public class DialogueEditorWindow : EditorWindow
     {
+        private readonly struct NodeSearchResult
+        {
+            public readonly NodeData Node;
+            public readonly string Match;
+
+            public NodeSearchResult(NodeData node, string match)
+            {
+                Node = node;
+                Match = match;
+            }
+        }
+
+        private sealed class NodeSearchDocument
+        {
+            public NodeData Node;
+            public readonly List<string> Values = new();
+            public readonly List<string> LocalizedValues = new();
+        }
+
         private DialogueGraph graph;
 
         private const long LOCALIZATION_REFRESH_DEBOUNCE_MS = 200;
+        private const long SEARCH_REFRESH_DEBOUNCE_MS = 120;
 
         private IVisualElementScheduledItem localizationRefresh;
+        private IVisualElementScheduledItem searchRefresh;
 
         private VisualElement topRightBar;
         private VisualElement languageBar;
@@ -25,6 +46,9 @@ namespace Yang.Dialogue.Editor
         private readonly List<Locale> locales = new();
 
         private readonly Dictionary<string, List<EntryData>> entryCache = new();
+        private readonly List<NodeSearchDocument> searchIndex = new();
+
+        private bool searchIndexDirty = true;
 
         private string saveData;
 
@@ -145,6 +169,8 @@ namespace Yang.Dialogue.Editor
             LocalizationEditorSettings.EditorEvents.LocaleRemoved -= OnLocaleChanged;
 
             localizationRefresh?.Pause();
+            searchRefresh?.Pause();
+            searchRefresh = null;
 
             graph.UnregisterCallback<KeyDownEvent>(OnKeyDownEvent);
 
@@ -183,6 +209,7 @@ namespace Yang.Dialogue.Editor
         /// <summary>Rebuilds the language dropdown and refreshes tables and the view.</summary>
         private void RefreshLocalization()
         {
+            searchIndexDirty = true;
             BuildLanguageDropdown();
 
             if (SO == null) return;
@@ -255,7 +282,7 @@ namespace Yang.Dialogue.Editor
             languageBar.Add(label);
             languageBar.Add(languageDropdown);
 
-            topRightBar.Insert(0, languageBar);
+            topRightBar.Insert(System.Math.Min(1, topRightBar.childCount), languageBar);
         }
 
         /// <summary>Creates the top-right toolbar stack and the node-search bar.</summary>
@@ -264,25 +291,42 @@ namespace Yang.Dialogue.Editor
             topRightBar = new VisualElement();
 
             topRightBar.style.position = Position.Absolute;
-            topRightBar.style.top = 8;
-            topRightBar.style.right = 8;
+            topRightBar.style.top = 12;
+            topRightBar.style.right = 12;
+            topRightBar.style.width = 420;
 
             topRightBar.style.flexDirection = FlexDirection.Column;
             topRightBar.style.alignItems = Align.Stretch;
+            topRightBar.style.overflow = Overflow.Visible;
 
-            topRightBar.style.paddingLeft = 6;
-            topRightBar.style.paddingRight = 6;
-            topRightBar.style.paddingTop = 3;
-            topRightBar.style.paddingBottom = 3;
+            topRightBar.style.paddingLeft = 10;
+            topRightBar.style.paddingRight = 10;
+            topRightBar.style.paddingTop = 8;
+            topRightBar.style.paddingBottom = 10;
 
-            topRightBar.style.backgroundColor = new Color(0f, 0f, 0f, 0.35f);
+            topRightBar.style.backgroundColor = new Color(0.075f, 0.085f, 0.105f, 0.97f);
 
-            topRightBar.style.borderTopLeftRadius = 4;
-            topRightBar.style.borderTopRightRadius = 4;
-            topRightBar.style.borderBottomLeftRadius = 4;
-            topRightBar.style.borderBottomRightRadius = 4;
+            topRightBar.style.borderTopLeftRadius = 8;
+            topRightBar.style.borderTopRightRadius = 8;
+            topRightBar.style.borderBottomLeftRadius = 8;
+            topRightBar.style.borderBottomRightRadius = 8;
+            topRightBar.style.borderTopWidth = 1;
+            topRightBar.style.borderRightWidth = 1;
+            topRightBar.style.borderBottomWidth = 1;
+            topRightBar.style.borderLeftWidth = 1;
+            topRightBar.style.borderTopColor = new Color(0.22f, 0.26f, 0.34f);
+            topRightBar.style.borderRightColor = new Color(0.22f, 0.26f, 0.34f);
+            topRightBar.style.borderBottomColor = new Color(0.22f, 0.26f, 0.34f);
+            topRightBar.style.borderLeftColor = new Color(0.22f, 0.26f, 0.34f);
 
             rootVisualElement.Add(topRightBar);
+
+            Label toolbarTitle = new("Dialogue Tools");
+            toolbarTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            toolbarTitle.style.fontSize = 13;
+            toolbarTitle.style.color = new Color(0.88f, 0.92f, 1f);
+            toolbarTitle.style.marginBottom = 4;
+            topRightBar.Add(toolbarTitle);
 
             searchBar = new VisualElement();
 
@@ -291,13 +335,14 @@ namespace Yang.Dialogue.Editor
             searchBar.style.flexDirection = FlexDirection.Column;
             searchBar.style.alignItems = Align.Stretch;
             searchBar.style.marginTop = 6;
+            searchBar.style.overflow = Overflow.Visible;
 
             VisualElement inputRow = new();
 
             inputRow.style.flexDirection = FlexDirection.Row;
             inputRow.style.alignItems = Align.Center;
 
-            Label searchLabel = new("ID")
+            Label searchLabel = new("Search Nodes")
             {
                 style =
                 {
@@ -307,20 +352,40 @@ namespace Yang.Dialogue.Editor
                 }
             };
 
-            TextField searchField = new() { name = "node-search", tooltip = "노드 ID 입력 — 일치하는 항목을 골라 이동" };
-
-            searchField.style.minWidth = 160;
+            TextField searchField = new()
+            {
+                name = "node-search",
+                tooltip = "Search by node ID, node type, or a value stored inside a node.",
+            };
+            searchField.style.flexGrow = 1;
+            searchField.style.minWidth = 220;
             searchField.style.marginLeft = 0;
             searchField.style.marginRight = 4;
             searchField.style.marginTop = 0;
             searchField.style.marginBottom = 0;
 
-            VisualElement suggestions = new() { name = "node-suggestions" };
+            ScrollView suggestions = new(ScrollViewMode.Vertical) { name = "node-suggestions" };
 
             suggestions.style.display = DisplayStyle.None;
             suggestions.style.marginTop = 4;
+            suggestions.style.maxHeight = 320;
+            suggestions.style.minWidth = 400;
+            suggestions.style.maxWidth = 400;
+            suggestions.style.backgroundColor = new Color(0.045f, 0.05f, 0.065f, 1f);
+            suggestions.style.borderTopWidth = 1;
+            suggestions.style.borderRightWidth = 1;
+            suggestions.style.borderBottomWidth = 1;
+            suggestions.style.borderLeftWidth = 1;
+            suggestions.style.borderTopColor = new Color(0.35f, 0.35f, 0.35f);
+            suggestions.style.borderRightColor = new Color(0.35f, 0.35f, 0.35f);
+            suggestions.style.borderBottomColor = new Color(0.35f, 0.35f, 0.35f);
+            suggestions.style.borderLeftColor = new Color(0.35f, 0.35f, 0.35f);
 
-            searchField.RegisterValueChangedCallback(evt => RefreshSuggestions(searchField, suggestions, evt.newValue));
+            searchField.RegisterValueChangedCallback(_ =>
+            {
+                searchRefresh ??= searchField.schedule.Execute(() => RefreshSuggestions(searchField, suggestions, searchField.value));
+                searchRefresh.ExecuteLater(SEARCH_REFRESH_DEBOUNCE_MS);
+            });
 
             searchField.RegisterCallback<KeyDownEvent>(evt =>
             {
@@ -333,7 +398,7 @@ namespace Yang.Dialogue.Editor
 
             searchField.RegisterCallback<FocusOutEvent>(_ => suggestions.schedule.Execute(() => HideSuggestions(suggestions)).StartingIn(150));
 
-            Button searchButton = new(() => SearchNode(searchField, suggestions)) { text = "이동" };
+            Button searchButton = new(() => SearchNode(searchField, suggestions)) { text = "Go" };
 
             searchButton.style.marginLeft = 0;
             searchButton.style.marginRight = 0;
@@ -356,10 +421,21 @@ namespace Yang.Dialogue.Editor
             repairBar.style.justifyContent = Justify.FlexEnd;
             repairBar.style.marginTop = 6;
 
+            Button refreshButton = new(RefreshEditor)
+            {
+                text = "↻  Refresh",
+                tooltip = "Refresh added or changed assets, localization data, command schemas, and the graph view.",
+            };
+
+            refreshButton.style.marginLeft = 0;
+            refreshButton.style.marginRight = 4;
+            refreshButton.style.marginTop = 0;
+            refreshButton.style.marginBottom = 0;
+
             Button repairButton = new(RepairData)
             {
-                text = "데이터 검사 / 복구",
-                tooltip = "끊어진 링크·중복·고아 노드 등 그래프 데이터와 뷰의 결함을 검사해 자동으로 정리합니다.",
+                text = "✓  Validate / Repair",
+                tooltip = "Finds and repairs broken links, duplicates, orphaned nodes, and other graph data issues.",
             };
 
             repairButton.style.marginLeft = 0;
@@ -367,9 +443,13 @@ namespace Yang.Dialogue.Editor
             repairButton.style.marginTop = 0;
             repairButton.style.marginBottom = 0;
 
+            repairBar.Add(refreshButton);
             repairBar.Add(repairButton);
 
             topRightBar.Add(repairBar);
+
+            // Search results can overlap the rows below; draw this bar last so the list stays visible.
+            searchBar.BringToFront();
         }
 
         /// <summary>Lays a toolbar row out horizontally; the shared dark background is applied once on the container.</summary>
@@ -379,9 +459,17 @@ namespace Yang.Dialogue.Editor
             bar.style.alignItems = Align.Center;
         }
 
+        /// <summary>Imports changed assets and rebuilds all editor-side dialogue data and views.</summary>
+        private void RefreshEditor()
+        {
+            AssetDatabase.Refresh();
+            DialogueVariableSchemaUtility.Invalidate();
+            RefreshLocalization();
+        }
+
         private const int MAX_SUGGESTIONS = 10;
 
-        /// <summary>Rebuilds the autocomplete list from node ids matching the typed text.</summary>
+        /// <summary>Rebuilds the autocomplete list from node ids, types, and stored values matching the typed text.</summary>
         private void RefreshSuggestions(TextField field, VisualElement container, string rawQuery)
         {
             container.Clear();
@@ -397,11 +485,13 @@ namespace Yang.Dialogue.Editor
 
             int shown = 0;
 
-            foreach (string id in AllNodeIds())
-            {
-                if (id.IndexOf(query, System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+            EnsureSearchIndex();
 
-                container.Add(MakeSuggestion(field, container, id));
+            foreach (NodeSearchDocument document in searchIndex)
+            {
+                if (!TryMatchNode(document, query, out NodeSearchResult result)) continue;
+
+                container.Add(MakeSuggestion(field, container, result));
 
                 if (++shown >= MAX_SUGGESTIONS) break;
             }
@@ -410,29 +500,57 @@ namespace Yang.Dialogue.Editor
         }
 
         /// <summary>One clickable row in the autocomplete list.</summary>
-        private VisualElement MakeSuggestion(TextField field, VisualElement container, string id)
+        private VisualElement MakeSuggestion(TextField field, VisualElement container, NodeSearchResult result)
         {
-            Label item = new(id);
+            VisualElement item = new();
+            VisualElement header = new();
+            Label type = new(result.Node.type.ToString());
+            Label id = new(result.Node.guid);
+            Label match = new(result.Match);
 
-            item.style.paddingLeft = 6;
-            item.style.paddingRight = 6;
-            item.style.paddingTop = 2;
-            item.style.paddingBottom = 2;
-            item.style.color = new Color(0.86f, 0.86f, 0.86f);
-            item.style.whiteSpace = WhiteSpace.NoWrap;
+            header.style.flexDirection = FlexDirection.Row;
+            header.style.alignItems = Align.Center;
 
-            Color hover = new(1f, 1f, 1f, 0.12f);
+            type.style.unityFontStyleAndWeight = FontStyle.Bold;
+            type.style.color = new Color(0.62f, 0.78f, 1f);
+            type.style.marginRight = 8;
+
+            id.style.flexGrow = 1;
+            id.style.color = new Color(0.72f, 0.75f, 0.8f);
+            id.style.whiteSpace = WhiteSpace.NoWrap;
+
+            match.style.marginTop = 3;
+            match.style.color = new Color(0.9f, 0.9f, 0.92f);
+            match.style.whiteSpace = WhiteSpace.Normal;
+
+            header.Add(type);
+            header.Add(id);
+            item.Add(header);
+            item.Add(match);
+
+            item.style.paddingLeft = 9;
+            item.style.paddingRight = 9;
+            item.style.paddingTop = 7;
+            item.style.paddingBottom = 7;
+            item.style.marginLeft = 3;
+            item.style.marginRight = 3;
+            item.style.marginTop = 2;
+            item.style.marginBottom = 2;
+            item.style.borderBottomWidth = 1;
+            item.style.borderBottomColor = new Color(0.18f, 0.2f, 0.25f);
+
+            Color hover = new(0.18f, 0.28f, 0.44f, 0.75f);
 
             item.RegisterCallback<MouseEnterEvent>(_ => item.style.backgroundColor = hover);
             item.RegisterCallback<MouseLeaveEvent>(_ => item.style.backgroundColor = StyleKeyword.Null);
 
             item.RegisterCallback<MouseDownEvent>(evt =>
             {
-                field.SetValueWithoutNotify(id);
+                field.SetValueWithoutNotify(result.Node.guid);
 
                 HideSuggestions(container);
 
-                FocusNode(id, true);
+                FocusNode(result.Node.guid, true);
 
                 evt.StopPropagation();
             });
@@ -475,35 +593,188 @@ namespace Yang.Dialogue.Editor
             FocusNode(guid, true);
         }
 
-        /// <summary>Returns the first node id containing the query, or null if none match.</summary>
+        /// <summary>Returns the first node matching by id, type, or stored value.</summary>
         private string FirstSuggestion(string query)
         {
-            foreach (string id in AllNodeIds())
+            EnsureSearchIndex();
+
+            foreach (NodeSearchDocument document in searchIndex)
             {
-                if (id.IndexOf(query, System.StringComparison.OrdinalIgnoreCase) >= 0) return id;
+                if (TryMatchNode(document, query, out _)) return document.Node.guid;
             }
 
             return null;
         }
 
-        /// <summary>Returns all node ids including the start node, for search and autocomplete.</summary>
-        private List<string> AllNodeIds()
+        /// <summary>Returns all nodes including the start node, for search and autocomplete.</summary>
+        private List<NodeData> AllNodes()
         {
-            List<string> ids = new();
+            List<NodeData> nodes = new();
 
-            if (SO == null) return ids;
+            if (SO == null) return nodes;
 
-            if (!string.IsNullOrEmpty(SO.StartGuid)) ids.Add(SO.StartGuid);
+            if (!string.IsNullOrEmpty(SO.StartGuid)) nodes.Add(SO.EditorStartNode);
 
             for (int i = 0; i < Nodes.Count; i++)
             {
-                if (!string.IsNullOrEmpty(Nodes[i].guid)) ids.Add(Nodes[i].guid);
+                if (!string.IsNullOrEmpty(Nodes[i].guid)) nodes.Add(Nodes[i]);
             }
 
-            return ids;
+            return nodes;
         }
 
-        /// <summary>Briefly tints the search field red to signal no matching node id.</summary>
+        /// <summary>Builds the expensive node/localization search data once after relevant editor changes.</summary>
+        private void EnsureSearchIndex()
+        {
+            if (!searchIndexDirty) return;
+
+            searchIndex.Clear();
+
+            foreach (NodeData node in AllNodes())
+            {
+                NodeSearchDocument document = new() { Node = node };
+
+                CollectDataValues(node.PortDatas, document.Values);
+                CollectDataValues(node.OptionDatas, document.Values);
+                CollectLocalizedValues(node, document.LocalizedValues);
+
+                searchIndex.Add(document);
+            }
+
+            searchIndexDirty = false;
+        }
+
+        private static void CollectDataValues(IReadOnlyList<DataWrapper> wrappers, List<string> target)
+        {
+            if (wrappers == null) return;
+
+            for (int i = 0; i < wrappers.Count; i++)
+            {
+                List<GenericData> values = wrappers[i].data;
+
+                if (values == null) continue;
+
+                for (int j = 0; j < values.Count; j++)
+                {
+                    string value = values[j].ToString();
+
+                    if (!string.IsNullOrEmpty(value)) target.Add(value);
+                }
+            }
+        }
+
+        /// <summary>Finds the highest-priority matching part of an indexed node.</summary>
+        private static bool TryMatchNode(NodeSearchDocument document, string query, out NodeSearchResult result)
+        {
+            NodeData node = document.Node;
+
+            if (Contains(node.guid, query))
+            {
+                result = new NodeSearchResult(node, $"ID: {node.guid}");
+                return true;
+            }
+
+            string type = node.type.ToString();
+
+            if (Contains(type, query))
+            {
+                result = new NodeSearchResult(node, $"Type: {type}");
+                return true;
+            }
+
+            if (TryMatchValues(document.LocalizedValues, query, out string localizedText))
+            {
+                result = new NodeSearchResult(node, $"Localized: {Shorten(localizedText)}");
+                return true;
+            }
+
+            if (TryMatchValues(document.Values, query, out string value))
+            {
+                result = new NodeSearchResult(node, $"Value: {Shorten(value)}");
+                return true;
+            }
+
+            result = default;
+            return false;
+        }
+
+        /// <summary>Indexes localized speaker, dialogue, and choice text in the currently selected language.</summary>
+        private void CollectLocalizedValues(NodeData node, List<string> target)
+        {
+            IReadOnlyList<DataWrapper> options = node.OptionDatas;
+
+            if (node.type == NodeType.Dialogue && options != null && options.Count >= 4)
+            {
+                AddLocalizedEntry(options[0], options[1], target);
+                AddLocalizedEntry(options[2], options[3], target);
+            }
+            else if (node.type == NodeType.Choice && options != null && options.Count >= 3)
+            {
+                AddLocalizedEntry(options[0], options[1], target);
+
+                IReadOnlyList<DataWrapper> ports = node.PortDatas;
+
+                if (ports != null)
+                {
+                    for (int i = 0; i < ports.Count; i++) AddLocalizedEntry(options[2], ports[i], target);
+                }
+            }
+        }
+
+        private void AddLocalizedEntry(DataWrapper tableWrapper, DataWrapper entryWrapper, List<string> target)
+        {
+            List<GenericData> tableData = tableWrapper.data;
+            List<GenericData> entryData = entryWrapper.data;
+
+            if (tableData == null || tableData.Count == 0 || entryData == null || entryData.Count < 2)
+                return;
+
+            string tableName = tableData[0].ToString();
+            string key = entryData[0].ToString();
+
+            if (string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(key))
+                return;
+
+            for (int i = 0; collections != null && i < collections.Count; i++)
+            {
+                LocalizationTableCollection collection = collections[i];
+
+                if (collection.TableCollectionName != tableName) continue;
+
+                string text = new EntryData(entryData[1].GetLong(), key, collection.Tables).GetText(Language);
+
+                if (!string.IsNullOrEmpty(text)) target.Add(text);
+                return;
+            }
+        }
+
+        private static bool TryMatchValues(IReadOnlyList<string> values, string query, out string match)
+        {
+            for (int i = 0; values != null && i < values.Count; i++)
+            {
+                if (!Contains(values[i], query)) continue;
+
+                match = values[i];
+                return true;
+            }
+
+            match = null;
+            return false;
+        }
+
+        private static bool Contains(string value, string query) =>
+            value?.IndexOf(query, System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+        private static string Shorten(string value)
+        {
+            const int maxLength = 60;
+
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength) return value ?? "";
+
+            return value.Substring(0, maxLength - 1) + "…";
+        }
+
+        /// <summary>Briefly tints the search field red to signal no matching node.</summary>
         private static void FlashInvalid(TextField field)
         {
             VisualElement input = field.Q("unity-text-input") ?? field;
@@ -597,7 +868,11 @@ namespace Yang.Dialogue.Editor
         }
 
         /// <summary>Marks the window as having unsaved changes.</summary>
-        public void SetUnsaved() => hasUnsavedChanges = true;
+        public void SetUnsaved()
+        {
+            hasUnsavedChanges = true;
+            searchIndexDirty = true;
+        }
 
         /// <summary>Refreshes the view when undo-tracked condition or event properties change.</summary>
         private UndoPropertyModification[] OnPostprocessModifications(UndoPropertyModification[] mods)
@@ -691,6 +966,7 @@ namespace Yang.Dialogue.Editor
         private void ResetView()
         {
             pendingRebuild = false;
+            searchIndexDirty = true;
 
             entryCache.Clear();
 
@@ -832,7 +1108,7 @@ namespace Yang.Dialogue.Editor
         {
             if (SO == null)
             {
-                EditorUtility.DisplayDialog("데이터 복구", "검사할 Dialogue 에셋이 없습니다.", "확인");
+                EditorUtility.DisplayDialog("Dialogue Repair", "There is no Dialogue asset to validate.", "OK");
 
                 return;
             }
@@ -895,11 +1171,11 @@ namespace Yang.Dialogue.Editor
 
             if (removedNodes == 0 && removedLinks == 0)
             {
-                EditorUtility.DisplayDialog("데이터 복구", "결함이 발견되지 않았습니다.", "확인");
+                EditorUtility.DisplayDialog("Dialogue Repair", "No issues were found.", "OK");
             }
             else
             {
-                EditorUtility.DisplayDialog("데이터 복구", $"복구를 완료했습니다.\n\n• 정리된 노드: {removedNodes}개\n• 정리된 링크: {removedLinks}개\n\n변경 사항을 저장(Ctrl+S)하세요.", "확인");
+                EditorUtility.DisplayDialog("Dialogue Repair", $"Repair complete.\n\n• Removed nodes: {removedNodes}\n• Removed links: {removedLinks}\n\nSave the changes with Ctrl+S.", "OK");
             }
         }
 

@@ -4,15 +4,15 @@ using UnityEngine;
 namespace Yang.Dialogue
 {
     /// <summary>
-    /// Serializable named runtime variable holding either a float or bool, used by the dialogue trigger/condition system.
+    /// Serializable stable-id runtime variable holding either a float or bool.
     /// </summary>
     [Serializable]
     public struct RunnerValue
     {
-        [SerializeField] private string key;
+        [SerializeField] private int fieldId;
 
-        /// <summary>Name identifying this variable.</summary>
-        public readonly string Key => key;
+        /// <summary>Stable schema id identifying this variable.</summary>
+        public readonly int FieldId => fieldId;
 
         [SerializeField] private ValueType type;
 
@@ -21,20 +21,20 @@ namespace Yang.Dialogue
 
         [SerializeField] private float value;
 
-        /// <summary>Creates a float-typed variable with the given key and value.</summary>
-        public RunnerValue(string key, float value)
+        /// <summary>Creates a float-typed variable with the given FieldId and value.</summary>
+        public RunnerValue(int fieldId, float value)
         {
-            this.key = key;
+            this.fieldId = fieldId;
 
             type = ValueType.Float;
 
             this.value = value;
         }
 
-        /// <summary>Creates a bool-typed variable with the given key and value.</summary>
-        public RunnerValue(string key, bool value)
+        /// <summary>Creates a bool-typed variable with the given FieldId and value.</summary>
+        public RunnerValue(int fieldId, bool value)
         {
-            this.key = key;
+            this.fieldId = fieldId;
 
             type = ValueType.Bool;
 

@@ -9,12 +9,12 @@ namespace Yang.Dialogue.Editor
     /// Port Data (Unused)
     /// 
     /// Option Data (Float)
-    /// 0 : Key - string
+    /// 0 : FieldId - int
     /// 1 : Value - float, bool
     /// 2 : SetterType - enum
     /// 
     /// Option Data (Bool)
-    /// 0 : Key - string
+    /// 0 : FieldId - int
     /// 1 : Value - float, bool
     /// </summary>
     public class TriggerNode : BaseNode
@@ -57,16 +57,16 @@ namespace Yang.Dialogue.Editor
                 {
                     DialogueVariableSchemaUtility.VariableInfo captured = variable;
                     menu.AppendAction($"Add Variable/{captured.label}",
-                        _ => CreateVariableField(captured.key, captured.type));
+                        _ => CreateVariableField(captured.fieldId, captured.type));
                 }
             }
             menu.AppendSeparator();
         }
 
-        private void CreateVariableField(string key, System.Type type)
+        private void CreateVariableField(int fieldId, System.Type type)
         {
-            if (type == typeof(float)) CreateFloatField(key);
-            else if (type == typeof(bool)) CreateBoolField(key);
+            if (type == typeof(float)) CreateFloatField(fieldId);
+            else if (type == typeof(bool)) CreateBoolField(fieldId);
         }
 
         /// <summary>Seeds default option and port data when none exist.</summary>
@@ -75,7 +75,7 @@ namespace Yang.Dialogue.Editor
             if (portDatas.Count == 0)
             {
                 DataWrapper optionData = new(
-                    new(GenericData.DataType.String),
+                    new(GenericData.DataType.Int),
                     new(GenericData.DataType.Bool)
                 );
 
@@ -94,16 +94,16 @@ namespace Yang.Dialogue.Editor
             {
                 IReadOnlyList<GenericData> optionData = optionDatas[i].data;
 
-                string key = optionData[0].ToString();
+                int fieldId = optionData[0].GetInt();
 
                 switch (optionData[1].Type)
                 {
                     case GenericData.DataType.Float:
-                        AddFloatField(key, optionData[1].GetFloat(), optionData[2].GetEnum<ValueSetterType>());
+                        AddFloatField(fieldId, optionData[1].GetFloat(), optionData[2].GetEnum<ValueSetterType>());
                         break;
 
                     case GenericData.DataType.Bool:
-                        AddBoolField(key, optionData[1].GetBool());
+                        AddBoolField(fieldId, optionData[1].GetBool());
                         break;
                 }
             }
@@ -144,7 +144,7 @@ namespace Yang.Dialogue.Editor
 
                 int optionIndex = itemElement.parent.IndexOf(itemElement);
 
-                optionDatas[optionIndex].data[0] = new(GenericData.DataType.String);
+                optionDatas[optionIndex].data[0] = new(GenericData.DataType.Int);
 
                 EditorUtility.SetDirty(so);
 
@@ -163,29 +163,30 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(so, "Change Trigger Option");
 
-            System.Type selectedType = DialogueVariableSchemaUtility.GetValueType(evt.newValue);
+            int fieldId = DialogueVariableSchemaUtility.GetFieldId(evt.newValue);
+            System.Type selectedType = DialogueVariableSchemaUtility.GetValueType(fieldId);
             GenericData.DataType currentType = optionDatas[optionIndex].data[1].Type;
 
             if (selectedType == typeof(float) && currentType != GenericData.DataType.Float)
             {
                 optionDatas[optionIndex] = new DataWrapper(
-                    new GenericData(evt.newValue),
+                    new GenericData(fieldId),
                     new GenericData(0f),
                     new GenericData(ValueSetterType.Plus));
 
-                ReplaceRow(itemElement, optionIndex, true, evt.newValue);
+                ReplaceRow(itemElement, optionIndex, true, fieldId);
             }
             else if (selectedType == typeof(bool) && currentType != GenericData.DataType.Bool)
             {
                 optionDatas[optionIndex] = new DataWrapper(
-                    new GenericData(evt.newValue),
+                    new GenericData(fieldId),
                     new GenericData(false));
 
-                ReplaceRow(itemElement, optionIndex, false, evt.newValue);
+                ReplaceRow(itemElement, optionIndex, false, fieldId);
             }
             else
             {
-                optionDatas[optionIndex].data[0] = new(evt.newValue);
+                optionDatas[optionIndex].data[0] = new(fieldId);
             }
 
             EditorUtility.SetDirty(so);
@@ -193,31 +194,31 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private void ReplaceRow(VisualElement oldRow, int index, bool isFloat, string key)
+        private void ReplaceRow(VisualElement oldRow, int index, bool isFloat, int fieldId)
         {
             extensionContainer.Remove(oldRow);
 
-            if (isFloat) AddFloatField(key, 0f, ValueSetterType.Plus);
-            else AddBoolField(key, false);
+            if (isFloat) AddFloatField(fieldId, 0f, ValueSetterType.Plus);
+            else AddBoolField(fieldId, false);
 
             VisualElement newRow = extensionContainer[extensionContainer.childCount - 1];
             extensionContainer.Insert(index, newRow);
         }
 
         /// <summary>Appends a new float trigger field and its option data with undo support.</summary>
-        private void CreateFloatField(string key = "")
+        private void CreateFloatField(int fieldId = 0)
         {
             DialogueSO so = window.SO;
 
             Undo.RecordObject(so, "Create Float Trigger");
 
             DataWrapper optionData = new(
-                new(key),
+                new(fieldId),
                 new(GenericData.DataType.Float),
                 new(GenericData.DataType.Enum)
             );
 
-            AddFloatField(key, 0, ValueSetterType.Plus);
+            AddFloatField(fieldId, 0, ValueSetterType.Plus);
 
             optionDatas.Add(optionData);
 
@@ -227,7 +228,7 @@ namespace Yang.Dialogue.Editor
         }
 
         /// <summary>Builds a draggable row with a condition popup, float value, setter-type enum, and remove button.</summary>
-        private void AddFloatField(string key, float value, ValueSetterType type)
+        private void AddFloatField(int fieldId, float value, ValueSetterType type)
         {
             VisualElement container = new() { name = "Item Element" };
 
@@ -235,7 +236,7 @@ namespace Yang.Dialogue.Editor
 
             DialogueVariableSchemaUtility.GetKeys(conditions);
 
-            int index = conditions.IndexOf(key);
+            int index = conditions.IndexOf(DialogueVariableSchemaUtility.GetLabel(fieldId));
 
             PopupField<string> field = new("Variable", conditions, index);
 
@@ -323,18 +324,18 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
         /// <summary>Appends a new bool trigger field and its option data with undo support.</summary>
-        private void CreateBoolField(string key = "")
+        private void CreateBoolField(int fieldId = 0)
         {
             DialogueSO so = window.SO;
 
             Undo.RecordObject(so, "Create Bool Trigger");
 
             DataWrapper optionData = new(
-                new(key),
+                new(fieldId),
                 new(GenericData.DataType.Bool)
             );
 
-            AddBoolField(key, false);
+            AddBoolField(fieldId, false);
 
             optionDatas.Add(optionData);
 
@@ -344,7 +345,7 @@ namespace Yang.Dialogue.Editor
         }
 
         /// <summary>Builds a draggable row with a condition popup, bool toggle, and remove button.</summary>
-        private void AddBoolField(string key, bool value)
+        private void AddBoolField(int fieldId, bool value)
         {
             VisualElement container = new() { name = "Item Element" };
 
@@ -352,7 +353,7 @@ namespace Yang.Dialogue.Editor
 
             DialogueVariableSchemaUtility.GetKeys(conditions);
 
-            int index = conditions.IndexOf(key);
+            int index = conditions.IndexOf(DialogueVariableSchemaUtility.GetLabel(fieldId));
 
             PopupField<string> field = new("Variable", conditions, index);
 

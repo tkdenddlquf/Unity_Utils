@@ -108,12 +108,13 @@ namespace Yang.Dialogue
                 int argumentCount = (datas.Count - 1) / 2;
 
                 RunnerArgument[] arguments = new RunnerArgument[argumentCount];
+                HashSet<int> fieldIds = new(argumentCount);
 
                 for (int j = 1; j + 1 < datas.Count; j += 2)
                 {
-                    if (!datas[j].TryGetString(out string key) || string.IsNullOrWhiteSpace(key)) continue;
+                    if (!datas[j].TryGetInt(out int fieldId) || fieldId <= 0 || !fieldIds.Add(fieldId)) continue;
 
-                    arguments[writeIndex++] = new RunnerArgument(key, datas[j + 1]);
+                    arguments[writeIndex++] = new RunnerArgument(fieldId, datas[j + 1]);
                 }
 
                 if (writeIndex != arguments.Length) System.Array.Resize(ref arguments, writeIndex);
@@ -162,13 +163,13 @@ namespace Yang.Dialogue
 
                             for (int j = 0; j < datas.Count; j += 3)
                             {
-                                string key = datas[j].ToString();
+                                int fieldId = datas[j].GetInt();
 
                                 switch (datas[j + 1].Type)
                                 {
                                     case GenericData.DataType.Float:
                                         {
-                                            float value = runnerTrigger.GetFloatValue(key);
+                                            float value = runnerTrigger.GetFloatValue(fieldId);
                                             float checkValue = datas[j + 1].GetFloat();
 
                                             ValueCheckType type = datas[j + 2].GetEnum<ValueCheckType>();
@@ -179,7 +180,7 @@ namespace Yang.Dialogue
 
                                     case GenericData.DataType.Bool:
                                         {
-                                            bool value = runnerTrigger.GetBoolValue(key);
+                                            bool value = runnerTrigger.GetBoolValue(fieldId);
                                             bool checkValue = datas[j + 1].GetBool();
 
                                             if (value != checkValue) allExist = false;
@@ -203,9 +204,9 @@ namespace Yang.Dialogue
                         {
                             IReadOnlyList<GenericData> datas = optionDatas[i].data;
 
-                            string key = datas[0].ToString();
+                            int fieldId = datas[0].GetInt();
 
-                            if (key == "") continue;
+                            if (fieldId <= 0) continue;
 
                             switch (datas[1].Type)
                             {
@@ -214,28 +215,28 @@ namespace Yang.Dialogue
                                     {
                                         case ValueSetterType.Plus:
                                             {
-                                                float value = runnerTrigger.GetFloatValue(key);
+                                                float value = runnerTrigger.GetFloatValue(fieldId);
 
-                                                runnerTrigger.SetValue(key, value + datas[1].GetFloat());
+                                                runnerTrigger.SetValue(fieldId, value + datas[1].GetFloat());
                                             }
                                             break;
 
                                         case ValueSetterType.Minus:
                                             {
-                                                float value = runnerTrigger.GetFloatValue(key);
+                                                float value = runnerTrigger.GetFloatValue(fieldId);
 
-                                                runnerTrigger.SetValue(key, value - datas[1].GetFloat());
+                                                runnerTrigger.SetValue(fieldId, value - datas[1].GetFloat());
                                             }
                                             break;
 
                                         case ValueSetterType.Set:
-                                            runnerTrigger.SetValue(key, datas[1].GetFloat());
+                                            runnerTrigger.SetValue(fieldId, datas[1].GetFloat());
                                             break;
                                     }
                                     break;
 
                                 case GenericData.DataType.Bool:
-                                    runnerTrigger.SetValue(key, datas[1].GetBool());
+                                    runnerTrigger.SetValue(fieldId, datas[1].GetBool());
                                     break;
                             }
                         }
@@ -288,13 +289,13 @@ namespace Yang.Dialogue
                             {
                                 int dataIndex = 3 + (j * 3);
 
-                                string key = textEntry[dataIndex].ToString();
+                                int fieldId = textEntry[dataIndex].GetInt();
 
                                 switch (textEntry[dataIndex + 1].Type)
                                 {
                                     case GenericData.DataType.Float:
                                         {
-                                            float value = runnerTrigger.GetFloatValue(key);
+                                            float value = runnerTrigger.GetFloatValue(fieldId);
                                             float checkValue = textEntry[dataIndex + 1].GetFloat();
 
                                             ValueCheckType type = textEntry[dataIndex + 2].GetEnum<ValueCheckType>();
@@ -303,20 +304,20 @@ namespace Yang.Dialogue
 
                                             if (!check) isValid = false;
 
-                                            conditions[j] = new(key, check, checkValue, type);
+                                            conditions[j] = new(fieldId, check, checkValue, type);
                                         }
                                         break;
 
                                     case GenericData.DataType.Bool:
                                         {
-                                            bool value = runnerTrigger.GetBoolValue(key);
+                                            bool value = runnerTrigger.GetBoolValue(fieldId);
                                             bool checkValue = textEntry[dataIndex + 1].GetBool();
 
                                             bool check = value == checkValue;
 
                                             if (!check) isValid = false;
 
-                                            conditions[j] = new(key, check, checkValue);
+                                            conditions[j] = new(fieldId, check, checkValue);
                                         }
                                         break;
                                 }

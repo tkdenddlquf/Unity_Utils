@@ -854,7 +854,6 @@ namespace Yang.Dialogue.Editor
             "Wait" => NodeType.Wait,
             "Condition" => NodeType.Condition,
             "Command" => NodeType.Command,
-            "Object" => NodeType.Command,
             _ => NodeType.Dialogue,
         };
 
@@ -881,16 +880,17 @@ namespace Yang.Dialogue.Editor
                 if (part == "hide") continue;
 
                 if (!TrySplitCondition(part, out string key, out string op, out string valueStr)) continue;
+                if (!int.TryParse(key, NumberStyles.Integer, CultureInfo.InvariantCulture, out int fieldId) || fieldId <= 0) continue;
 
                 if (bool.TryParse(valueStr, out bool boolValue))
                 {
-                    target.Add(new GenericData(key));
+                    target.Add(new GenericData(fieldId));
                     target.Add(new GenericData(boolValue));
                     target.Add(new GenericData(GenericData.DataType.Enum));
                 }
                 else if (float.TryParse(valueStr, NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue))
                 {
-                    target.Add(new GenericData(key));
+                    target.Add(new GenericData(fieldId));
                     target.Add(new GenericData(floatValue));
                     target.Add(new GenericData(OpToCheckType(op)));
                 }
@@ -903,10 +903,11 @@ namespace Yang.Dialogue.Editor
             foreach (string part in SplitData(data))
             {
                 if (!TrySplitSetter(part, out string key, out char op, out string valueStr)) continue;
+                if (!int.TryParse(key, NumberStyles.Integer, CultureInfo.InvariantCulture, out int fieldId) || fieldId <= 0) continue;
 
                 if (op == '=' && bool.TryParse(valueStr, out bool boolValue))
                 {
-                    options.Add(new DataWrapper(new GenericData(key), new GenericData(boolValue)));
+                    options.Add(new DataWrapper(new GenericData(fieldId), new GenericData(boolValue)));
                 }
                 else if (float.TryParse(valueStr, NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue))
                 {
@@ -917,17 +918,17 @@ namespace Yang.Dialogue.Editor
                         _ => ValueSetterType.Set,
                     };
 
-                    options.Add(new DataWrapper(new GenericData(key), new GenericData(floatValue), new GenericData(setter)));
+                    options.Add(new DataWrapper(new GenericData(fieldId), new GenericData(floatValue), new GenericData(setter)));
                 }
             }
 
             if (options.Count == 0)
             {
-                options.Add(new DataWrapper(new GenericData(GenericData.DataType.String), new GenericData(GenericData.DataType.Bool)));
+                options.Add(new DataWrapper(new GenericData(GenericData.DataType.Int), new GenericData(GenericData.DataType.Bool)));
             }
         }
 
-        /// <summary>Parses "key:type=value" command arguments into key/value pairs.</summary>
+        /// <summary>Parses "fieldId:type=value" command arguments into stable id/value pairs.</summary>
         private static void AppendCommandArguments(List<GenericData> command, string data, Ctx ctx, string nodeId)
         {
             foreach (string part in SplitData(data))
@@ -941,9 +942,11 @@ namespace Yang.Dialogue.Editor
                     continue;
                 }
 
-                string key = System.Uri.UnescapeDataString(part.Substring(0, colon).Trim());
+                string rawFieldId = System.Uri.UnescapeDataString(part.Substring(0, colon).Trim());
                 string type = part.Substring(colon + 1, equals - colon - 1).Trim().ToLowerInvariant();
                 string value = System.Uri.UnescapeDataString(part.Substring(equals + 1).Trim());
+
+                bool validFieldId = int.TryParse(rawFieldId, NumberStyles.Integer, CultureInfo.InvariantCulture, out int fieldId) && fieldId > 0;
 
                 GenericData parsed;
                 bool valid = true;
@@ -988,13 +991,13 @@ namespace Yang.Dialogue.Editor
                         break;
                 }
 
-                if (!valid || key.Length == 0)
+                if (!valid || !validFieldId)
                 {
-                    ctx.warnings.Add($"'{nodeId}': ignored command argument '{part}' with an invalid key, type, or value.");
+                    ctx.warnings.Add($"'{nodeId}': ignored command argument '{part}' with an invalid field id, type, or value.");
                     continue;
                 }
 
-                command.Add(new GenericData(key));
+                command.Add(new GenericData(fieldId));
                 command.Add(parsed);
             }
         }

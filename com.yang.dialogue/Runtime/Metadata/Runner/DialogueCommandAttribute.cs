@@ -4,7 +4,8 @@ namespace Yang.Dialogue
 {
     /// <summary>
     /// Declares a data-only command schema that the dialogue editor can discover.
-    /// Public instance fields become command arguments; the type is never stored in DialogueSO.
+    /// Supported public instance fields marked with DialogueArgument become command arguments;
+    /// the schema type itself is never stored in DialogueSO.
     /// </summary>
     public abstract class DialogueSchemaAttribute : Attribute
     {
@@ -35,25 +36,44 @@ namespace Yang.Dialogue
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
     public sealed class DialogueVariableAttribute : Attribute
     {
+        public int FieldId { get; }
         public string DisplayName { get; }
-        public int Order { get; set; }
 
-        public DialogueVariableAttribute(string displayName = null)
+        public DialogueVariableAttribute(int fieldId, string displayName = null)
         {
+            FieldId = fieldId;
             DisplayName = displayName;
         }
     }
 
-    /// <summary>Customizes the label and order of a public command schema field.</summary>
+    /// <summary>Assigns a stable numeric id and editor label to a public command or event field.</summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
     public sealed class DialogueArgumentAttribute : Attribute
     {
+        public int FieldId { get; }
         public string DisplayName { get; }
-        public int Order { get; set; }
 
-        public DialogueArgumentAttribute(string displayName = null)
+        public DialogueArgumentAttribute(int fieldId, string displayName = null)
         {
+            FieldId = fieldId;
             DisplayName = displayName;
+        }
+    }
+
+    /// <summary>
+    /// Shows a command or event argument in the editor only when another field has the expected value.
+    /// Hidden arguments remain serialized and are still available at runtime.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = true, Inherited = true)]
+    public sealed class DialogueShowIfAttribute : Attribute
+    {
+        public int FieldId { get; }
+        public object ExpectedValue { get; }
+
+        public DialogueShowIfAttribute(int fieldId, object expectedValue)
+        {
+            FieldId = fieldId;
+            ExpectedValue = expectedValue;
         }
     }
 

@@ -89,8 +89,8 @@ namespace Yang.Dialogue
     /// </summary>
     public readonly struct RunnerCondition
     {
-        /// <summary>Name of the trigger variable this condition tests.</summary>
-        public readonly string key;
+        /// <summary>Stable FieldId of the trigger variable this condition tests.</summary>
+        public readonly int fieldId;
 
         /// <summary>True if this individual condition passed.</summary>
         public readonly bool isValid;
@@ -103,10 +103,10 @@ namespace Yang.Dialogue
 
         private readonly float value;
 
-        /// <summary>Creates a float condition with the compared key, pass result, expected value, and comparison operator.</summary>
-        public RunnerCondition(string key, bool isValid, float value, ValueCheckType checkType)
+        /// <summary>Creates a float condition with the compared FieldId and expected value.</summary>
+        public RunnerCondition(int fieldId, bool isValid, float value, ValueCheckType checkType)
         {
-            this.key = key;
+            this.fieldId = fieldId;
             this.isValid = isValid;
 
             this.value = value;
@@ -116,10 +116,10 @@ namespace Yang.Dialogue
             type = ValueType.Float;
         }
 
-        /// <summary>Creates a bool condition with the compared key, pass result, and expected boolean value.</summary>
-        public RunnerCondition(string key, bool isValid, bool value)
+        /// <summary>Creates a bool condition with the compared FieldId and expected value.</summary>
+        public RunnerCondition(int fieldId, bool isValid, bool value)
         {
-            this.key = key;
+            this.fieldId = fieldId;
             this.isValid = isValid;
 
             this.value = value ? 1 : 0;
