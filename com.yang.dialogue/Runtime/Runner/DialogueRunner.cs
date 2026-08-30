@@ -80,16 +80,12 @@ namespace Yang.Dialogue
         /// awaiting each view callback until the flow ends. Optionally start at a specific node and route to a custom view set.
         /// Typically called as runner.StartDialogue("npc_blacksmith"); the same key resumes a paused flow.
         /// </summary>
-        public void StartDialogue(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null)
-            => _ = StartDialogueAsync(key, nodeName, views);
+        public void StartDialogue(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null) => _ = StartDialogueAsync(key, nodeName, views);
 
         /// <summary>
         /// Starts or resumes a conversation and returns a task that completes when the flow pauses, stops, or ends.
         /// </summary>
-        public async Awaitable StartDialogueAsync(
-            string key,
-            string nodeName = "",
-            IReadOnlyList<IDialogueView> views = null)
+        public async Awaitable StartDialogueAsync(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null)
         {
             if (so == null) return;
 
@@ -153,17 +149,17 @@ namespace Yang.Dialogue
                     return;
 
                 case TokenState.Paused:
-                    foreach (IDialogueView view in token.Views) view.OnPaused();
+                    foreach (IDialogueView view in token.Views) view.OnPaused(key);
                     break;
 
                 case TokenState.Stopped:
-                    foreach (IDialogueView view in token.Views) view.OnStopped();
+                    foreach (IDialogueView view in token.Views) view.OnStopped(key);
 
                     tokens.Remove(key);
                     return;
 
                 case TokenState.Ended:
-                    foreach (IDialogueView view in token.Views) view.OnEnded();
+                    foreach (IDialogueView view in token.Views) view.OnEnded(key);
 
                     tokens.Remove(key);
                     return;
@@ -280,7 +276,7 @@ namespace Yang.Dialogue
 
                     if (!capturedViewIDs.Add(viewID)) continue;
 
-                    object data = view.CaptureView();
+                    object data = view.CaptureView(pair.Key);
 
                     if (data == null) continue;
 

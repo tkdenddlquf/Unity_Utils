@@ -41,13 +41,13 @@ namespace Yang.Dialogue
         /// </summary>
         public virtual async Awaitable OnMessage(string reason, IRunnerToken token) => await Awaitable.NextFrameAsync();
 
-        public virtual void OnPaused() { }
+        public virtual void OnPaused(string key) { }
 
-        public virtual void OnStopped() { }
+        public virtual void OnStopped(string key) { }
 
-        public virtual void OnEnded() { }
+        public virtual void OnEnded(string key) { }
 
-        public virtual object CaptureView() => null;
+        public virtual object CaptureView(string key) => null;
     }
 
     /// <summary>
@@ -78,12 +78,12 @@ namespace Yang.Dialogue
         /// </summary>
         public Awaitable OnMessage(string reason, IRunnerToken token);
 
-        public void OnPaused();
+        public void OnPaused(string key);
 
-        public void OnStopped();
+        public void OnStopped(string key);
 
-        public void OnEnded();
+        public void OnEnded(string key);
 
-        public object CaptureView();
+        public object CaptureView(string key);
     }
 }
