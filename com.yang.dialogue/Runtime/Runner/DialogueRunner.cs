@@ -125,20 +125,17 @@ namespace Yang.Dialogue
 
                 if (token.State != TokenState.Running) break;
 
-                if (token.NodeIndex >= 0)
+                if (token.NodeIndex >= 0 && runnerNode.TryGetLink(token.NodeIndex, portIndex, out int targetIndex))
                 {
-                    if (runnerNode.TryGetLink(token.NodeIndex, portIndex, out int targetIndex))
-                    {
-                        token.NodeIndex = targetIndex;
-                        token.TargetNode = runnerNode.GetNodeGuid(targetIndex);
-                    }
-                    else
-                    {
-                        token.SetState(TokenState.Ended);
+                    token.NodeIndex = targetIndex;
+                    token.TargetNode = runnerNode.GetNodeGuid(targetIndex);
 
-                        break;
-                    }
+                    continue;
                 }
+
+                token.SetState(TokenState.Ended);
+
+                break;
             }
 
             token.RefreshView();
