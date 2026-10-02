@@ -8,7 +8,6 @@ namespace Yang.Localize
     public class Variables<T> : IVariableValueChanged
     {
         public event Action<IVariable> ValueChanged;
-
         private readonly List<T> values = new();
 
         public T this[int index]
@@ -17,7 +16,6 @@ namespace Yang.Localize
             set
             {
                 values[index] = value;
-
                 ValueChanged?.Invoke(this);
             }
         }
@@ -25,7 +23,6 @@ namespace Yang.Localize
         public void Add(T value)
         {
             values.Add(value);
-
             ValueChanged?.Invoke(this);
         }
 
@@ -34,21 +31,18 @@ namespace Yang.Localize
             if (!values.Remove(value)) return false;
 
             ValueChanged?.Invoke(this);
-
             return true;
         }
 
         public void Remove(int index)
         {
             values.RemoveAt(index);
-
             ValueChanged?.Invoke(this);
         }
 
         public void Clear()
         {
             values.Clear();
-
             ValueChanged?.Invoke(this);
         }
 

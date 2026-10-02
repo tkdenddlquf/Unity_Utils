@@ -1,7 +1,4 @@
 using System;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.Localization.Tables;
 
 namespace Yang.Localize.Editor
 {
@@ -9,53 +6,32 @@ namespace Yang.Localize.Editor
     {
         public readonly long id;
         public readonly string key;
+        public readonly string preview;
 
-        public readonly IReadOnlyCollection<LazyLoadReference<LocalizationTable>> tables;
-
-        public EntryData(long id, string key, IReadOnlyCollection<LazyLoadReference<LocalizationTable>> tables)
+        public EntryData(long id, string key, string preview = "")
         {
             this.id = id;
             this.key = key;
-
-            this.tables = tables;
+            this.preview = preview ?? "";
         }
 
-        public EntryData(long id, string key)
+        public string GetPreview(int maxLength = 90)
         {
-            this.id = id;
-            this.key = key;
+            if (string.IsNullOrEmpty(preview)) return "";
 
-            tables = null;
+            string text = preview.Replace('\n', ' ').Replace('\r', ' ');
+            return text.Length > maxLength ? text.Substring(0, maxLength) + "…" : text;
         }
 
-        public readonly string GetText(SystemLanguage language)
+        public string GetDisplayName(int previewLength = 60)
         {
-            if (tables == null) return "";
-
-            foreach (LazyLoadReference<LocalizationTable> reference in tables)
-            {
-                LocalizationTable table = reference.asset;
-
-                if (table.LocaleIdentifier == language && table is StringTable stringTable)
-                {
-                    StringTableEntry entry = stringTable.GetEntry(key);
-
-                    if (entry == null) return "";
-                    else return entry.Value;
-                }
-            }
-
-            return "";
+            string text = GetPreview(previewLength);
+            return string.IsNullOrEmpty(text) ? key : $"{key}    {text}";
         }
 
         public override string ToString() => key;
-
-        #region Equatable
-        public readonly bool Equals(EntryData other) => id == other.id;
-
-        public readonly override bool Equals(object obj) => obj is EntryData other && Equals(other);
-
-        public readonly override int GetHashCode() => HashCode.Combine(id);
-        #endregion
+        public bool Equals(EntryData other) => id == other.id;
+        public override bool Equals(object obj) => obj is EntryData other && Equals(other);
+        public override int GetHashCode() => HashCode.Combine(id);
     }
 }

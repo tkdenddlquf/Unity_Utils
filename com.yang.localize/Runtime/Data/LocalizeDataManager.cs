@@ -9,7 +9,6 @@ namespace Yang.Localize
         public static void SetTable(this LocalizeStringEvent stringEvent, LocalizeReference reference)
         {
             stringEvent.StringReference.SetReference(reference.tableName, reference.entryName);
-            stringEvent.RefreshString();
         }
 
         public static void SetTable(this LocalizeSpriteEvent spriteEvent, LocalizeReference reference)
@@ -21,7 +20,6 @@ namespace Yang.Localize
         {
             stringEvent.StringReference.Clear();
             stringEvent.StringReference.SetReference("", "");
-            stringEvent.RefreshString();
         }
 
         public static void Clear(this LocalizeSpriteEvent spriteEvent)
@@ -31,17 +29,20 @@ namespace Yang.Localize
 
         public static void SetVariable(this LocalizeStringEvent stringEvent, LocalizeVariableData data)
         {
-            stringEvent.Clear();
-
-            stringEvent.SetVariable(data.key, data.value);
-            stringEvent.SetTable(data.reference);
+            stringEvent.StringReference.Clear();
+            stringEvent.StringReference[data.key] = data.value;
+            stringEvent.StringReference.SetReference(data.reference.tableName, data.reference.entryName);
         }
 
         public static void SetVariable(this LocalizeStringEvent stringEvent, string key, IVariable value)
         {
-            stringEvent.StringReference.Add(key, value);
+            stringEvent.StringReference[key] = value;
+            stringEvent.RefreshString();
         }
 
-        public static string GetText(LocalizeReference reference) => LocalizationSettings.StringDatabase.GetLocalizedString(reference.tableName, reference.entryName);
+        public static string GetText(LocalizeReference reference)
+        {
+            return LocalizationSettings.StringDatabase.GetLocalizedString(reference.tableName, reference.entryName);
+        }
     }
 }
