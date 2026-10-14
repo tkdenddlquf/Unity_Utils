@@ -15,7 +15,6 @@ namespace Yang.Dialogue.Editor
         }
     }
 
-    /// <summary>Creates a custom UI Toolkit field for a dialogue schema field attribute.</summary>
     public abstract class DialogueArgumentDrawer
     {
         public abstract VisualElement CreateField(FieldInfo field, Attribute attribute, string label, GenericData value, Action<GenericData> onChanged);

@@ -2,11 +2,6 @@ using System;
 
 namespace Yang.Dialogue
 {
-    /// <summary>
-    /// Declares a data-only command schema that the dialogue editor can discover.
-    /// Supported public instance fields marked with DialogueArgument become command arguments;
-    /// the schema type itself is never stored in DialogueSO.
-    /// </summary>
     public abstract class DialogueSchemaAttribute : Attribute
     {
         public string ID { get; }
@@ -46,7 +41,6 @@ namespace Yang.Dialogue
         }
     }
 
-    /// <summary>Assigns a stable numeric id and editor label to a public command or event field.</summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
     public sealed class DialogueArgumentAttribute : Attribute
     {
@@ -60,10 +54,6 @@ namespace Yang.Dialogue
         }
     }
 
-    /// <summary>
-    /// Shows a command or event argument in the editor only when another field has the expected value.
-    /// Hidden arguments remain serialized and are still available at runtime.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = true, Inherited = true)]
     public sealed class DialogueShowIfAttribute : Attribute
     {
@@ -77,10 +67,6 @@ namespace Yang.Dialogue
         }
     }
 
-    /// <summary>
-    /// Replaces a string field with a popup populated by a static parameterless provider method.
-    /// The method may return any IEnumerable&lt;string&gt;.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
     public sealed class DialogueOptionsAttribute : Attribute
     {

@@ -2,18 +2,11 @@ using System.Collections.Generic;
 
 namespace Yang.Dialogue
 {
-    /// <summary>
-    /// Converts a serialized runner instruction into a game-defined command or event without reflection.
-    /// </summary>
     public interface IDialogueInstruction
     {
         void ReadFrom(RunnerCommand command);
     }
 
-    /// <summary>
-    /// A serializable, asset-independent instruction emitted by a Command node.
-    /// The dialogue package does not interpret the id or arguments; registered views do.
-    /// </summary>
     public readonly struct RunnerCommand
     {
         private readonly IReadOnlyList<RunnerArgument> arguments;
@@ -37,7 +30,6 @@ namespace Yang.Dialogue
                     return true;
                 }
             }
-
             value = default;
             return false;
         }
@@ -66,7 +58,6 @@ namespace Yang.Dialogue
         public T GetEnum<T>(int fieldId, T fallback = default) where T : struct, System.Enum
             => TryGet(fieldId, out GenericData value) && value.TryGetEnum(out T result) ? result : fallback;
 
-        /// <summary>Converts this instruction without reflection after verifying its schema id.</summary>
         public bool TryConvert<T>(string expectedId, out T result) where T : class, IDialogueInstruction, new()
         {
             if (ID != expectedId)
@@ -74,14 +65,12 @@ namespace Yang.Dialogue
                 result = default;
                 return false;
             }
-
             result = new T();
             result.ReadFrom(this);
             return true;
         }
     }
 
-    /// <summary>A stable-id, strongly tagged value passed to a dialogue command.</summary>
     public readonly struct RunnerArgument
     {
         public int FieldId { get; }

@@ -3,9 +3,6 @@ using UnityEngine;
 
 namespace Yang.Dialogue
 {
-    /// <summary>
-    /// Serializable save/load payload capturing a dialogue runner's in-progress state (task keys, their point nodes, and runtime values) for persistence and restore.
-    /// </summary>
     [System.Serializable]
     public class DialogueSaveData
     {
@@ -20,11 +17,13 @@ namespace Yang.Dialogue
     {
         public string key;
         public string nodeGuid;
+        public List<string> viewIDs = new();
     }
 
     [System.Serializable]
     public class ViewDataEntry
     {
+        public string key;
         public string viewID;
         public string data;
     }
