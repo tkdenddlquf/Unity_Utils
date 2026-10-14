@@ -45,7 +45,7 @@ namespace Yang.Dialogue.Editor
 
                 if (table.LocaleIdentifier == identifier && table is StringTable stringTable)
                 {
-                    StringTableEntry entry = stringTable.GetEntry(key);
+                    StringTableEntry entry = stringTable.GetEntry(id);
 
                     if (entry == null) return "";
                     else return entry.Value;
@@ -59,12 +59,12 @@ namespace Yang.Dialogue.Editor
         public override string ToString() => key;
 
         /// <summary>Returns true when both entries share the same key and id.</summary>
-        public readonly bool Equals(EntryData other) => key == other.key && id == other.id;
+        public readonly bool Equals(EntryData other) => id == other.id;
 
         /// <summary>Returns true when the object is an equal <see cref="EntryData"/>.</summary>
         public readonly override bool Equals(object obj) => obj is EntryData other && Equals(other);
 
         /// <summary>Returns a hash combining the key and id.</summary>
-        public readonly override int GetHashCode() => HashCode.Combine(key, id);
+        public readonly override int GetHashCode() => HashCode.Combine(id);
     }
 }
