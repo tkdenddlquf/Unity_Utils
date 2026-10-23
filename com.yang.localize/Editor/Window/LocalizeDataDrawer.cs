@@ -187,16 +187,20 @@ namespace Yang.Localize.Editor
             private void BindEntryRow(VisualElement element, int index)
             {
                 EntryRow row = (EntryRow)element;
+
                 row.index = index;
                 row.indexLabel.text = (index + 1).ToString();
 
                 if (index < 0 || index >= entryKeysProp.arraySize) return;
+
                 long id = entryIDsProp.GetArrayElementAtIndex(index).longValue;
                 string key = entryKeysProp.GetArrayElementAtIndex(index).stringValue;
                 int foundIndex = entries.FindIndex(entry => entry.id == id);
+
                 if (foundIndex >= 0)
                 {
                     EntryData entry = entries[foundIndex];
+
                     row.pickButton.text = entry.key;
                     row.pickButton.tooltip = entry.GetDisplayName(160);
                     row.previewLabel.text = entry.GetPreview();
@@ -215,6 +219,7 @@ namespace Yang.Localize.Editor
             private void RefreshFromSerializedObject()
             {
                 typeField.SetValueWithoutNotify((LocalizeTableType)typeProp.enumValueIndex);
+
                 NormalizeEntryArrays();
                 RefreshCollections(false);
             }
@@ -225,6 +230,7 @@ namespace Yang.Localize.Editor
 
                 property.serializedObject.Update();
                 typeProp.enumValueIndex = (int)type;
+
                 ClearSelection();
                 Apply();
                 RefreshCollections(false);
@@ -240,10 +246,13 @@ namespace Yang.Localize.Editor
                 if (tableGuidProp.stringValue == guid) return;
 
                 property.serializedObject.Update();
+
                 tableKeyProp.stringValue = collection.TableCollectionName;
                 tableGuidProp.stringValue = guid;
+
                 entryIDsProp.ClearArray();
                 entryKeysProp.ClearArray();
+
                 Apply();
 
                 collectionIndex = index;
@@ -257,6 +266,7 @@ namespace Yang.Localize.Editor
                 property.serializedObject.Update();
 
                 LocalizeTableType type = (LocalizeTableType)typeProp.enumValueIndex;
+
                 collections = type switch
                 {
                     LocalizeTableType.Asset => LocalizationEditorSettings.GetAssetTableCollections(),
@@ -274,11 +284,15 @@ namespace Yang.Localize.Editor
                 }
 
                 collectionIndex = collections.GetTableIndex(tableKeyProp.stringValue, tableGuidProp.stringValue);
+
                 if (collectionIndex >= 0)
                 {
                     tableField.SetValueWithoutNotify(tableNames[collectionIndex]);
+
                     RepairTableReference();
+
                     collections[collectionIndex].SetEntries(entries, Application.systemLanguage);
+
                     RepairEntryReferences();
                 }
                 else
@@ -294,8 +308,10 @@ namespace Yang.Localize.Editor
             private void RepairTableReference()
             {
                 LocalizationTableCollection collection = collections[collectionIndex];
+
                 string tableName = collection.TableCollectionName;
                 string tableGuid = collection.TableCollectionNameReference.TableCollectionNameGuid.ToString();
+
                 if (tableKeyProp.stringValue == tableName && tableGuidProp.stringValue == tableGuid) return;
 
                 tableKeyProp.stringValue = tableName;
@@ -306,11 +322,14 @@ namespace Yang.Localize.Editor
             private void RepairEntryReferences()
             {
                 bool changed = false;
+
                 for (int i = 0; i < entryKeysProp.arraySize; i++)
                 {
                     SerializedProperty idProp = entryIDsProp.GetArrayElementAtIndex(i);
                     SerializedProperty keyProp = entryKeysProp.GetArrayElementAtIndex(i);
+
                     EntryData entry = entries.FirstOrDefault(item => item.id == idProp.longValue);
+
                     if (entry.id != SharedTableData.EmptyId)
                     {
                         if (keyProp.stringValue != entry.key)
@@ -321,9 +340,11 @@ namespace Yang.Localize.Editor
 
                         continue;
                     }
+
                     if (string.IsNullOrEmpty(keyProp.stringValue)) continue;
 
                     entry = entries.FirstOrDefault(item => item.key == keyProp.stringValue);
+
                     if (entry.id == SharedTableData.EmptyId) continue;
 
                     idProp.longValue = entry.id;
@@ -337,6 +358,7 @@ namespace Yang.Localize.Editor
             {
                 bool hasTable = collectionIndex >= 0 && collectionIndex < collections.Count;
                 bool savedTableMissing = !hasTable && (!string.IsNullOrEmpty(tableKeyProp.stringValue) || !string.IsNullOrEmpty(tableGuidProp.stringValue));
+
                 openButton.SetEnabled(hasTable);
                 invalidTableHelp.style.display = savedTableMissing ? DisplayStyle.Flex : DisplayStyle.None;
             }
@@ -357,11 +379,15 @@ namespace Yang.Localize.Editor
 
                 bool hasTable = collectionIndex >= 0 && collectionIndex < collections.Count;
                 HashSet<long> used = GetUsedEntryIds();
+
                 addButton.SetEnabled(hasTable && entries.Any(entry => !used.Contains(entry.id)));
+
                 emptyLabel.text = hasTable ? "No entries selected." : "Select a localization table first.";
                 emptyLabel.style.display = entryKeysProp.arraySize == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+
                 listView.style.display = entryKeysProp.arraySize > 0 ? DisplayStyle.Flex : DisplayStyle.None;
                 listView.style.height = Mathf.Min(250f, Mathf.Max(RowHeight, entryKeysProp.arraySize * RowHeight + 2f));
+
                 duplicateHelp.style.display = HasDuplicateEntries() ? DisplayStyle.Flex : DisplayStyle.None;
             }
 
@@ -369,6 +395,7 @@ namespace Yang.Localize.Editor
             {
                 HashSet<long> used = GetUsedEntryIds();
                 List<EntryData> available = entries.Where(entry => !used.Contains(entry.id)).ToList();
+
                 ShowEntryPicker(addButton, available, AddEntry);
             }
 
@@ -378,7 +405,9 @@ namespace Yang.Localize.Editor
 
                 long currentId = entryIDsProp.GetArrayElementAtIndex(index).longValue;
                 HashSet<long> used = GetUsedEntryIds();
+
                 List<EntryData> available = entries.Where(entry => entry.id == currentId || !used.Contains(entry.id)).ToList();
+
                 ShowEntryPicker(anchor, available, entry => SetEntry(index, entry));
             }
 
@@ -387,6 +416,7 @@ namespace Yang.Localize.Editor
                 if (available.Count == 0) return;
 
                 EntryDropdown dropdown = new(available, onSelected);
+
                 dropdown.Show(anchor.worldBound);
             }
 
@@ -397,10 +427,12 @@ namespace Yang.Localize.Editor
                 if (ContainsEntry(entry.id, -1)) return;
 
                 int index = entryKeysProp.arraySize;
+
                 entryKeysProp.arraySize++;
                 entryIDsProp.arraySize++;
                 entryKeysProp.GetArrayElementAtIndex(index).stringValue = entry.key;
                 entryIDsProp.GetArrayElementAtIndex(index).longValue = entry.id;
+
                 Apply();
                 RefreshEntryUI();
             }
@@ -413,6 +445,7 @@ namespace Yang.Localize.Editor
 
                 entryKeysProp.GetArrayElementAtIndex(index).stringValue = entry.key;
                 entryIDsProp.GetArrayElementAtIndex(index).longValue = entry.id;
+
                 Apply();
                 RefreshEntryUI();
             }

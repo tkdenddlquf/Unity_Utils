@@ -33,7 +33,7 @@ namespace Yang.Localize.Editor
 
             foreach (SharedTableData.SharedTableEntry current in collection.SharedData.Entries)
             {
-                string preview = previewTable?.GetEntry(current.Id)?.Value ?? "";
+                string preview = previewTable != null ? previewTable.GetEntry(current.Id)?.Value : null ?? "";
 
                 entries.Add(new EntryData(current.Id, current.Key, preview));
             }

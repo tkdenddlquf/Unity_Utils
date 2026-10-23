@@ -3,6 +3,7 @@ using UnityEngine.Localization.SmartFormat.PersistentVariables;
 
 namespace Yang.Localize
 {
+    [Serializable]
     public readonly struct LocalizeVariableData : IEquatable<LocalizeVariableData>
     {
         public readonly LocalizeReference reference;

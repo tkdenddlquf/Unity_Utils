@@ -15,9 +15,10 @@ namespace Yang.Localize
         [SerializeField] private long[] entryIDs = Array.Empty<long>();
 #endif
 
-        public string Key => tableKey;
         public int Length => entryKeys?.Length ?? 0;
+
         public bool IsEmpty => Length == 0;
+
         public LocalizeReference this[int index] => new(tableKey, entryKeys[index]);
     }
 
@@ -27,6 +28,7 @@ namespace Yang.Localize
         Asset,
     }
 
+    [Serializable]
     public readonly struct LocalizeReference : IEquatable<LocalizeReference>
     {
         public readonly string tableName;
