@@ -2,6 +2,7 @@ using UnityEngine.Localization.SmartFormat.Core.Extensions;
 
 namespace Yang.Localize.Formatter
 {
+    [System.Serializable]
     public class Multiply : IFormatter
     {
         public string[] Names { get; set; } = { "mult" };
