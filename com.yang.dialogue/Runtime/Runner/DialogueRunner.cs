@@ -17,6 +17,8 @@ namespace Yang.Dialogue
 
         public IReadOnlyList<IDialogueView> Views => views;
 
+        public HashSet<string> UnsaveKeys { get; private set; } = new();
+
         private readonly RunnerNode runnerNode = new();
         private readonly RunnerEvent runnerEvent = new();
         private readonly RunnerTrigger runnerTrigger = new();
@@ -35,18 +37,25 @@ namespace Yang.Dialogue
         public void SetDialogue(DialogueSO so)
         {
             if (so == null) return;
+
             bool isRunning = false;
+
             foreach (RunnerToken token in tokens.Values)
             {
                 if (token.State == TokenState.Running)
                 {
                     isRunning = true;
+
                     break;
                 }
             }
+
             if (isRunning) return;
+
             StopAllDialogue();
+
             this.so = so;
+
             runnerNode.SetDatas(so);
         }
 
@@ -55,16 +64,21 @@ namespace Yang.Dialogue
         public async Awaitable StartDialogueAsync(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null)
         {
             if (so == null) return;
+
             if (tokens.TryGetValue(key, out RunnerToken token))
             {
                 if (token.State == TokenState.Running) return;
+
                 if (token.IsExecuting)
                 {
                     await token.ExecutionCompletion.Task;
+
                     if (!tokens.TryGetValue(key, out RunnerToken current) || !ReferenceEquals(current, token) || token.State == TokenState.Running) return;
                 }
+
                 if (runnerNode.CheckNode(nodeName)) token.TargetNode = nodeName;
                 else if (string.IsNullOrEmpty(token.TargetNode)) token.TargetNode = so.StartGuid;
+
                 token.NodeIndex = runnerNode.GetNodeIndex(token.TargetNode);
                 token.SetView(views ?? (token.Views.Count > 0 ? token.Views : Views));
                 token.SetState(TokenState.Running);
@@ -75,22 +89,30 @@ namespace Yang.Dialogue
                 token.NodeIndex = runnerNode.GetNodeIndex(token.TargetNode);
                 tokens.Add(key, token);
             }
+
             TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
             token.ExecutionCompletion = completion;
             token.IsExecuting = true;
+
             try
             {
                 while (token.State == TokenState.Running)
                 {
                     token.RefreshView();
+
                     int portIndex = await runnerNode.NextNode(token, token);
+
                     if (token.State != TokenState.Running) break;
+
                     if (token.NodeIndex >= 0 && runnerNode.TryGetLink(token.NodeIndex, portIndex, out int targetIndex))
                     {
                         token.NodeIndex = targetIndex;
                         token.TargetNode = runnerNode.GetNodeGuid(targetIndex);
+
                         continue;
                     }
+
                     token.SetState(TokenState.Ended);
                 }
             }
@@ -98,11 +120,13 @@ namespace Yang.Dialogue
             catch
             {
                 token.SetState(TokenState.Stopped);
+
                 throw;
             }
             finally
             {
                 token.IsExecuting = false;
+
                 try { CompleteDialogue(key, token); }
                 finally { completion.TrySetResult(true); }
             }
@@ -111,16 +135,20 @@ namespace Yang.Dialogue
         private void CompleteDialogue(string key, RunnerToken token)
         {
             if (!tokens.TryGetValue(key, out RunnerToken current) || !ReferenceEquals(current, token)) return;
+
             token.RefreshView();
+
             switch (token.State)
             {
                 case TokenState.Paused:
                     foreach (IDialogueView view in token.Views) view.OnPaused(key);
                     break;
+
                 case TokenState.Stopped:
                     tokens.Remove(key);
                     foreach (IDialogueView view in token.Views) view.OnStopped(key);
                     break;
+
                 case TokenState.Ended:
                     tokens.Remove(key);
                     foreach (IDialogueView view in token.Views) view.OnEnded(key);
@@ -133,7 +161,9 @@ namespace Yang.Dialogue
         public void StopDialogue(string key)
         {
             if (!tokens.TryGetValue(key, out RunnerToken token)) return;
+
             token.SetState(TokenState.Stopped);
+
             if (!token.IsExecuting) CompleteDialogue(key, token);
         }
 
@@ -157,12 +187,16 @@ namespace Yang.Dialogue
         public async Awaitable JumpNodeAsync(string key, string nodeName)
         {
             if (!tokens.TryGetValue(key, out RunnerToken token) || !runnerNode.CheckNode(nodeName)) return;
+
             if (token.State == TokenState.Running)
             {
                 Task completion = token.ExecutionCompletion.Task;
+
                 token.SetState(TokenState.Paused);
+
                 await completion;
             }
+
             if (tokens.TryGetValue(key, out RunnerToken current) && ReferenceEquals(current, token) && token.State == TokenState.Paused)
                 await StartDialogueAsync(key, nodeName, token.Views);
         }
@@ -171,7 +205,9 @@ namespace Yang.Dialogue
         public bool AddView(IDialogueView view)
         {
             if (view == null || views.Contains(view)) return false;
+
             views.Add(view);
+
             return true;
         }
 
@@ -183,38 +219,53 @@ namespace Yang.Dialogue
         public DialogueSaveData Save()
         {
             if (so == null) return null;
+
             DialogueSaveData result = new() { triggerValues = new List<RunnerValue>(runnerTrigger.Values) };
+
             foreach (KeyValuePair<string, RunnerToken> pair in tokens)
             {
+                if (UnsaveKeys.Contains(pair.Key)) continue;
+
                 RunnerToken token = pair.Value;
                 DialogueFlowData flow = new() { key = pair.Key, nodeGuid = token.TargetNode };
+
                 result.dialogueFlows.Add(flow);
+
                 foreach (IDialogueView view in token.Views)
                 {
                     flow.viewIDs.Add(view.ViewID);
                     object data = view.CaptureView(pair.Key);
+
                     if (data != null) result.viewDatas.Add(new ViewDataEntry { key = pair.Key, viewID = view.ViewID, data = JsonUtility.ToJson(data) });
                 }
             }
+
             saveData = result;
+
             return result;
         }
 
         public void Load(DialogueSaveData data)
         {
             if (data == null) return;
+
             StopAllDialogue();
+
             tokens.Clear();
             saveData = JsonUtility.FromJson<DialogueSaveData>(JsonUtility.ToJson(data));
+
             if (saveData.dialogueFlows != null)
             {
                 foreach (DialogueFlowData flow in saveData.dialogueFlows)
                 {
                     if (string.IsNullOrWhiteSpace(flow.key) || tokens.ContainsKey(flow.key)) continue;
+
                     RunnerToken token = new() { TargetNode = flow.nodeGuid };
+
                     if (flow.viewIDs != null && flow.viewIDs.Count > 0)
                     {
                         List<IDialogueView> selected = new();
+
                         foreach (string id in flow.viewIDs)
                         {
                             foreach (IDialogueView view in views)
@@ -222,31 +273,38 @@ namespace Yang.Dialogue
                                 if (view.ViewID == id) { selected.Add(view); break; }
                             }
                         }
+
                         token.SetView(selected);
                     }
+
                     tokens.Add(flow.key, token);
                 }
             }
+
             runnerTrigger.SetDatas(saveData.triggerValues ?? new List<RunnerValue>());
         }
 
         public TData Get<TData>(IDialogueView view)
         {
             if (saveData?.viewDatas == null) return default;
+
             foreach (ViewDataEntry entry in saveData.viewDatas)
             {
                 if (entry.viewID == view.ViewID) return JsonUtility.FromJson<TData>(entry.data);
             }
+
             return default;
         }
 
         public TData Get<TData>(string key, IDialogueView view)
         {
             if (saveData?.viewDatas == null) return default;
+
             foreach (ViewDataEntry entry in saveData.viewDatas)
             {
                 if (entry.key == key && entry.viewID == view.ViewID) return JsonUtility.FromJson<TData>(entry.data);
             }
+
             return default;
         }
 
