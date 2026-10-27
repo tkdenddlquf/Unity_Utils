@@ -17,7 +17,7 @@ namespace Yang.UIController
 
         protected void Init()
         {
-            UIBase<TEnum>[] popups = FindObjectsByType<UIBase<TEnum>>(FindObjectsSortMode.None);
+            UIBase<TEnum>[] popups = FindObjectsByType<UIBase<TEnum>>();
 
             popupDict.Clear();
 
@@ -81,32 +81,44 @@ namespace Yang.UIController
             }
         }
 
-        public void SetData<TData>(TEnum type, TData dataMarker) where TData : struct, IDataMarker
+        #region Marker Data
+        public void SetData<TData>(TEnum type, TData dataMarker) where TData : IDataMarker
         {
             if (popupDict.TryGetValue(type, out UIBase<TEnum> popup)) popup.SetData(dataMarker);
         }
 
-        public void SetData<TData>(TData dataMarker) where TData : struct, IDataMarker
-        {
-            if (activePopups.Count != 0) activePopups[^1].SetData(dataMarker);
-        }
+        public void SetData<TData>(TData dataMarker) where TData : IDataMarker => SetData(activePopups[^1].UIType, dataMarker);
 
-        public bool GetData<TData>(TEnum type, string markerID, out TData result) where TData : struct, IDataMarker
+        public bool GetData<TResult>(TEnum type, out TResult result) where TResult : IDataMarker
         {
-            if (popupDict.TryGetValue(type, out UIBase<TEnum> popup)) return popup.GetData(markerID, out result);
+            if (popupDict.TryGetValue(type, out UIBase<TEnum> popup)) return popup.GetData(out result);
 
             result = default;
 
             return false;
         }
 
-        public bool GetData<TData>(string markerID, out TData result) where TData : struct, IDataMarker
+        public bool GetData<TResult>(out TResult result) where TResult : IDataMarker => GetData(activePopups[^1].UIType, out result);
+        #endregion
+
+        #region Normal Data
+        public void SetData<TData>(TEnum type, string id, TData data)
         {
-            if (activePopups.Count != 0) return activePopups[^1].GetData(markerID, out result);
+            if (popupDict.TryGetValue(type, out UIBase<TEnum> popup)) popup.SetData(id, data);
+        }
+
+        public void SetData<TData>(string id, TData data) => SetData(activePopups[^1].UIType, id, data);
+
+        public bool GetData<TResult>(TEnum type, string id, out TResult result)
+        {
+            if (popupDict.TryGetValue(type, out UIBase<TEnum> popup)) return popup.GetData(id, out result);
 
             result = default;
 
             return false;
         }
+
+        public bool GetData<TResult>(string id, out TResult result) => GetData(activePopups[^1].UIType, id, out result);
+        #endregion
     }
 }

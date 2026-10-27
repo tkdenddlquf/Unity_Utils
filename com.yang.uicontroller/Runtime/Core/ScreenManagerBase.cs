@@ -15,7 +15,7 @@ namespace Yang.UIController
 
         protected void Init(TEnum type)
         {
-            UIBase<TEnum>[] screens = FindObjectsByType<UIBase<TEnum>>(FindObjectsSortMode.None);
+            UIBase<TEnum>[] screens = FindObjectsByType<UIBase<TEnum>>();
 
             screenDict.Clear();
 
@@ -46,22 +46,44 @@ namespace Yang.UIController
             }
         }
 
-        public void SetData<TData>(TEnum type, TData dataMarker) where TData : struct, IDataMarker
+        #region Marker Data
+        public void SetData<TData>(TEnum type, TData dataMarker) where TData : IDataMarker
         {
             if (screenDict.TryGetValue(type, out UIBase<TEnum> screen)) screen.SetData(dataMarker);
         }
 
-        public void SetData<TData>(TData dataMarker) where TData : struct, IDataMarker => SetData(CurrentScreen, dataMarker);
+        public void SetData<TData>(TData dataMarker) where TData : IDataMarker => SetData(CurrentScreen, dataMarker);
 
-        public bool GetData<TData>(TEnum type, string markerID, out TData result) where TData : struct, IDataMarker
+        public bool GetData<TResult>(TEnum type, out TResult result) where TResult : IDataMarker
         {
-            if (screenDict.TryGetValue(type, out UIBase<TEnum> screen)) return screen.GetData(markerID, out result);
+            if (screenDict.TryGetValue(type, out UIBase<TEnum> screen)) return screen.GetData(out result);
 
             result = default;
 
             return false;
         }
 
-        public bool GetData<TData>(string markerID, out TData result) where TData : struct, IDataMarker => GetData(CurrentScreen, markerID, out result);
+        public bool GetData<TResult>(out TResult result) where TResult : IDataMarker => GetData(CurrentScreen, out result);
+        #endregion
+
+        #region Normal Data
+        public void SetData<TData>(TEnum type, string id, TData data)
+        {
+            if (screenDict.TryGetValue(type, out UIBase<TEnum> screen)) screen.SetData(id, data);
+        }
+
+        public void SetData<TData>(string id, TData data) => SetData(CurrentScreen, id, data);
+
+        public bool GetData<TResult>(TEnum type, string id, out TResult result)
+        {
+            if (screenDict.TryGetValue(type, out UIBase<TEnum> screen)) return screen.GetData(id, out result);
+
+            result = default;
+
+            return false;
+        }
+
+        public bool GetData<TResult>(string id, out TResult result) => GetData(CurrentScreen, id, out result);
+        #endregion
     }
 }

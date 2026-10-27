@@ -11,7 +11,7 @@ namespace Yang.UIController
             {
                 if (instance == null)
                 {
-                    instance = FindFirstObjectByType<TSelf>();
+                    instance = FindAnyObjectByType<TSelf>();
 
                     if (instance == null)
                     {
