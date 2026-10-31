@@ -30,9 +30,11 @@ namespace Yang.Dialogue.Editor
         public readonly string GetText(LocaleIdentifier identifier)
         {
             if (tables == null) return "";
+
             foreach (LazyLoadReference<LocalizationTable> reference in tables)
             {
                 LocalizationTable table = reference.asset;
+
                 if (table.LocaleIdentifier == identifier && table is StringTable stringTable)
                 {
                     StringTableEntry entry = id != 0 && stringTable.SharedData.GetEntry(id) != null ? stringTable.GetEntry(id) : stringTable.GetEntry(key);
@@ -40,6 +42,7 @@ namespace Yang.Dialogue.Editor
                     else return entry.Value;
                 }
             }
+
             return "";
         }
 

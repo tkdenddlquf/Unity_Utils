@@ -8,7 +8,8 @@ namespace Yang.Dialogue
 
         public void OnEvent(RunnerCommand data)
         {
-            if (callbacks.TryGetValue(data.ID, out System.Action<RunnerCommand> callback)) callback?.Invoke(data);
+            if (callbacks.TryGetValue(data.ID, out System.Action<RunnerCommand> callback))
+                callback?.Invoke(data);
         }
 
         public void ClearCallbacks() => callbacks.Clear();
@@ -30,6 +31,7 @@ namespace Yang.Dialogue
                 callbacks[id] -= callback;
                 return true;
             }
+
             return false;
         }
     }

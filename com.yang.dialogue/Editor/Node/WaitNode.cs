@@ -38,6 +38,7 @@ namespace Yang.Dialogue.Editor
         private void SetOptions()
         {
             List<GenericData> optionData = optionDatas[0].data;
+
             if (optionData[0].TryGetEnum(out WaitType eResult))
             {
                 EnumField typeField = GetTypeField(eResult);
@@ -54,10 +55,12 @@ namespace Yang.Dialogue.Editor
         {
             TextField reasonField = extensionContainer.Q<TextField>();
             FloatField secondsField = extensionContainer.Q<FloatField>();
+
             switch (waitType)
             {
                 case WaitType.Notify:
                     secondsField.style.display = DisplayStyle.None;
+
                     if (setElementValue)
                     {
                         string currentReason = reasonField.value;
@@ -69,10 +72,12 @@ namespace Yang.Dialogue.Editor
                         string value = optionDatas[0].data[1].ToString();
                         reasonField.SetValueWithoutNotify(value);
                     }
+
                     reasonField.style.display = DisplayStyle.Flex;
                     break;
                 case WaitType.Seconds:
                     reasonField.style.display = DisplayStyle.None;
+
                     if (setElementValue)
                     {
                         float currentSeconds = secondsField.value;
@@ -84,6 +89,7 @@ namespace Yang.Dialogue.Editor
                         float value = optionDatas[0].data[1].GetFloat();
                         secondsField.SetValueWithoutNotify(value);
                     }
+
                     secondsField.style.display = DisplayStyle.Flex;
                     break;
             }

@@ -30,45 +30,54 @@ namespace Yang.Dialogue
 
         public readonly DataType Type => type;
 
+        internal readonly int GetRuntimeHashCode() => HashCode.Combine(type, intValue, floatValue, longValue, colorValue, stringValue);
+
         public static GenericData Convert(string data)
         {
             GenericData result = new();
+
             if (int.TryParse(data, out int i))
             {
                 result.type = DataType.Int;
                 result.intValue = i;
                 return result;
             }
+
             if (long.TryParse(data, out long l))
             {
                 result.type = DataType.Long;
                 result.longValue = l;
                 return result;
             }
+
             if (float.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
             {
                 result.type = DataType.Float;
                 result.floatValue = f;
                 return result;
             }
+
             if (bool.TryParse(data, out bool b))
             {
                 result.type = DataType.Bool;
                 result.intValue = b ? 1 : 0;
                 return result;
             }
+
             if (ColorUtility.TryParseHtmlString(data, out Color c))
             {
                 result.type = DataType.Color;
                 result.colorValue = c;
                 return result;
             }
+
             if (Guid.TryParse(data, out Guid g))
             {
                 result.type = DataType.Guid;
                 result.stringValue = g.ToString();
                 return result;
             }
+
             result.type = DataType.String;
             result.stringValue = data;
             return result;
@@ -152,6 +161,7 @@ namespace Yang.Dialogue
                 value = intValue;
                 return true;
             }
+
             value = default;
             return false;
         }
@@ -163,6 +173,7 @@ namespace Yang.Dialogue
                 value = floatValue;
                 return true;
             }
+
             value = default;
             return false;
         }
@@ -174,6 +185,7 @@ namespace Yang.Dialogue
                 value = longValue;
                 return true;
             }
+
             value = default;
             return false;
         }
@@ -185,6 +197,7 @@ namespace Yang.Dialogue
                 value = intValue == 1;
                 return true;
             }
+
             value = default;
             return false;
         }
@@ -196,6 +209,7 @@ namespace Yang.Dialogue
                 value = colorValue;
                 return true;
             }
+
             value = default;
             return false;
         }
@@ -214,6 +228,7 @@ namespace Yang.Dialogue
                 value = (T)Enum.ToObject(typeof(T), intValue);
                 return true;
             }
+
             value = default;
             return false;
         }
@@ -225,6 +240,7 @@ namespace Yang.Dialogue
                 value = stringValue;
                 return true;
             }
+
             value = default;
             return false;
         }

@@ -30,6 +30,7 @@ namespace Yang.Dialogue
                     return true;
                 }
             }
+
             value = default;
             return false;
         }
@@ -65,6 +66,7 @@ namespace Yang.Dialogue
                 result = default;
                 return false;
             }
+
             result = new T();
             result.ReadFrom(this);
             return true;

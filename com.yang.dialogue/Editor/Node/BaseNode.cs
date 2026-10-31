@@ -9,6 +9,7 @@ namespace Yang.Dialogue.Editor
     public abstract class BaseNode : Node
     {
         protected DialogueEditorWindow window;
+        private bool extensionBuilt;
 
         protected const int ITEM_MIN_WIDTH = 150;
 
@@ -35,7 +36,8 @@ namespace Yang.Dialogue.Editor
             NodeData data = window.GetNode(GUID);
             Undo.RecordObject(so, "Node Expended Change");
             data.expended = !data.expended;
-            if (data.expended) EnsureExtension();
+            if (data.expended)
+                EnsureExtension();
             SetExpendedWithoutNotify(data.expended);
             window.SetNode(GUID, data);
             EditorUtility.SetDirty(so);
@@ -43,8 +45,6 @@ namespace Yang.Dialogue.Editor
         }
 
         public abstract void SetPorts();
-
-        private bool extensionBuilt;
 
         protected virtual void BuildExtension() { }
 
@@ -83,7 +83,8 @@ namespace Yang.Dialogue.Editor
         {
             Port port = InstantiatePort(Orientation.Horizontal, Direction.Output, Port.Capacity.Single, typeof(bool));
             port.portName = "Output";
-            if (accent) AddPortAccent(port);
+            if (accent)
+                AddPortAccent(port);
             outputContainer.Add(port);
             return port;
         }
@@ -107,7 +108,8 @@ namespace Yang.Dialogue.Editor
             {
                 if (evt.clickCount < 2) return;
                 string target = NextConnectedGuid(port, ref cycle);
-                if (!string.IsNullOrEmpty(target)) window.FocusNode(target);
+                if (!string.IsNullOrEmpty(target))
+                    window.FocusNode(target);
                 evt.StopPropagation();
             });
         }
@@ -115,17 +117,27 @@ namespace Yang.Dialogue.Editor
         private string NextConnectedGuid(Port port, ref int cycle)
         {
             List<LinkData> links = window.Links;
+
             if (port.direction == Direction.Output)
             {
                 int index = port.parent.IndexOf(port);
+
                 for (int i = 0; i < links.Count; i++)
                 {
                     if (links[i].nodeGuid == GUID && links[i].outPortIndex == index) return links[i].targetGuid;
                 }
+
                 return "";
             }
+
             List<string> sources = new();
-            for (int i = 0; i < links.Count; i++) { if (links[i].targetGuid == GUID) sources.Add(links[i].nodeGuid); }
+
+            for (int i = 0; i < links.Count; i++)
+            {
+                if (links[i].targetGuid == GUID)
+                    sources.Add(links[i].nodeGuid);
+            }
+
             if (sources.Count == 0) return "";
             int pick = cycle % sources.Count;
             cycle = (cycle + 1) % sources.Count;
@@ -135,18 +147,26 @@ namespace Yang.Dialogue.Editor
         protected bool RemovePort(Port port)
         {
             DialogueSO so = window.SO;
+
             if (portDatas.Count > 1)
             {
                 int portIndex = port.parent.IndexOf(port);
                 List<LinkData> links = window.Links;
                 Undo.RecordObject(so, "Remove Port");
+
                 for (int i = links.Count - 1; i >= 0; i--)
                 {
                     LinkData link = links[i];
                     if (link.nodeGuid != GUID) continue;
-                    if (link.outPortIndex == portIndex) links.RemoveAt(i);
-                    else if (link.outPortIndex > portIndex) { link.outPortIndex--; links[i] = link; }
+                    if (link.outPortIndex == portIndex)
+                        links.RemoveAt(i);
+                    else if (link.outPortIndex > portIndex)
+                    {
+                        link.outPortIndex--;
+                        links[i] = link;
+                    }
                 }
+
                 window.RemoveEdge(port);
                 portDatas.RemoveAt(portIndex);
                 outputContainer.Remove(port);
@@ -156,18 +176,22 @@ namespace Yang.Dialogue.Editor
                 window.SetUnsaved();
                 return true;
             }
+
             return false;
         }
 
         protected void SwapPortLinks(int a, int b)
         {
             List<LinkData> links = window.Links;
+
             for (int i = 0; i < links.Count; i++)
             {
                 LinkData link = links[i];
                 if (link.nodeGuid != GUID) continue;
-                if (link.outPortIndex == a) link.outPortIndex = b;
-                else if (link.outPortIndex == b) link.outPortIndex = a;
+                if (link.outPortIndex == a)
+                    link.outPortIndex = b;
+                else if (link.outPortIndex == b)
+                    link.outPortIndex = a;
                 else continue;
                 links[i] = link;
             }
@@ -178,10 +202,15 @@ namespace Yang.Dialogue.Editor
             if (evt.target is TextField field)
             {
                 DialogueSO so = window.SO;
-                if (string.IsNullOrWhiteSpace(evt.newValue) || evt.newValue == so.StartGuid) { field.SetValueWithoutNotify(GUID); }
+
+                if (string.IsNullOrWhiteSpace(evt.newValue) || evt.newValue == so.StartGuid)
+                {
+                    field.SetValueWithoutNotify(GUID);
+                }
                 else
                 {
                     List<NodeData> nodes = window.Nodes;
+
                     for (int i = 0; i < nodes.Count; i++)
                     {
                         if (nodes[i].guid == evt.newValue)
@@ -190,21 +219,37 @@ namespace Yang.Dialogue.Editor
                             return;
                         }
                     }
+
                     string oldGuid = GUID;
                     NodeData data = window.GetNode(oldGuid);
                     Undo.RecordObject(so, "Change GUID");
                     data.guid = evt.newValue;
                     window.SetNode(oldGuid, data);
                     List<LinkData> links = window.Links;
+
                     for (int i = 0; i < links.Count; i++)
                     {
                         LinkData link = links[i];
                         bool changed = false;
-                        if (link.nodeGuid == oldGuid) { link.nodeGuid = evt.newValue; changed = true; }
-                        if (link.targetGuid == oldGuid) { link.targetGuid = evt.newValue; changed = true; }
-                        if (changed) links[i] = link;
+
+                        if (link.nodeGuid == oldGuid)
+                        {
+                            link.nodeGuid = evt.newValue;
+                            changed = true;
+                        }
+
+                        if (link.targetGuid == oldGuid)
+                        {
+                            link.targetGuid = evt.newValue;
+                            changed = true;
+                        }
+
+                        if (changed)
+                            links[i] = link;
                     }
+
                     GUID = data.guid;
+                    window.OnNodeGuidChanged(oldGuid, GUID);
                     EditorUtility.SetDirty(so);
                     window.SetUnsaved();
                 }

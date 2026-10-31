@@ -11,6 +11,7 @@ namespace Yang.Dialogue.Editor
         {
             tables.Clear();
             if (collections == null) return;
+
             foreach (LocalizationTableCollection collection in collections)
             {
                 string tableName = collection.TableCollectionName;
@@ -23,13 +24,16 @@ namespace Yang.Dialogue.Editor
         {
             ids.Clear();
             ids.Add(Guid.Empty);
-            foreach (LocalizationTableCollection collection in collections) ids.Add(collection.TableCollectionNameReference.TableCollectionNameGuid);
+            foreach (LocalizationTableCollection collection in collections)
+                ids.Add(collection.TableCollectionNameReference.TableCollectionNameGuid);
         }
 
-        public static LocalizationTableCollection ResolveCollection(this IReadOnlyList<LocalizationTableCollection> collections, string name, Guid guid, long entryId = 0, string entryKey = null)
+        public static LocalizationTableCollection ResolveCollection(this IReadOnlyList<LocalizationTableCollection> collections,
+            string name, Guid guid, long entryId = 0, string entryKey = null)
         {
             foreach (LocalizationTableCollection collection in collections)
-                if (guid != Guid.Empty && collection.TableCollectionNameReference.TableCollectionNameGuid == guid) return collection;
+                if (guid != Guid.Empty && collection.TableCollectionNameReference.TableCollectionNameGuid == guid)
+                    return collection;
             foreach (LocalizationTableCollection collection in collections)
                 if (!string.IsNullOrEmpty(name) && collection.TableCollectionName == name) return collection;
             LocalizationTableCollection match = FindUniqueEntryCollection(collections, entryId, null);
@@ -40,12 +44,15 @@ namespace Yang.Dialogue.Editor
         {
             if (id == 0 && string.IsNullOrEmpty(key)) return null;
             LocalizationTableCollection match = null;
+
             foreach (LocalizationTableCollection collection in collections)
             {
-                if (id != 0 ? collection.SharedData.GetEntry(id) == null : collection.SharedData.GetEntry(key) == null) continue;
+                if (id != 0 ? collection.SharedData.GetEntry(id) == null : collection.SharedData.GetEntry(key) == null)
+                    continue;
                 if (match != null) return null;
                 match = collection;
             }
+
             return match;
         }
 
@@ -59,6 +66,7 @@ namespace Yang.Dialogue.Editor
         {
             entries.Clear();
             if (collection == null) return;
+
             foreach (SharedTableData.SharedTableEntry current in collection.SharedData.Entries)
             {
                 EntryData data = new(current.Id, current.Key, collection.Tables);

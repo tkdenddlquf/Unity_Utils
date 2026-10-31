@@ -8,16 +8,21 @@ namespace Yang.Dialogue.Editor
         public static string ToCsv(IReadOnlyList<IReadOnlyList<string>> rows)
         {
             StringBuilder sb = new();
+
             for (int r = 0; r < rows.Count; r++)
             {
                 IReadOnlyList<string> row = rows[r];
+
                 for (int c = 0; c < row.Count; c++)
                 {
-                    if (c > 0) sb.Append(',');
+                    if (c > 0)
+                        sb.Append(',');
                     sb.Append(Escape(row[c]));
                 }
+
                 sb.Append('\n');
             }
+
             return sb.ToString();
         }
 
@@ -28,9 +33,11 @@ namespace Yang.Dialogue.Editor
             List<string> row = new();
             StringBuilder field = new();
             bool inQuotes = false;
+
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
+
                 if (inQuotes)
                 {
                     if (c == '"')
@@ -69,11 +76,13 @@ namespace Yang.Dialogue.Editor
                     }
                 }
             }
+
             if (field.Length > 0 || row.Count > 0)
             {
                 row.Add(field.ToString());
                 rows.Add(row);
             }
+
             return rows;
         }
 

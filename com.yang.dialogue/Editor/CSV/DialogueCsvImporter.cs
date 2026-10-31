@@ -28,6 +28,8 @@ namespace Yang.Dialogue.Editor
             public string code;
             public int speakerColumn;
             public int textColumn;
+            public int speakerPresentColumn;
+            public int textPresentColumn;
         }
 
         private class Row
@@ -59,19 +61,79 @@ namespace Yang.Dialogue.Editor
             public readonly List<string> warnings = new();
         }
 
-        public static bool Import(DialogueSO so, string csv, out string message)
+        public static bool Preview(DialogueSO so, string csv, out string message)
         {
-            message = "";
             List<List<string>> rows = CsvUtility.FromCsv(csv);
+
             if (rows.Count < 1)
             {
                 message = "CSV is empty.";
                 return false;
             }
+
+            List<LocaleColumn> languages = ParseHeader(rows[0]);
+            List<Row> nodes;
+
+            try
+            {
+                nodes = ParseRows(rows, languages, rows[0]);
+            }
+            catch (System.FormatException exception)
+            {
+                message = exception.Message;
+                return false;
+            }
+
+            int childRows = 0;
+            int textCells = 0;
+            int speakerCells = 0;
+
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                Row node = nodes[i];
+                childRows += node.children.Count;
+                textCells += node.text.Count;
+                speakerCells += node.speaker.Count;
+
+                for (int j = 0; j < node.children.Count; j++)
+                {
+                    textCells += node.children[j].text.Count;
+                    speakerCells += node.children[j].speaker.Count;
+                }
+            }
+
+            message = $"Current asset: {so.EditorNodes.Count + 1} nodes, {so.EditorLinks.Count} links.\n"
+                + $"CSV: {nodes.Count} nodes, {childRows} detail rows, {languages.Count} locale columns/groups.\n"
+                + $"Localized cells present: speaker {speakerCells}, text {textCells}.\n\n"
+                + "Import replaces this asset's nodes and links, and may update the referenced String Tables. "
+                + "Counts represent CSV contents, not an exact difference preview.";
+            return true;
+        }
+
+        public static bool Import(DialogueSO so, string csv, out string message)
+        {
+            message = "";
+            List<List<string>> rows = CsvUtility.FromCsv(csv);
+
+            if (rows.Count < 1)
+            {
+                message = "CSV is empty.";
+                return false;
+            }
+
             List<LocaleColumn> localeColumns = ParseHeader(rows[0]);
             List<Row> nodes;
-            try { nodes = ParseRows(rows, localeColumns, rows[0]); }
-            catch (System.FormatException exception) { message = exception.Message; return false; }
+
+            try
+            {
+                nodes = ParseRows(rows, localeColumns, rows[0]);
+            }
+            catch (System.FormatException exception)
+            {
+                message = exception.Message;
+                return false;
+            }
+
             ResolveIds(nodes);
             Ctx ctx = new()
             {
@@ -82,16 +144,19 @@ namespace Yang.Dialogue.Editor
             Undo.SetCurrentGroupName("Import Dialogue CSV");
             Build(so, nodes, ctx);
             Undo.CollapseUndoOperations(undoGroup);
-            if (ctx.warnings.Count > 0) message = "Imported with warnings:\n- " + string.Join("\n- ", ctx.warnings);
+            if (ctx.warnings.Count > 0)
+                message = "Imported with warnings:\n- " + string.Join("\n- ", ctx.warnings);
             return true;
         }
 
         private static List<LocaleColumn> ParseHeader(List<string> header)
         {
             Dictionary<string, LocaleColumn> byCode = new();
+
             for (int i = FIXED_COLUMNS; i < header.Count; i++)
             {
                 string name = header[i];
+
                 if (TryParseLocaleHeader(name, "Speaker", out string code))
                 {
                     LocaleColumn column = GetOrAdd(byCode, code);
@@ -102,7 +167,12 @@ namespace Yang.Dialogue.Editor
                     LocaleColumn column = GetOrAdd(byCode, code);
                     column.textColumn = i;
                 }
+                else if (TryParseLocaleHeader(name, "SpeakerPresent", out code))
+                    GetOrAdd(byCode, code).speakerPresentColumn = i;
+                else if (TryParseLocaleHeader(name, "TextPresent", out code))
+                    GetOrAdd(byCode, code).textPresentColumn = i;
             }
+
             return new List<LocaleColumn>(byCode.Values);
         }
 
@@ -110,9 +180,10 @@ namespace Yang.Dialogue.Editor
         {
             if (!map.TryGetValue(code, out LocaleColumn column))
             {
-                column = new LocaleColumn { code = code, speakerColumn = -1, textColumn = -1 };
+                column = new LocaleColumn { code = code, speakerColumn = -1, textColumn = -1, speakerPresentColumn = -1, textPresentColumn = -1 };
                 map.Add(code, column);
             }
+
             return column;
         }
 
@@ -133,11 +204,13 @@ namespace Yang.Dialogue.Editor
             int speakerIdColumn = header.IndexOf("SpeakerEntryId");
             int textIdColumn = header.IndexOf("TextEntryId");
             Row current = null;
+
             for (int r = 1; r < rows.Count; r++)
             {
                 List<string> cells = rows[r];
                 if (IsEmptyRow(cells)) continue;
                 Row row = ReadRow(cells, localeColumns, speakerGuidColumn, textGuidColumn, speakerIdColumn, textIdColumn);
+
                 if (row.type == "Option" || row.type == "Branch" || row.type == "Instruction" || row.type == "Asset")
                 {
                     current?.children.Add(row);
@@ -148,6 +221,7 @@ namespace Yang.Dialogue.Editor
                     current = row;
                 }
             }
+
             return nodes;
         }
 
@@ -155,14 +229,19 @@ namespace Yang.Dialogue.Editor
         {
             HashSet<string> seen = new();
             bool generateAll = false;
+
             foreach (Row row in nodes)
             {
                 if (string.IsNullOrEmpty(row.type)) continue;
                 bool missing = string.IsNullOrEmpty(row.id);
                 bool duplicate = !missing && seen.Contains(row.id);
+
                 if (missing || duplicate)
                 {
-                    if (generateAll) { row.id = System.Guid.NewGuid().ToString(); }
+                    if (generateAll)
+                    {
+                        row.id = System.Guid.NewGuid().ToString();
+                    }
                     else
                     {
                         string title = missing ? "Missing Node ID" : "Duplicate Node ID";
@@ -170,17 +249,24 @@ namespace Yang.Dialogue.Editor
                             ? $"A '{row.type}' node has no ID.\n\nGenerate a new ID for it?"
                             : $"The ID '{row.id}' is already used by another node.\n\nGenerate a new ID for this '{row.type}' node?";
                         int choice = EditorUtility.DisplayDialogComplex(title, body, "Generate", "Skip Node", "Generate All");
-                        if (choice == 2) generateAll = true;
+                        if (choice == 2)
+                            generateAll = true;
                         row.id = choice == 1 ? "" : System.Guid.NewGuid().ToString();
                     }
                 }
-                if (!string.IsNullOrEmpty(row.id)) seen.Add(row.id);
+
+                if (!string.IsNullOrEmpty(row.id))
+                    seen.Add(row.id);
             }
         }
 
         private static bool IsEmptyRow(List<string> cells)
         {
-            for (int i = 0; i < cells.Count; i++) { if (!string.IsNullOrEmpty(cells[i])) return false; }
+            for (int i = 0; i < cells.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(cells[i])) return false;
+            }
+
             return true;
         }
 
@@ -207,13 +293,17 @@ namespace Yang.Dialogue.Editor
                 speakerId = speakerId,
                 textId = textId,
             };
+
             foreach (LocaleColumn column in localeColumns)
             {
-                string speaker = Content(Cell(cells, column.speakerColumn, false));
-                string text = Content(Cell(cells, column.textColumn, false));
-                if (column.speakerColumn >= 0 && (row.speakerId != 0 || !string.IsNullOrEmpty(row.speakerKey) || !string.IsNullOrEmpty(speaker))) row.speaker[column.code] = speaker;
-                if (column.textColumn >= 0 && (row.textId != 0 || !string.IsNullOrEmpty(row.textKey) || !string.IsNullOrEmpty(text))) row.text[column.code] = text;
+                string speaker = Cell(cells, column.speakerColumn, false);
+                string text = Cell(cells, column.textColumn, false);
+                if (column.speakerColumn >= 0 && (column.speakerPresentColumn >= 0 ? Cell(cells, column.speakerPresentColumn) == "1" : !string.IsNullOrEmpty(speaker)))
+                    row.speaker[column.code] = speaker;
+                if (column.textColumn >= 0 && (column.textPresentColumn >= 0 ? Cell(cells, column.textPresentColumn) == "1" : !string.IsNullOrEmpty(text)))
+                    row.text[column.code] = text;
             }
+
             return row;
         }
 
@@ -243,9 +333,11 @@ namespace Yang.Dialogue.Editor
             NodeData startNode = default;
             bool hasStart = false;
             string firstNodeId = null;
+
             foreach (Row row in rows)
             {
                 if (string.IsNullOrEmpty(row.id) || string.IsNullOrEmpty(row.type)) continue;
+
                 if (row.type == "Start")
                 {
                     startNode = new NodeData(NodeType.Start) { guid = row.id };
@@ -253,18 +345,24 @@ namespace Yang.Dialogue.Editor
                     AddLink(linkRequests, row.id, 0, row.next);
                     continue;
                 }
+
                 NodeData node = BuildNode(row, ctx, linkRequests);
                 nodeList.Add(node);
                 firstNodeId ??= node.guid;
             }
+
             if (!hasStart)
             {
                 startNode = new NodeData(NodeType.Start);
-                if (firstNodeId != null) AddLink(linkRequests, startNode.guid, 0, firstNodeId);
+                if (firstNodeId != null)
+                    AddLink(linkRequests, startNode.guid, 0, firstNodeId);
             }
+
             HashSet<string> validIds = new() { startNode.guid };
-            foreach (NodeData node in nodeList) validIds.Add(node.guid);
+            foreach (NodeData node in nodeList)
+                validIds.Add(node.guid);
             List<string> droppedLinks = new();
+
             foreach ((string source, int port, string target) in linkRequests)
             {
                 if (!validIds.Contains(target))
@@ -272,11 +370,14 @@ namespace Yang.Dialogue.Editor
                     droppedLinks.Add($"{source} → {target}");
                     continue;
                 }
+
                 links.Add(new LinkData { nodeGuid = source, targetGuid = target, outPortIndex = port });
             }
+
             if (droppedLinks.Count > 0)
                 ctx.warnings.Add($"{droppedLinks.Count} link(s) dropped — target node missing or skipped: " + string.Join(", ", droppedLinks));
             Dictionary<string, Vector2> explicitPositions = new();
+
             foreach (Row row in rows)
             {
                 if (string.IsNullOrEmpty(row.id)) continue;
@@ -286,6 +387,7 @@ namespace Yang.Dialogue.Editor
                     explicitPositions[row.id] = new Vector2(x, y);
                 }
             }
+
             AssignPositions(ref startNode, nodeList, links, explicitPositions);
             so.EditorStartNode = startNode;
             so.EditorNodes.Clear();
@@ -298,7 +400,8 @@ namespace Yang.Dialogue.Editor
 
         private static void AddLink(List<(string, int, string)> requests, string source, int port, string target)
         {
-            if (!string.IsNullOrEmpty(target)) requests.Add((source, port, target));
+            if (!string.IsNullOrEmpty(target))
+                requests.Add((source, port, target));
         }
 
         private static NodeData BuildNode(Row row, Ctx ctx, List<(string, int, string)> linkRequests)
@@ -309,6 +412,7 @@ namespace Yang.Dialogue.Editor
             List<DataWrapper> ports = node.EditorPortDatas;
             StringTableCollection speakerCol = ResolveTable(ctx, row.speakerTable);
             StringTableCollection textCol = ResolveTable(ctx, row.textTable);
+
             switch (type)
             {
                 case NodeType.Dialogue:
@@ -331,6 +435,7 @@ namespace Yang.Dialogue.Editor
                         options.Add(MakeEntryRef(speakerCol, speakerKey, row.speakerId));
                         options.Add(MakeTableName(textCol, HasContent(row, true)));
                         options.Add(new DataWrapper(new GenericData(row.message)));
+
                         for (int i = 0; i < row.children.Count; i++)
                         {
                             Row option = row.children[i];
@@ -346,6 +451,7 @@ namespace Yang.Dialogue.Editor
                         ports.Add(new DataWrapper(data));
                         AddLink(linkRequests, row.id, i, option.next);
                     }
+
                         if (ports.Count == 0)
                         {
                             ports.Add(new DataWrapper(
@@ -369,6 +475,7 @@ namespace Yang.Dialogue.Editor
                         AppendCommandArguments(eventData, instruction.data, ctx, row.id);
                         options.Add(new DataWrapper(eventData));
                     }
+
                     if (options.Count == 0)
                         options.Add(new DataWrapper(new GenericData(GenericData.DataType.String)));
                     ports.Add(new DataWrapper());
@@ -382,6 +489,7 @@ namespace Yang.Dialogue.Editor
                 case NodeType.Condition:
                     ports.Add(new DataWrapper());
                     AddLink(linkRequests, row.id, 0, row.next);
+
                     for (int i = 0; i < row.children.Count; i++)
                     {
                         Row branch = row.children[i];
@@ -390,6 +498,7 @@ namespace Yang.Dialogue.Editor
                         ports.Add(new DataWrapper(data));
                         AddLink(linkRequests, row.id, i + 1, branch.next);
                     }
+
                     break;
                 case NodeType.Command:
                     for (int i = 0; i < row.children.Count; i++)
@@ -403,22 +512,29 @@ namespace Yang.Dialogue.Editor
                         AppendCommandArguments(command, instruction.data, ctx, row.id);
                         options.Add(new DataWrapper(command));
                     }
+
                     if (options.Count == 0)
                         options.Add(new DataWrapper(new GenericData(GenericData.DataType.String)));
                     ports.Add(new DataWrapper());
                     AddLink(linkRequests, row.id, 0, row.next);
                     break;
             }
+
             return node;
         }
 
         private static bool HasContent(Row row, bool checkChildren)
         {
             if (row.text.Count > 0 || row.textId != 0) return true;
+
             if (checkChildren)
             {
-                foreach (Row child in row.children) { if (child.text.Count > 0 || child.textId != 0) return true; }
+                foreach (Row child in row.children)
+                {
+                    if (child.text.Count > 0 || child.textId != 0) return true;
+                }
             }
+
             return false;
         }
 
@@ -428,18 +544,24 @@ namespace Yang.Dialogue.Editor
             if (!ResolveGuidNames(nodes, ctx, out error)) return false;
             ApplyDefaultTables(so, nodes, ctx);
             List<(string name, string nodeId, string kind)> needed = new();
+
             foreach (Row row in nodes)
             {
                 if (string.IsNullOrEmpty(row.id)) continue;
                 NodeType type = ParseType(row.type);
+
                 if (type == NodeType.Dialogue)
                 {
-                    if (row.speaker.Count > 0 || row.speakerId != 0) needed.Add((row.speakerTable, row.id, "Speaker"));
-                    if (row.text.Count > 0 || row.textId != 0) needed.Add((row.textTable, row.id, "Text"));
+                    if (row.speaker.Count > 0 || row.speakerId != 0)
+                        needed.Add((row.speakerTable, row.id, "Speaker"));
+                    if (row.text.Count > 0 || row.textId != 0)
+                        needed.Add((row.textTable, row.id, "Text"));
                 }
                 else if (type == NodeType.Choice)
                 {
-                    if (row.speaker.Count > 0 || row.speakerId != 0) needed.Add((row.speakerTable, row.id, "Speaker"));
+                    if (row.speaker.Count > 0 || row.speakerId != 0)
+                        needed.Add((row.speakerTable, row.id, "Speaker"));
+
                     foreach (Row option in row.children)
                     {
                         if (option.text.Count > 0 || option.textId != 0)
@@ -450,6 +572,7 @@ namespace Yang.Dialogue.Editor
                     }
                 }
             }
+
             foreach ((string name, string nodeId, string kind) in needed)
             {
                 if (string.IsNullOrEmpty(name))
@@ -458,65 +581,84 @@ namespace Yang.Dialogue.Editor
                     return false;
                 }
             }
+
             foreach (Row row in nodes)
             {
-                if (!ValidateEntry(ctx, row.speakerTable, ref row.speakerId, ref row.speakerKey, row.id, out error)) return false;
-                if (row.type == "Dialogue" && !ValidateEntry(ctx, row.textTable, ref row.textId, ref row.textKey, row.id, out error)) return false;
+                if (!ValidateEntry(ctx, row.speakerTable, ref row.speakerId, ref row.speakerKey, row.id, out error))
+                    return false;
+                if (row.type == "Dialogue" && !ValidateEntry(ctx, row.textTable, ref row.textId, ref row.textKey, row.id, out error))
+                    return false;
                 if (row.type != "Choice") continue;
                 foreach (Row option in row.children)
-                    if (!ValidateEntry(ctx, row.textTable, ref option.textId, ref option.textKey, row.id, out error)) return false;
+                    if (!ValidateEntry(ctx, row.textTable, ref option.textId, ref option.textKey, row.id, out error))
+                        return false;
             }
+
             foreach ((string name, string nodeId, string kind) in needed)
             {
                 if (ctx.resolvedTables.ContainsKey(name)) continue;
                 StringTableCollection existing = FindCollection(ctx.collections, name);
+
                 if (existing != null)
                 {
                     ctx.resolvedTables[name] = existing;
                     continue;
                 }
+
                 bool create = EditorUtility.DisplayDialog(
                     "Table Not Found",
                     $"The {kind} table '{name}' (used by node '{nodeId}') does not exist.\n\nCreate it?",
                     "Create",
                     "Cancel");
+
                 if (!create)
                 {
                     error = $"Import aborted: {kind} table '{name}' does not exist.";
                     return false;
                 }
+
                 string absolute = EditorUtility.SaveFolderPanel($"Select a folder for new table '{name}'", "Assets", name);
+
                 if (string.IsNullOrEmpty(absolute))
                 {
                     error = $"Import aborted: no folder selected for new table '{name}'.";
                     return false;
                 }
+
                 string relative = ToProjectRelative(absolute);
+
                 if (relative == null)
                 {
                     error = "Import aborted: the selected folder must be inside this project's Assets folder.";
                     return false;
                 }
+
                 StringTableCollection created = LocalizationEditorSettings.CreateStringTableCollection(name, relative);
+
                 if (created == null)
                 {
                     error = $"Import aborted: failed to create table '{name}'.";
                     return false;
                 }
+
                 ctx.collections = LocalizationEditorSettings.GetStringTableCollections();
                 ctx.resolvedTables[name] = created;
             }
+
             return true;
         }
 
         private static bool ResolveGuidNames(List<Row> rows, Ctx ctx, out string error)
         {
             error = "";
+
             foreach (Row row in rows)
             {
-                if (!ResolveGuidName(ctx, row.speakerGuid, ref row.speakerTable, row.speakerId, row.speakerKey, row.id, out error)) return false;
+                if (!ResolveGuidName(ctx, row.speakerGuid, ref row.speakerTable, row.speakerId, row.speakerKey, row.id, out error))
+                    return false;
                 long textId = row.textId;
                 string textKey = row.textKey;
+
                 if (row.type == "Choice")
                 {
                     foreach (Row option in row.children)
@@ -527,8 +669,10 @@ namespace Yang.Dialogue.Editor
                         break;
                     }
                 }
+
                 if (!ResolveGuidName(ctx, row.textGuid, ref row.textTable, textId, textKey, row.id, out error)) return false;
             }
+
             return true;
         }
 
@@ -538,11 +682,13 @@ namespace Yang.Dialogue.Editor
             if (string.IsNullOrEmpty(guidText) && id == 0) return true;
             System.Guid.TryParse(guidText, out System.Guid guid);
             StringTableCollection collection = ctx.collections.ResolveCollection(name, guid, id, key) as StringTableCollection;
+
             if (collection == null)
             {
                 error = $"Localization table GUID '{guidText}' in node '{nodeId}' could not be resolved by GUID, name, or entry. Import aborted.";
                 return false;
             }
+
             name = collection.TableCollectionName;
             return true;
         }
@@ -552,19 +698,23 @@ namespace Yang.Dialogue.Editor
             error = "";
             if (id == 0 && string.IsNullOrEmpty(key)) return true;
             StringTableCollection collection = ResolveTable(ctx, tableName) ?? FindCollection(ctx.collections, tableName);
+
             if (collection == null)
             {
                 if (id == 0) return true;
                 error = $"Localization entry ID '{id}' in node '{nodeId}' references missing table '{tableName}'. Import aborted.";
                 return false;
             }
+
             SharedTableData.SharedTableEntry entry = collection.ResolveEntry(id, key);
+
             if (entry == null)
             {
                 if (id == 0) return true;
                 error = $"Localization entry ID '{id}' and key '{key}' for node '{nodeId}' were not found in '{tableName}'. Import aborted.";
                 return false;
             }
+
             id = entry.Id;
             key = entry.Key;
             return true;
@@ -576,10 +726,12 @@ namespace Yang.Dialogue.Editor
             string textDefault = GetDefaultTableName(so.TextTable, ctx);
             if (string.IsNullOrEmpty(speakerDefault) && string.IsNullOrEmpty(textDefault)) return;
             Dictionary<string, bool> decisions = new();
+
             foreach (Row row in nodes)
             {
                 if (string.IsNullOrEmpty(row.id)) continue;
                 NodeType type = ParseType(row.type);
+
                 if (type == NodeType.Dialogue)
                 {
                     row.speakerTable = ResolveDefault(row.speaker.Count > 0 || row.speakerId != 0, row.speakerTable, speakerDefault, "Speaker", row.id, decisions);
@@ -589,6 +741,7 @@ namespace Yang.Dialogue.Editor
                 {
                     row.speakerTable = ResolveDefault(row.speaker.Count > 0 || row.speakerId != 0, row.speakerTable, speakerDefault, "Speaker", row.id, decisions);
                     bool hasOptionText = false;
+
                     foreach (Row option in row.children)
                     {
                         if (option.text.Count > 0 || option.textId != 0)
@@ -597,6 +750,7 @@ namespace Yang.Dialogue.Editor
                             break;
                         }
                     }
+
                     row.textTable = ResolveDefault(hasOptionText, row.textTable, textDefault, "Text", row.id, decisions);
                 }
             }
@@ -605,6 +759,7 @@ namespace Yang.Dialogue.Editor
         private static string ResolveDefault(bool hasText, string tableName, string defaultName, string kind, string nodeId, Dictionary<string, bool> decisions)
         {
             if (!hasText || !string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(defaultName)) return tableName;
+
             if (!decisions.TryGetValue(defaultName, out bool use))
             {
                 use = EditorUtility.DisplayDialog(
@@ -614,6 +769,7 @@ namespace Yang.Dialogue.Editor
                     "Skip");
                 decisions[defaultName] = use;
             }
+
             return use ? defaultName : tableName;
         }
 
@@ -632,7 +788,11 @@ namespace Yang.Dialogue.Editor
 
         private static StringTableCollection FindCollection(IReadOnlyList<StringTableCollection> collections, string name)
         {
-            for (int i = 0; i < collections.Count; i++) { if (collections[i].TableCollectionName == name) return collections[i]; }
+            for (int i = 0; i < collections.Count; i++)
+            {
+                if (collections[i].TableCollectionName == name) return collections[i];
+            }
+
             return null;
         }
 
@@ -664,7 +824,8 @@ namespace Yang.Dialogue.Editor
         private static DataWrapper MakeEntryRef(StringTableCollection collection, string key, long stableId = 0)
         {
             long id = collection == null ? 0 : LookupId(collection, key, stableId);
-            if (id == 0) return new DataWrapper(new GenericData(GenericData.DataType.String), new GenericData(GenericData.DataType.Long));
+            if (id == 0)
+                return new DataWrapper(new GenericData(GenericData.DataType.String), new GenericData(GenericData.DataType.Long));
             return new DataWrapper(new GenericData(collection.SharedData.GetEntry(id).Key), new GenericData(id));
         }
 
@@ -677,21 +838,29 @@ namespace Yang.Dialogue.Editor
             SharedTableData shared = collection.SharedData;
             SharedTableData.SharedTableEntry entry = collection.ResolveEntry(stableId, key);
             if (entry == null && values.Count == 0) return 0;
+
             if (entry == null)
             {
                 Undo.RecordObject(shared, "Import Dialogue CSV Localization");
                 entry = shared.AddKey(key);
                 EditorUtility.SetDirty(shared);
             }
+
             long id = entry.Id;
+
             foreach (LazyLoadReference<LocalizationTable> reference in collection.Tables)
             {
                 if (reference.asset is not StringTable table) continue;
                 if (!values.TryGetValue(table.LocaleIdentifier.Code, out string value)) continue;
+                StringTableEntry existing = table.GetEntry(id);
+                if (existing != null && existing.Value == value) continue;
                 Undo.RecordObject(table, "Import Dialogue CSV Localization");
-                table.AddEntry(id, value);
+                if (existing != null)
+                    existing.Value = value;
+                else table.AddEntry(id, value);
                 EditorUtility.SetDirty(table);
             }
+
             return id;
         }
 
@@ -712,7 +881,11 @@ namespace Yang.Dialogue.Editor
 
         private static bool ParseHide(string data)
         {
-            foreach (string part in SplitData(data)) { if (part == "hide") return true; }
+            foreach (string part in SplitData(data))
+            {
+                if (part == "hide") return true;
+            }
+
             return false;
         }
 
@@ -722,7 +895,9 @@ namespace Yang.Dialogue.Editor
             {
                 if (part == "hide") continue;
                 if (!TrySplitCondition(part, out string key, out string op, out string valueStr)) continue;
-                if (!int.TryParse(key, NumberStyles.Integer, CultureInfo.InvariantCulture, out int fieldId) || fieldId <= 0) continue;
+                if (!int.TryParse(key, NumberStyles.Integer, CultureInfo.InvariantCulture, out int fieldId) || fieldId <= 0)
+                    continue;
+
                 if (bool.TryParse(valueStr, out bool boolValue))
                 {
                     target.Add(new GenericData(fieldId));
@@ -743,7 +918,9 @@ namespace Yang.Dialogue.Editor
             foreach (string part in SplitData(data))
             {
                 if (!TrySplitSetter(part, out string key, out char op, out string valueStr)) continue;
-                if (!int.TryParse(key, NumberStyles.Integer, CultureInfo.InvariantCulture, out int fieldId) || fieldId <= 0) continue;
+                if (!int.TryParse(key, NumberStyles.Integer, CultureInfo.InvariantCulture, out int fieldId) || fieldId <= 0)
+                    continue;
+
                 if (op == '=' && bool.TryParse(valueStr, out bool boolValue))
                 {
                     options.Add(new DataWrapper(new GenericData(fieldId), new GenericData(boolValue)));
@@ -759,6 +936,7 @@ namespace Yang.Dialogue.Editor
                     options.Add(new DataWrapper(new GenericData(fieldId), new GenericData(floatValue), new GenericData(setter)));
                 }
             }
+
             if (options.Count == 0)
             {
                 options.Add(new DataWrapper(new GenericData(GenericData.DataType.Int), new GenericData(GenericData.DataType.Bool)));
@@ -771,17 +949,20 @@ namespace Yang.Dialogue.Editor
             {
                 int colon = part.IndexOf(':');
                 int equals = part.IndexOf('=');
+
                 if (colon <= 0 || equals <= colon + 1)
                 {
                     ctx.warnings.Add($"'{nodeId}': ignored invalid command argument '{part}'.");
                     continue;
                 }
+
                 string rawFieldId = System.Uri.UnescapeDataString(part.Substring(0, colon).Trim());
                 string type = part.Substring(colon + 1, equals - colon - 1).Trim().ToLowerInvariant();
                 string value = System.Uri.UnescapeDataString(part.Substring(equals + 1).Trim());
                 bool validFieldId = int.TryParse(rawFieldId, NumberStyles.Integer, CultureInfo.InvariantCulture, out int fieldId) && fieldId > 0;
                 GenericData parsed;
                 bool valid = true;
+
                 switch (type)
                 {
                     case "string":
@@ -813,11 +994,13 @@ namespace Yang.Dialogue.Editor
                         valid = false;
                         break;
                 }
+
                 if (!valid || !validFieldId)
                 {
                     ctx.warnings.Add($"'{nodeId}': ignored command argument '{part}' with an invalid field id, type, or value.");
                     continue;
                 }
+
                 command.Add(new GenericData(fieldId));
                 command.Add(parsed);
             }
@@ -826,23 +1009,30 @@ namespace Yang.Dialogue.Editor
         private static DataWrapper MakeWait(string data)
         {
             data = data.Trim();
+
             if (float.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out float seconds))
             {
                 return new DataWrapper(new GenericData(WaitNode.WaitType.Seconds), new GenericData(seconds));
             }
+
             string reason = "";
-            if (data.StartsWith("notify:")) reason = data.Substring("notify:".Length);
-            else if (data != "notify") reason = data;
+            if (data.StartsWith("notify:"))
+                reason = data.Substring("notify:".Length);
+            else if (data != "notify")
+                reason = data;
             return new DataWrapper(new GenericData(WaitNode.WaitType.Notify), new GenericData(reason));
         }
 
         private static IEnumerable<string> SplitData(string data)
         {
-            if (string.IsNullOrEmpty(data)) yield break;
+            if (string.IsNullOrEmpty(data))
+                yield break;
+
             foreach (string raw in data.Split(';'))
             {
                 string part = raw.Trim();
-                if (part.Length > 0) yield return part;
+                if (part.Length > 0)
+                    yield return part;
             }
         }
 
@@ -850,9 +1040,11 @@ namespace Yang.Dialogue.Editor
         {
             key = op = value = "";
             string[] ops = { ">=", "<=", "==", "!=", ">", "<" };
+
             foreach (string candidate in ops)
             {
                 int index = part.IndexOf(candidate, System.StringComparison.Ordinal);
+
                 if (index > 0)
                 {
                     key = part.Substring(0, index).Trim();
@@ -861,6 +1053,7 @@ namespace Yang.Dialogue.Editor
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -868,9 +1061,11 @@ namespace Yang.Dialogue.Editor
         {
             key = value = "";
             op = '=';
+
             for (int i = 1; i < part.Length; i++)
             {
                 char c = part[i];
+
                 if (c == '+' || c == '-' || c == '=')
                 {
                     key = part.Substring(0, i).Trim();
@@ -879,6 +1074,7 @@ namespace Yang.Dialogue.Editor
                     return key.Length > 0;
                 }
             }
+
             return false;
         }
 
@@ -897,6 +1093,7 @@ namespace Yang.Dialogue.Editor
             Dictionary<string, Vector2> explicitPositions)
         {
             Dictionary<string, List<string>> outgoing = new();
+
             foreach (LinkData link in links)
             {
                 if (!outgoing.TryGetValue(link.nodeGuid, out List<string> list))
@@ -904,8 +1101,10 @@ namespace Yang.Dialogue.Editor
                     list = new List<string>();
                     outgoing.Add(link.nodeGuid, list);
                 }
+
                 list.Add(link.targetGuid);
             }
+
             Dictionary<string, int> depth = new();
             Queue<string> queue = new();
             depth[startNode.guid] = 0;
@@ -914,6 +1113,7 @@ namespace Yang.Dialogue.Editor
             {
                 string guid = queue.Dequeue();
                 if (!outgoing.TryGetValue(guid, out List<string> targets)) continue;
+
                 foreach (string target in targets)
                 {
                     if (depth.ContainsKey(target)) continue;
@@ -921,19 +1121,26 @@ namespace Yang.Dialogue.Editor
                     queue.Enqueue(target);
                 }
             }
+
             Dictionary<int, int> rowInColumn = new();
             startNode.position = explicitPositions.TryGetValue(startNode.guid, out Vector2 startPos)
                 ? startPos
                 : NextPosition(rowInColumn, 0);
+
             for (int i = 0; i < nodeList.Count; i++)
             {
                 NodeData node = nodeList[i];
-                if (explicitPositions.TryGetValue(node.guid, out Vector2 pos)) { node.position = pos; }
+
+                if (explicitPositions.TryGetValue(node.guid, out Vector2 pos))
+                {
+                    node.position = pos;
+                }
                 else
                 {
                     int column = depth.TryGetValue(node.guid, out int d) ? d : 0;
                     node.position = NextPosition(rowInColumn, column);
                 }
+
                 nodeList[i] = node;
             }
         }

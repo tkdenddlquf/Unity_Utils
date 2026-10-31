@@ -46,13 +46,23 @@ namespace Yang.Dialogue.Editor
                 int to = currentTarget;
                 VisualElement container = row.parent;
                 EndDrag();
+
                 if (container != null)
                 {
                     container.Insert(originalIndex, row);
                     int from = originalIndex;
-                    while (from < to) { swapAdjacent(from, from + 1); from++; }
-                    while (from > to) { swapAdjacent(from - 1, from); from--; }
+                    while (from < to)
+                    {
+                        swapAdjacent(from, from + 1);
+                        from++;
+                    }
+                    while (from > to)
+                    {
+                        swapAdjacent(from - 1, from);
+                        from--;
+                    }
                 }
+
                 onComplete?.Invoke();
             }
             grip.RegisterCallback<PointerDownEvent>(evt =>
@@ -109,12 +119,15 @@ namespace Yang.Dialogue.Editor
         {
             int count = container.childCount;
             int above = 0;
+
             for (int i = locked; i < count; i++)
             {
                 VisualElement child = container[i];
                 if (child == row) continue;
-                if (child.worldBound.center.y < pointerY) above++;
+                if (child.worldBound.center.y < pointerY)
+                    above++;
             }
+
             return locked + above;
         }
     }

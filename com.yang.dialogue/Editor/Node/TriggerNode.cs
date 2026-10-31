@@ -25,6 +25,7 @@ namespace Yang.Dialogue.Editor
             if (evt.target != this) return;
             DropdownMenu menu = evt.menu;
             List<DialogueVariableSchemaUtility.VariableInfo> variables = DialogueVariableSchemaUtility.GetVariables();
+
             if (variables.Count == 0)
             {
                 menu.AppendAction("Add Variable/No schema variables", _ => { }, DropdownMenuAction.Status.Disabled);
@@ -38,13 +39,16 @@ namespace Yang.Dialogue.Editor
                         _ => CreateVariableField(captured.fieldId, captured.type));
                 }
             }
+
             menu.AppendSeparator();
         }
 
         private void CreateVariableField(int fieldId, System.Type type)
         {
-            if (type == typeof(float)) CreateFloatField(fieldId);
-            else if (type == typeof(bool)) CreateBoolField(fieldId);
+            if (type == typeof(float))
+                CreateFloatField(fieldId);
+            else if (type == typeof(bool))
+                CreateBoolField(fieldId);
         }
 
         private void SetDefault()
@@ -60,10 +64,12 @@ namespace Yang.Dialogue.Editor
         private void SetOptions()
         {
             conditions.Clear();
+
             for (int i = 0; i < optionDatas.Count; i++)
             {
                 IReadOnlyList<GenericData> optionData = optionDatas[i].data;
                 int fieldId = optionData[0].GetInt();
+
                 switch (optionData[1].Type)
                 {
                     case GenericData.DataType.Float:
@@ -112,6 +118,7 @@ namespace Yang.Dialogue.Editor
             int fieldId = DialogueVariableSchemaUtility.GetFieldId(evt.newValue);
             System.Type selectedType = DialogueVariableSchemaUtility.GetValueType(fieldId);
             GenericData.DataType currentType = optionDatas[optionIndex].data[1].Type;
+
             if (selectedType == typeof(float) && currentType != GenericData.DataType.Float)
             {
                 optionDatas[optionIndex] = new DataWrapper(
@@ -127,7 +134,11 @@ namespace Yang.Dialogue.Editor
                     new GenericData(false));
                 ReplaceRow(itemElement, optionIndex, false, fieldId);
             }
-            else { optionDatas[optionIndex].data[0] = new(fieldId); }
+            else
+            {
+                optionDatas[optionIndex].data[0] = new(fieldId);
+            }
+
             EditorUtility.SetDirty(so);
             window.SetUnsaved();
         }
@@ -135,7 +146,8 @@ namespace Yang.Dialogue.Editor
         private void ReplaceRow(VisualElement oldRow, int index, bool isFloat, int fieldId)
         {
             extensionContainer.Remove(oldRow);
-            if (isFloat) AddFloatField(fieldId, 0f, ValueSetterType.Plus);
+            if (isFloat)
+                AddFloatField(fieldId, 0f, ValueSetterType.Plus);
             else AddBoolField(fieldId, false);
             VisualElement newRow = extensionContainer[extensionContainer.childCount - 1];
             extensionContainer.Insert(index, newRow);
@@ -185,6 +197,7 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
             VisualElement container = itemElement.parent;
+
             if (container.childCount > 1)
             {
                 int optionIndex = container.IndexOf(itemElement);
@@ -217,6 +230,7 @@ namespace Yang.Dialogue.Editor
             EditorUtility.SetDirty(so);
             window.SetUnsaved();
         }
+
         private void CreateBoolField(int fieldId = 0)
         {
             DialogueSO so = window.SO;
@@ -252,6 +266,7 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
             VisualElement container = itemElement.parent;
+
             if (container.childCount > 1)
             {
                 int optionIndex = container.IndexOf(itemElement);

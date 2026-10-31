@@ -57,7 +57,33 @@ Localization 의존성은 `com.unity.localization` 1.5.3이며, 런타임 어셈
 
 - **연결 표시 막대** — 포트 끝의 막대로 연결 여부를 표시합니다. *꽉 찬 막대* = 연결됨, *속이 빈 막대* = 미연결 (색은 초록/회색, 색 없이 모양만으로도 구분됩니다).
 - **연결 노드로 이동** — 포트의 막대를 더블클릭하면 연결된 노드로 화면이 이동합니다. 입력 포트에 여러 개가 연결돼 있으면 더블클릭할 때마다 순환합니다.
-- **ID 검색** — 우측 상단(언어 선택 아래) 검색창에 노드 ID 일부를 입력하면 자동완성 목록에서 골라 해당 노드로 이동할 수 있습니다.
+- **통합 검색** — 우측 상단에서 노드 ID, 타입, 데이터 값, 현지화 텍스트를 검색합니다. 자동완성은 10개까지 표시하며, ↑/↓로 선택하고 Enter로 이동합니다. Enter를 반복하면 전체 일치 노드를 순서대로, Shift+Enter는 역순으로 탐색합니다. 검색어는 유지됩니다.
+- **탐색 기록** — 검색 및 포트 더블클릭으로 이동한 위치는 `←`/`→` 버튼으로 되돌아가거나 다시 이동할 수 있습니다(에셋당 작업 중 최대 50단계).
+- **작업 상태 유지** — Undo/Redo와 언어 변경 후에도 살아 있는 선택 노드를 복원합니다. 화면 이동·확대 상태는 에디터 로컬에 자동 저장하며 콘텐츠의 미저장 표시를 만들지 않습니다.
+- **빠른 편집** — Choice/Condition/Command 노드 제목의 `+` 버튼으로 항목을 추가할 수 있습니다. 우측 도구 패널에서 현재 DialogueSO를 직접 바꾸거나 패널을 접을 수 있습니다.
+- **Localization 직접 수정** — Dialogue/Choice의 텍스트 미리보기에서 현지화 키가 연결되어 있으면 현재 언어의 String Table 값을 직접 편집합니다. 이 변경은 **String Table에 즉시 저장**되고, 그래프의 Save/Discard와 별도로 관리됩니다. 다른 로케일은 언어 선택에서 바꾸며, 노드 데이터에 텍스트를 중복 보관하지 않습니다.
+- **CSV 가져오기 확인** — Inspector의 Import CSV에서 현재 노드·링크 수와 CSV의 노드·언어별 셀 수를 가져오기 전에 확인할 수 있습니다. 이는 내용 통계이며 정확한 변경 차이(diff)를 계산한 미리보기는 아닙니다.
+
+**플레이 모드 테스트:** 게임을 실행하면 우측 도구 패널에 `Play Mode · Runner Debug`가 표시됩니다. `Runner`에서 씬의 `DialogueRunner`를 지정하거나, 현재 DialogueSO를 사용하는 Runner를 자동 선택하게 둡니다. `Flow`에서 실행 키를 선택하면 현재 진행 중인 노드의 GUID와 상태가 나타나고 노드에 초록 테두리가 표시됩니다. `Follow active node`를 켜면 진행 중인 노드로 화면이 자동 이동합니다. 기존 흐름을 테스트할 때는 대상 노드를 선택하고 `Play / Jump selected`를 클릭하거나 노드를 우클릭해 `Play / Jump to this node`를 실행하세요. 흐름이 없다면 `New key` 값으로 선택 노드에서 새 실행을 시작합니다. **편집 변경사항이 아직 Runner에 적용되지 않았다면** 확인창이 표시되며, `Apply and Jump`를 선택하면 변경사항을 적용한 후 지정한 노드에서 실행합니다. 취소하면 재적용과 점프를 모두 수행하지 않습니다. 재적용 과정에서 다른 Flow는 일시정지 상태로 남고, 선택한 Flow만 해당 노드에서 재시작합니다. 이 기능은 **플레이 모드 전용**이며, ScriptableObject 데이터에 디버그 상태를 저장하지 않습니다.
+
+**플레이 중 그래프 수정 및 재적용:** Runner는 초기화 시 `NodeData`의 포트·옵션 리스트까지 복사한 **독립 실행 스냅샷**을 사용합니다. 따라서 플레이 중 노드를 추가·삭제하거나 분기, Event, Command를 수정해도 실행 중인 Runner에는 부분적으로만 변경되는 일이 없습니다. 그래프 콘텐츠를 수정하면 Debug 패널에 미적용 상태가 표시됩니다. `Apply graph changes to Runner`를 누르면 모든 실행 흐름에 **Pause를 요청**하고 이전 View 콜백 종료를 기다린 다음 새 스냅샷을 만들고 Choice 캐시를 비웁니다. 기존 흐름은 **일시정지된 상태로 남으며 자동 재시작하지 않습니다.** `Play / Jump selected`로 이동하거나 `StartDialogue(key)`로 직접 재개하세요. 편집 과정에서 지워진 노드를 진행 중이었다면 시작 노드로 복귀하고 Console에 경고가 표시됩니다. 다른 Runner의 스냅샷에는 영향을 주지 않습니다.
+
+```csharp
+// 게임 로직에서 수동으로 재적용할 경우
+bool applied = await runner.ApplyGraphChangesAsync();
+// applied == true: 모든 기존 흐름이 Paused 상태이며 데이터 캐시가 교체됨
+runner.StartDialogue("main"); // 현재 노드 시작점부터 재실행
+```
+
+- 재적용은 **현재 메모리의 DialogueSO**를 읽으며 에셋 저장과는 별개입니다.
+- 노드 위치/확대만 변경한 것은 실행 데이터 변경으로 취급하지 않습니다.
+- 별도 Localization String Table의 문자열 갱신은 실행 스냅샷 복사 대상이 아니며 Localization 시스템의 갱신 정책을 따릅니다.
+- View의 비동기 작업은 기존 `IRunnerToken` 취소 계약에 따라 취소 후 반환해야 재적용이 완료됩니다.
+- 재적용 후 재시작하는 노드의 Event/Trigger/Command는 다시 실행될 수 있으므로, 재시작 지점을 직접 선택할 수 있게 했습니다.
+
+**빈 그래프:** DialogueSO를 선택하지 않은 상태에서는 노드 생성·삭제·붙여넣기를 사용할 수 없고, 에셋을 선택하라는 안내가 표시됩니다.
+
+**대규모 그래프 편집:** 팬·줌·창 크기 변경으로 발생하는 여러 가시성 검사를 한 번의 UI 갱신으로 병합하고, 화면 주변 노드만 생성하는 기존 가상화는 유지합니다. 노드 GUID 검색은 인덱스를 사용하고, 포트의 연결 상태는 링크를 한 번 순회하여 계산합니다. 노드 이동만으로 포트 연결 색상을 다시 계산하지 않으며, 다중 노드 삭제·붙여넣기는 일괄 처리합니다. 노드 추가·삭제·GUID 변경·Undo/Redo·CSV 가져오기 후에는 인덱스를 갱신합니다.
 
 ### 3-2. Event와 Variable 스키마
 
@@ -298,10 +324,11 @@ void StopAllDialogue();
 void PauseAllDialogue();
 void JumpNode(string key, string nodeName);   // 진행 중 흐름을 다른 노드로 점프
 Awaitable JumpNodeAsync(string key, string nodeName);
+Awaitable<bool> RequestJumpNodeAsync(string key, string nodeName); // 새 노드 실행이 시작되면 반환
 void SetDialogue(DialogueSO so);    // 다른 그래프로 교체 (진행 중이면 무시)
 ```
 
-- `key`별로 독립적인 흐름이 유지됩니다. 같은 `key`가 이미 진행 중이면 중복 시작은 무시됩니다.
+- `key`별로 독립적인 흐름이 유지됩니다. 같은 `key`가 이미 진행 중이면 중복 시작은 무시됩니다. 같은 흐름에 점프를 연속 요청하면 가장 나중의 요청만 유효합니다. `JumpNodeAsync()`는 점프 이후의 대화 종료까지 기다리고, `RequestJumpNodeAsync()`는 새 노드 실행을 시작하면 `true`를 반환하므로 에디터 테스트 버튼처럼 완료를 기다리지 않는 호출에 적합합니다.
 - `views`를 넘기면 그 대화 흐름의 View 목록으로 사용합니다. 미지정 시 기존 흐름의 View를 유지하며, 새 흐름은 인스펙터의 `viewBases`와 등록된 View를 사용합니다.
 
 ### View 관리
@@ -364,7 +391,7 @@ foreach (DialogueFlowData flow in data.dialogueFlows) runner.StartDialogue(flow.
 MyViewState state = runner.Get<MyViewState>("main", myView);
 ```
 
-`Load()`는 기존 대화를 중단하고 저장된 트리거와 대화 위치를 복원하지만 자동으로 재생하지는 않습니다. 사용자 지정 View 목록을 복원하려면 해당 View를 `AddView()`로 등록한 뒤 `Load()`를 호출해야 합니다. `Get<TData>(view)`는 첫 일치 항목을 반환하는 기존 API이며, 여러 대화에서 같은 View를 사용하면 `Get<TData>(key, view)`를 사용하세요.
+`Load()`는 기존 대화에 중지를 요청한 뒤 저장된 트리거와 대화 위치를 동기적으로 복원하지만 자동으로 재생하지는 않습니다. 이전 View가 아직 실행 중이면 해당 콜백이 끝난 후 `OnStopped`를 한 번 호출하며, 그때까지 새 대화 실행을 대기시켜 동일 View에서 이전 실행과 새 실행이 겹치지 않도록 합니다. `Load()` 자체는 비동기 콜백 종료까지 기다리지 않습니다. 사용자 지정 View 목록을 복원하려면 해당 View를 `AddView()`로 등록한 뒤 `Load()`를 호출해야 합니다. `Get<TData>(view)`는 첫 일치 항목을 반환하는 기존 API이며, 여러 대화에서 같은 View를 사용하면 `Get<TData>(key, view)`를 사용하세요.
 
 ---
 
@@ -407,7 +434,7 @@ scanSource.TrySetResult("result");
 
 `DialogueSO`의 텍스트를 번역용 CSV로 주고받을 수 있습니다 (`Yang.Dialogue.Editor`의 `DialogueCsvExporter` / `DialogueCsvImporter`).
 
-- 컬럼: `ID, Type, Next, Message, Data` + 로케일별 `Speaker[code]` / `Text[code]`
+- 컬럼: `ID, Type, Next, Message, Data` + 로케일별 `Speaker[code]` / `Text[code]` 및 `SpeakerPresent[code]` / `TextPresent[code]` (번역 엔트리 존재 여부). 빈 문자열 값과 엔트리가 없는 상태를 구분해 CSV 내보내기/가져오기를 진행합니다.
 - Choice 옵션, Condition 분기, Command/Event 명령은 소유 노드 아래 하위 행으로 표현됩니다.
 - Command/Event 인자는 `fieldId:type=value` 형식으로 왕복합니다. 지원 타입은 `string`, `int`, `float`, `long`, `bool`, `color`, `guid`, `enum`이며, 색상은 `#RRGGBBAA` 형식으로 저장됩니다.
 - 가져올 때 노드 ID가 **비어 있거나 중복**되면 노드마다 확인창이 떠서 *새 ID 생성 / 건너뛰기 / 모두 생성* 을 고를 수 있습니다.
@@ -418,3 +445,11 @@ scanSource.TrySetResult("result");
 ## 라이선스
 
 `LICENSE.txt` 참고. Author: Yang Jaewan.
+
+### 에디터 상태 저장
+
+그래프의 화면 중심/배율은 에셋 GUID에 따라 `EditorPrefs`에 별도로 저장합니다. `DialogueSO`의 노드 및 링크 직렬화 형식은 변경하지 않았으며, 마이그레이션 기능은 제공하지 않습니다.
+
+### 작업 검증 참고
+
+UI와 런타임 디버거 코드는 Unity Editor 컴파일 및 Play Mode에서 최종 확인해야 합니다. 주요 확인 항목은 빈 그래프 우클릭, 우클릭 삭제의 Undo/Edge 갱신, 1,000노드에서 에디터 포커스 전환, Localization이 일부 없는 CSV 왕복, 서로 다른 키의 동시 대화 추적, 선택 노드 점프입니다.

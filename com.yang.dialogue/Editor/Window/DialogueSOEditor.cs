@@ -43,17 +43,22 @@ namespace Yang.Dialogue.Editor
             if (so == null) return;
             string path = EditorUtility.OpenFilePanel("Import Dialogue CSV", "", "csv");
             if (string.IsNullOrEmpty(path)) return;
-            if (!EditorUtility.DisplayDialog(
-                "Import Dialogue CSV",
-                "This replaces all nodes and links in this dialogue, and writes text into the assigned Speaker/Text tables. Continue?",
-                "Import",
-                "Cancel")) return;
             string csv = System.IO.File.ReadAllText(path);
+
+            if (!DialogueCsvImporter.Preview(so, csv, out string preview))
+            {
+                EditorUtility.DisplayDialog("Import Failed", preview, "OK");
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog("Import Dialogue CSV", preview, "Import", "Cancel")) return;
+
             if (DialogueCsvImporter.Import(so, csv, out string message))
             {
                 DialogueEditorWindow window = DialogueEditorWindow.Open();
                 window.SO = so;
-                if (!string.IsNullOrEmpty(message)) EditorUtility.DisplayDialog("Import Complete", message, "OK");
+                if (!string.IsNullOrEmpty(message))
+                    EditorUtility.DisplayDialog("Import Complete", message, "OK");
             }
             else EditorUtility.DisplayDialog("Import Failed", message, "OK");
         }

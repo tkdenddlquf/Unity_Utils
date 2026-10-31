@@ -7,14 +7,11 @@ namespace Yang.Dialogue
     public struct RunnerValue
     {
         [SerializeField] private int fieldId;
+        [SerializeField] private ValueType type;
+        [SerializeField] private float value;
 
         public readonly int FieldId => fieldId;
-
-        [SerializeField] private ValueType type;
-
         public readonly ValueType Type => type;
-
-        [SerializeField] private float value;
 
         public RunnerValue(int fieldId, float value)
         {

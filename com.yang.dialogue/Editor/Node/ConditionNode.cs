@@ -15,6 +15,10 @@ namespace Yang.Dialogue.Editor
 
         public override void SetPorts()
         {
+            Button add = new(CreateConditionBox) { text = "+", tooltip = "Add condition branch" };
+            add.style.width = 22;
+            add.style.height = 20;
+            titleButtonContainer.Add(add);
             SetDefault();
             CreateInputPort();
             SetOptions();
@@ -30,20 +34,24 @@ namespace Yang.Dialogue.Editor
 
         private void SetDefault()
         {
-            if (portDatas.Count == 0) portDatas.Add(new());
+            if (portDatas.Count == 0)
+                portDatas.Add(new());
         }
 
         private void SetOptions()
         {
             conditions.Clear();
             AddDefaultCondition();
+
             for (int i = 1; i < portDatas.Count; i++)
             {
                 IReadOnlyList<GenericData> portOptions = portDatas[i].data;
                 VisualElement itemContainer = AddConditionBox();
+
                 for (int j = 0; j < portOptions.Count; j += 3)
                 {
                     int fieldId = portOptions[j].GetInt();
+
                     switch (portOptions[j + 1].Type)
                     {
                         case GenericData.DataType.Float:
@@ -135,8 +143,10 @@ namespace Yang.Dialogue.Editor
 
         private void CreateConditionField(VisualElement itemContainer, int fieldId, System.Type type)
         {
-            if (type == typeof(float)) CreateConditionFloatField(itemContainer, fieldId);
-            else if (type == typeof(bool)) CreateConditionBoolField(itemContainer, fieldId);
+            if (type == typeof(float))
+                CreateConditionFloatField(itemContainer, fieldId);
+            else if (type == typeof(bool))
+                CreateConditionBoolField(itemContainer, fieldId);
         }
 
         private void RemoveConditionField(VisualElement itemElement)
@@ -146,6 +156,7 @@ namespace Yang.Dialogue.Editor
             Port port = itemContainer.FindParent<Port>();
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = itemContainer.IndexOf(itemElement);
+
             if (itemIndex != -1)
             {
                 Undo.RecordObject(so, "Remove Condition Field");
@@ -188,6 +199,7 @@ namespace Yang.Dialogue.Editor
             int fieldId = DialogueVariableSchemaUtility.GetFieldId(evt.newValue);
             System.Type selectedType = DialogueVariableSchemaUtility.GetValueType(fieldId);
             GenericData.DataType currentType = data[itemIndex + 1].Type;
+
             if (selectedType == typeof(float) && currentType != GenericData.DataType.Float)
             {
                 data[itemIndex] = new GenericData(fieldId);
@@ -204,7 +216,11 @@ namespace Yang.Dialogue.Editor
                 ReplaceConditionRow(itemElement, itemIndex / 3,
                     GetConditionBoolField(fieldId, false));
             }
-            else { data[itemIndex] = new(fieldId); }
+            else
+            {
+                data[itemIndex] = new(fieldId);
+            }
+
             EditorUtility.SetDirty(so);
             window.SetUnsaved();
         }

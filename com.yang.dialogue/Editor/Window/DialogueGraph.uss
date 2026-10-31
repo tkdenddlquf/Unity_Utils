@@ -216,3 +216,15 @@
     border-top-color: rgba(130, 170, 235, 0.45);
     border-bottom-color: rgba(130, 170, 235, 0.45);
 }
+
+/* Play Mode: the node currently being executed by the selected flow. */
+.node.dlg-debug-current {
+    border-left-width: 3px;
+    border-right-width: 3px;
+    border-top-width: 3px;
+    border-bottom-width: 3px;
+    border-left-color: rgb(120, 245, 165);
+    border-right-color: rgb(120, 245, 165);
+    border-top-color: rgb(120, 245, 165);
+    border-bottom-color: rgb(120, 245, 165);
+}

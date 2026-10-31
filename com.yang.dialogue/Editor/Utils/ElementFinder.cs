@@ -12,6 +12,7 @@ namespace Yang.Dialogue.Editor
                 if (current is T target) return target;
                 current = current.parent;
             }
+
             return null;
         }
 
@@ -23,6 +24,7 @@ namespace Yang.Dialogue.Editor
                 if (current is T target) return target;
                 current = current.parent;
             }
+
             return null;
         }
 
@@ -34,6 +36,7 @@ namespace Yang.Dialogue.Editor
                 if (current.name == name && current is T target) return target;
                 current = current.parent;
             }
+
             return null;
         }
 
@@ -45,6 +48,7 @@ namespace Yang.Dialogue.Editor
                 if (current.name == name && current is T target) return target;
                 current = current.parent;
             }
+
             return null;
         }
 
@@ -56,6 +60,7 @@ namespace Yang.Dialogue.Editor
                 if (current is T target) return target;
                 current = current.parent;
             }
+
             return null;
         }
 
@@ -67,6 +72,7 @@ namespace Yang.Dialogue.Editor
                 if (current is T target) return target;
                 current = current.parent;
             }
+
             return null;
         }
 
@@ -78,6 +84,7 @@ namespace Yang.Dialogue.Editor
                 if (current.name == name && current is T target) return target;
                 current = current.parent;
             }
+
             return null;
         }
 
@@ -89,6 +96,7 @@ namespace Yang.Dialogue.Editor
                 if (current.name == name && current is T target) return target;
                 current = current.parent;
             }
+
             return null;
         }
     }

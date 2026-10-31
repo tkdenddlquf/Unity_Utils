@@ -34,6 +34,7 @@ namespace Yang.Dialogue
                 this.collection = collection;
                 index = -1;
             }
+
             public RunnerChoiceText Current => collection.choices[index];
             object IEnumerator.Current => Current;
             public bool MoveNext() => ++index < collection.Count;

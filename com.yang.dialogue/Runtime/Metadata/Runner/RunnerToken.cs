@@ -6,21 +6,21 @@ using UnityEngine;
 
 namespace Yang.Dialogue
 {
-    internal class RunnerToken : IRunnerNodeChecker, IRunnerToken
+    internal class RunnerToken : IRunnerToken
     {
         private CancellationTokenSource cts;
         private CancellationToken cancellationToken;
 
-        public TaskCompletionSource<bool> ExecutionCompletion { get; set; }
-        public bool IsExecuting { get; set; }
-
-        public TokenState State { get; private set; } = TokenState.Paused;
-
-        public string TargetNode { get; set; }
-        public int NodeIndex { get; set; } = -1;
-
         private readonly List<IDialogueView> views = new();
         private readonly Dictionary<string, RunnerChoiceCollection> choiceCaches = new();
+
+        public TaskCompletionSource<bool> ExecutionCompletion { get; set; }
+        public bool IsExecuting { get; set; }
+        public bool NotifyStoppedAfterRetire { get; set; }
+        public int JumpRevision { get; set; }
+        public TokenState State { get; private set; } = TokenState.Paused;
+        public string TargetNode { get; set; }
+        public int NodeIndex { get; set; } = -1;
         public IReadOnlyList<IDialogueView> Views => views;
         public CancellationToken CancellationToken => cancellationToken;
 
@@ -36,19 +36,22 @@ namespace Yang.Dialogue
         {
             if (ReferenceEquals(views, this.views)) return;
             this.views.Clear();
-            for (int i = 0; i < views.Count; i++) this.views.Add(views[i]);
+            for (int i = 0; i < views.Count; i++)
+                this.views.Add(views[i]);
         }
 
         public void SetState(TokenState state)
         {
             if (State == state) return;
             State = state;
+
             if (state == TokenState.Running)
             {
                 cts = new();
                 cancellationToken = cts.Token;
                 return;
             }
+
             CancellationTokenSource previous = cts;
             cts = null;
             if (previous == null) return;
@@ -59,17 +62,21 @@ namespace Yang.Dialogue
         public async Awaitable Delay(float second)
         {
             if (State != TokenState.Running) return;
+
             try
             {
                 await Awaitable.WaitForSecondsAsync(second, cts.Token);
             }
-            catch (OperationCanceledException) when (State != TokenState.Running) { }
+            catch (OperationCanceledException) when (State != TokenState.Running)
+            {
+            }
         }
 
         public async Awaitable<RunnerWaitResult> WaitFor(AwaitableCompletionSource source)
         {
             CancellationToken cancellationToken = CancellationToken;
             using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((AwaitableCompletionSource)state).TrySetCanceled(), source);
+
             try
             {
                 await source.Awaitable;
@@ -85,6 +92,7 @@ namespace Yang.Dialogue
         {
             CancellationToken cancellationToken = CancellationToken;
             using CancellationTokenRegistration registration = cancellationToken.Register(static state => ((AwaitableCompletionSource<T>)state).TrySetCanceled(), source);
+
             try
             {
                 T value = await source.Awaitable;
@@ -98,18 +106,27 @@ namespace Yang.Dialogue
 
         public void RefreshView()
         {
-            for (int i = views.Count - 1; i >= 0; i--) { if (views[i] == null) views.RemoveAt(i); }
+            for (int i = views.Count - 1; i >= 0; i--)
+            {
+                IDialogueView view = views[i];
+                if (view == null || (view is UnityEngine.Object unityView && unityView == null))
+                    views.RemoveAt(i);
+            }
         }
+
+        internal void ClearChoiceCaches() => choiceCaches.Clear();
 
         internal RunnerChoiceCollection GetChoiceCache(string nodeGuid, IReadOnlyList<DataWrapper> textEntries)
         {
             if (choiceCaches.TryGetValue(nodeGuid, out RunnerChoiceCollection cache)) return cache;
             cache = new RunnerChoiceCollection(textEntries.Count);
+
             for (int i = 0; i < textEntries.Count; i++)
             {
                 int conditionCount = Math.Max(0, (textEntries[i].data.Count - 3) / 3);
                 cache.ConditionBuffers[i] = new RunnerCondition[conditionCount];
             }
+
             choiceCaches.Add(nodeGuid, cache);
             return cache;
         }
@@ -128,12 +145,6 @@ namespace Yang.Dialogue
         public Awaitable<RunnerWaitResult> WaitFor(AwaitableCompletionSource source);
 
         public Awaitable<RunnerWaitResult<T>> WaitFor<T>(AwaitableCompletionSource<T> source);
-    }
-
-    internal interface IRunnerNodeChecker
-    {
-        public string TargetNode { get; }
-        public int NodeIndex { get; }
     }
 
     public enum TokenState
