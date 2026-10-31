@@ -39,6 +39,7 @@ namespace Yang.Dialogue
         private void OnEnable()
         {
             if (!string.IsNullOrEmpty(startNode.guid)) return;
+
             startNode = new NodeData(NodeType.Start);
             UnityEditor.EditorUtility.SetDirty(this);
         }
@@ -49,8 +50,9 @@ namespace Yang.Dialogue
             System.HashCode hash = new();
             hash.Add(startNode.GetRuntimeHashCode());
             hash.Add(nodes.Count);
-            for (int i = 0; i < nodes.Count; i++)
-                hash.Add(nodes[i].GetRuntimeHashCode());
+
+            for (int i = 0; i < nodes.Count; i++) hash.Add(nodes[i].GetRuntimeHashCode());
+
             hash.Add(links.Count);
 
             for (int i = 0; i < links.Count; i++)
@@ -69,13 +71,14 @@ namespace Yang.Dialogue
             nodes.Clear();
             links.Clear();
             nodes.Add(startNode.guid, startNode.CreateRuntimeCopy());
-            foreach (NodeData node in this.nodes)
-                nodes.Add(node.guid, node.CreateRuntimeCopy());
+
+            foreach (NodeData node in this.nodes) nodes.Add(node.guid, node.CreateRuntimeCopy());
 
             foreach (LinkData link in this.links)
             {
                 RunnerPort output = new(link.nodeGuid, link.outPortIndex);
                 RunnerPort input = new(link.targetGuid, -1);
+
                 links.TryAdd(output, input);
             }
         }

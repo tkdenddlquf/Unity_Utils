@@ -15,8 +15,8 @@ namespace Yang.Dialogue.Editor
 
                 for (int c = 0; c < row.Count; c++)
                 {
-                    if (c > 0)
-                        sb.Append(',');
+                    if (c > 0) sb.Append(',');
+
                     sb.Append(Escape(row[c]));
                 }
 
@@ -29,7 +29,9 @@ namespace Yang.Dialogue.Editor
         public static List<List<string>> FromCsv(string text)
         {
             List<List<string>> rows = new();
+
             if (string.IsNullOrEmpty(text)) return rows;
+
             List<string> row = new();
             StringBuilder field = new();
             bool inQuotes = false;
@@ -94,7 +96,9 @@ namespace Yang.Dialogue.Editor
                               value.IndexOf('\n') >= 0 ||
                               value.IndexOf('\r') >= 0 ||
                               (value.Length > 0 && (char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1])));
+
             if (!needsQuote) return value;
+
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
     }

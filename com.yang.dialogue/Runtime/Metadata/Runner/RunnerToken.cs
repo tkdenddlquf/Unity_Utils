@@ -35,14 +35,16 @@ namespace Yang.Dialogue
         public void SetView(IReadOnlyList<IDialogueView> views)
         {
             if (ReferenceEquals(views, this.views)) return;
+
             this.views.Clear();
-            for (int i = 0; i < views.Count; i++)
-                this.views.Add(views[i]);
+
+            for (int i = 0; i < views.Count; i++) this.views.Add(views[i]);
         }
 
         public void SetState(TokenState state)
         {
             if (State == state) return;
+
             State = state;
 
             if (state == TokenState.Running)
@@ -54,7 +56,9 @@ namespace Yang.Dialogue
 
             CancellationTokenSource previous = cts;
             cts = null;
+
             if (previous == null) return;
+
             previous.Cancel();
             previous.Dispose();
         }
@@ -80,6 +84,7 @@ namespace Yang.Dialogue
             try
             {
                 await source.Awaitable;
+
                 return new RunnerWaitResult(RunnerWaitStatus.Completed);
             }
             catch (OperationCanceledException)
@@ -96,6 +101,7 @@ namespace Yang.Dialogue
             try
             {
                 T value = await source.Awaitable;
+
                 return new RunnerWaitResult<T>(RunnerWaitStatus.Completed, value);
             }
             catch (OperationCanceledException)
@@ -109,8 +115,8 @@ namespace Yang.Dialogue
             for (int i = views.Count - 1; i >= 0; i--)
             {
                 IDialogueView view = views[i];
-                if (view == null || (view is UnityEngine.Object unityView && unityView == null))
-                    views.RemoveAt(i);
+
+                if (view == null || (view is UnityEngine.Object unityView && unityView == null)) views.RemoveAt(i);
             }
         }
 
@@ -119,6 +125,7 @@ namespace Yang.Dialogue
         internal RunnerChoiceCollection GetChoiceCache(string nodeGuid, IReadOnlyList<DataWrapper> textEntries)
         {
             if (choiceCaches.TryGetValue(nodeGuid, out RunnerChoiceCollection cache)) return cache;
+
             cache = new RunnerChoiceCollection(textEntries.Count);
 
             for (int i = 0; i < textEntries.Count; i++)
@@ -128,6 +135,7 @@ namespace Yang.Dialogue
             }
 
             choiceCaches.Add(nodeGuid, cache);
+
             return cache;
         }
     }

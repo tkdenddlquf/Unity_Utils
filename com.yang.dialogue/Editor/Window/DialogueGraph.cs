@@ -48,7 +48,9 @@ namespace Yang.Dialogue.Editor
             foreach (string guid in AssetDatabase.FindAssets("t:StyleSheet DialogueGraph"))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
+
                 if (!path.EndsWith("DialogueGraph.uss")) continue;
+
                 StyleSheet sheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(path);
 
                 if (sheet != null)
@@ -64,10 +66,11 @@ namespace Yang.Dialogue.Editor
         {
             HashSet<string> previousSelection = new(selectedGuids);
             suppressSelectionTracking = true;
-            foreach (Node node in nodes.ToList())
-                RemoveElement(node);
-            foreach (Edge edge in edges.ToList())
-                RemoveElement(edge);
+
+            foreach (Node node in nodes.ToList()) RemoveElement(node);
+
+            foreach (Edge edge in edges.ToList()) RemoveElement(edge);
+
             suppressSelectionTracking = false;
             selectedGuids.Clear();
 
@@ -81,8 +84,7 @@ namespace Yang.Dialogue.Editor
             {
                 foreach (string guid in previousSelection)
                 {
-                    if (!string.IsNullOrEmpty(window.GetNode(guid).guid))
-                        selectedGuids.Add(guid);
+                    if (!string.IsNullOrEmpty(window.GetNode(guid).guid)) selectedGuids.Add(guid);
                 }
 
                 SyncVisibleNodes();
@@ -91,8 +93,7 @@ namespace Yang.Dialogue.Editor
 
                 foreach (string guid in selectedGuids)
                 {
-                    if (currentNodes.TryGetValue(guid, out BaseNode node))
-                        AddToSelection(node);
+                    if (currentNodes.TryGetValue(guid, out BaseNode node)) AddToSelection(node);
                 }
 
                 suppressSelectionTracking = false;
@@ -102,18 +103,20 @@ namespace Yang.Dialogue.Editor
         public void SetDebugNode(string guid)
         {
             if (debugNodeGuid == guid) return;
+
             string previous = debugNodeGuid;
             debugNodeGuid = guid;
-            if (!string.IsNullOrEmpty(previous) && currentNodes.TryGetValue(previous, out BaseNode prior))
-                prior.RemoveFromClassList("dlg-debug-current");
-            if (!string.IsNullOrEmpty(guid) && currentNodes.TryGetValue(guid, out BaseNode current))
-                current.AddToClassList("dlg-debug-current");
+
+            if (!string.IsNullOrEmpty(previous) && currentNodes.TryGetValue(previous, out BaseNode prior)) prior.RemoveFromClassList("dlg-debug-current");
+
+            if (!string.IsNullOrEmpty(guid) && currentNodes.TryGetValue(guid, out BaseNode current)) current.AddToClassList("dlg-debug-current");
         }
 
         // Coalesce consecutive pan/zoom and geometry events into one visibility scan.
         public void RequestSync()
         {
             if (syncScheduled) return;
+
             syncScheduled = true;
             schedule.Execute(() =>
             {
@@ -125,13 +128,17 @@ namespace Yang.Dialogue.Editor
         public void SyncVisibleNodes()
         {
             if (window.SO == null) return;
+
             Rect view = GetVisibleContentRect(NODE_MARGIN);
+
             if (view.width <= 0) return;
+
             visibleGuids.Clear();
             CollectVisible(window.SO.EditorStartNode, view);
             List<NodeData> all = window.Nodes;
-            for (int i = 0; i < all.Count; i++)
-                CollectVisible(all[i], view);
+
+            for (int i = 0; i < all.Count; i++) CollectVisible(all[i], view);
+
             MapCurrentNodes();
             bool changed = false;
             suppressSelectionTracking = true;
@@ -140,8 +147,8 @@ namespace Yang.Dialogue.Editor
             {
                 if (!visibleGuids.Contains(kv.Key))
                 {
-                    if (selectedGuids.Contains(kv.Key))
-                        RemoveFromSelection(kv.Value);
+                    if (selectedGuids.Contains(kv.Key)) RemoveFromSelection(kv.Value);
+
                     RemoveElement(kv.Value);
                     changed = true;
                 }
@@ -152,21 +159,21 @@ namespace Yang.Dialogue.Editor
                 if (!currentNodes.ContainsKey(guid))
                 {
                     BaseNode node = CreateNode(window.GetNode(guid));
-                    if (selectedGuids.Contains(guid))
-                        AddToSelection(node);
+
+                    if (selectedGuids.Contains(guid)) AddToSelection(node);
+
                     changed = true;
                 }
             }
 
             suppressSelectionTracking = false;
-            if (changed)
-                RebuildEdges();
+
+            if (changed) RebuildEdges();
         }
 
         private void CollectVisible(NodeData data, Rect view)
         {
-            if (!string.IsNullOrEmpty(data.guid) && view.Contains(data.position))
-                visibleGuids.Add(data.guid);
+            if (!string.IsNullOrEmpty(data.guid) && view.Contains(data.position)) visibleGuids.Add(data.guid);
         }
 
         private void MapCurrentNodes()
@@ -175,29 +182,33 @@ namespace Yang.Dialogue.Editor
 
             foreach (Node node in nodes)
             {
-                if (node is BaseNode baseNode)
-                    currentNodes[baseNode.GUID] = baseNode;
+                if (node is BaseNode baseNode) currentNodes[baseNode.GUID] = baseNode;
             }
         }
 
         private void RebuildEdges()
         {
-            foreach (Edge edge in edges.ToList())
-                RemoveElement(edge);
+            foreach (Edge edge in edges.ToList()) RemoveElement(edge);
+
             MapCurrentNodes();
             List<LinkData> links = window.Links;
 
             for (int i = 0; i < links.Count; i++)
             {
                 LinkData link = links[i];
+
                 if (!currentNodes.TryGetValue(link.nodeGuid, out BaseNode fromNode)) continue;
+
                 if (!currentNodes.TryGetValue(link.targetGuid, out BaseNode toNode)) continue;
+
                 if (link.outPortIndex < 0 || link.outPortIndex >= fromNode.outputContainer.childCount) continue;
+
                 if (toNode.inputContainer.childCount == 0) continue;
+
                 Port fromPort = fromNode.outputContainer[link.outPortIndex] as Port;
                 Port toPort = toNode.inputContainer[0] as Port;
-                if (fromPort != null && toPort != null)
-                    AddElement(fromPort.ConnectTo(toPort));
+
+                if (fromPort != null && toPort != null) AddElement(fromPort.ConnectTo(toPort));
             }
 
             RefreshPortColors();
@@ -206,6 +217,7 @@ namespace Yang.Dialogue.Editor
         public void RefreshPortColors()
         {
             if (window.SO == null) return;
+
             linkedInputGuids.Clear();
             linkedOutputPorts.Clear();
             List<LinkData> links = window.Links;
@@ -221,15 +233,11 @@ namespace Yang.Dialogue.Editor
             {
                 if (node is not BaseNode baseNode) continue;
 
-                if (baseNode.inputContainer.childCount > 0 && baseNode.inputContainer[0] is Port inPort)
-                {
-                    ColorPort(inPort, linkedInputGuids.Contains(baseNode.GUID));
-                }
+                if (baseNode.inputContainer.childCount > 0 && baseNode.inputContainer[0] is Port inPort) ColorPort(inPort, linkedInputGuids.Contains(baseNode.GUID));
 
                 for (int i = 0; i < baseNode.outputContainer.childCount; i++)
                 {
-                    if (baseNode.outputContainer[i] is Port outPort)
-                        ColorPort(outPort, linkedOutputPorts.Contains((baseNode.GUID, i)));
+                    if (baseNode.outputContainer[i] is Port outPort) ColorPort(outPort, linkedOutputPorts.Contains((baseNode.GUID, i)));
                 }
             }
         }
@@ -238,6 +246,7 @@ namespace Yang.Dialogue.Editor
         {
             port.portColor = PortCapColor;
             VisualElement line = port.Q<VisualElement>(null, "dlg-port-line");
+
             if (line == null) return;
 
             if (linked)
@@ -267,11 +276,15 @@ namespace Yang.Dialogue.Editor
         public void FocusNode(string guid, bool select = false)
         {
             if (window.SO == null) return;
+
             NodeData data = window.GetNode(guid);
+
             if (string.IsNullOrEmpty(data.guid)) return;
+
             CenterOn(data.position, new Vector2(220f, 120f));
             SyncVisibleNodes();
             BaseNode node = FindVisibleNode(data.guid);
+
             if (node == null) return;
 
             if (select)
@@ -300,6 +313,7 @@ namespace Yang.Dialogue.Editor
             Vector3 scale = style.scale.value.value;
             Vector2 viewCenter = layout.size * 0.5f;
             Vector2 nodeCenter = topLeft + size * 0.5f;
+
             UpdateViewTransform(new Vector3(viewCenter.x - nodeCenter.x * scale.x, viewCenter.y - nodeCenter.y * scale.y, 0f), scale);
         }
 
@@ -316,15 +330,20 @@ namespace Yang.Dialogue.Editor
         private Rect GetVisibleContentRect(float margin)
         {
             Rect rect = contentRect;
+
             if (rect.width <= 1 || rect.height <= 1) return Rect.zero;
+
             IResolvedStyle style = contentViewContainer.resolvedStyle;
             Vector3 translate = style.translate;
             Vector3 scale = style.scale.value;
+
             if (scale.x == 0 || scale.y == 0) return Rect.zero;
+
             float minX = (0 - translate.x) / scale.x - margin;
             float maxX = (rect.width - translate.x) / scale.x + margin;
             float minY = (0 - translate.y) / scale.y - margin;
             float maxY = (rect.height - translate.y) / scale.y + margin;
+
             return Rect.MinMaxRect(minX, minY, maxX, maxY);
         }
         #endregion
@@ -332,10 +351,9 @@ namespace Yang.Dialogue.Editor
         #region Selection
         public void OnNodeGuidChanged(string previous, string current)
         {
-            if (selectedGuids.Remove(previous))
-                selectedGuids.Add(current);
-            if (visibleGuids.Remove(previous))
-                visibleGuids.Add(current);
+            if (selectedGuids.Remove(previous)) selectedGuids.Add(current);
+
+            if (visibleGuids.Remove(previous)) visibleGuids.Add(current);
 
             if (currentNodes.TryGetValue(previous, out BaseNode node))
             {
@@ -343,46 +361,49 @@ namespace Yang.Dialogue.Editor
                 currentNodes[current] = node;
             }
 
-            if (debugNodeGuid == previous)
-                debugNodeGuid = current;
+            if (debugNodeGuid == previous) debugNodeGuid = current;
+
             RefreshPortColors();
         }
 
         public string FirstSelectedGuid()
         {
             foreach (string guid in selectedGuids) return guid;
+
             return null;
         }
 
         public void SelectGuid(string guid)
         {
             ClearSelection();
+
             if (string.IsNullOrEmpty(guid) || window.SO == null || string.IsNullOrEmpty(window.GetNode(guid).guid)) return;
+
             selectedGuids.Add(guid);
             MapCurrentNodes();
-            if (currentNodes.TryGetValue(guid, out BaseNode node))
-                AddToSelection(node);
+
+            if (currentNodes.TryGetValue(guid, out BaseNode node)) AddToSelection(node);
         }
 
         public override void AddToSelection(ISelectable selectable)
         {
             base.AddToSelection(selectable);
-            if (!suppressSelectionTracking && selectable is BaseNode node)
-                selectedGuids.Add(node.GUID);
+
+            if (!suppressSelectionTracking && selectable is BaseNode node) selectedGuids.Add(node.GUID);
         }
 
         public override void RemoveFromSelection(ISelectable selectable)
         {
             base.RemoveFromSelection(selectable);
-            if (!suppressSelectionTracking && selectable is BaseNode node)
-                selectedGuids.Remove(node.GUID);
+
+            if (!suppressSelectionTracking && selectable is BaseNode node) selectedGuids.Remove(node.GUID);
         }
 
         public override void ClearSelection()
         {
             base.ClearSelection();
-            if (!suppressSelectionTracking)
-                selectedGuids.Clear();
+
+            if (!suppressSelectionTracking) selectedGuids.Clear();
         }
 
         private bool CanLogicalCopy()
@@ -399,8 +420,7 @@ namespace Yang.Dialogue.Editor
 
         private void OnValidateCommand(ValidateCommandEvent evt)
         {
-            if (evt.commandName == "Copy" && CanLogicalCopy())
-                evt.StopPropagation();
+            if (evt.commandName == "Copy" && CanLogicalCopy()) evt.StopPropagation();
         }
 
         private void OnExecuteCommand(ExecuteCommandEvent evt)
@@ -424,18 +444,24 @@ namespace Yang.Dialogue.Editor
             }
 
             VisualElement target = evt.target as VisualElement;
-            while (target != null && target != this && target is not BaseNode)
-                target = target.parent;
+
+            while (target != null && target != this && target is not BaseNode) target = target.parent;
+
             BaseNode clickedNode = target as BaseNode;
+
             if (Application.isPlaying && clickedNode != null)
                 menu.AppendAction("Play / Jump to this node", _ => window.DebugJumpToNode(clickedNode.GUID),
+
                     window.CanDebugJump ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
             menu.AppendAction("Copy", MenuActionCopy, selectedGuids.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
             menu.AppendAction("Paste", MenuActionPaste, jsonCopyData == "" ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
             menu.AppendAction("Remove", MenuActionRemove, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+
             if (clickedNode != null) return;
+
             Vector2 mousePos = evt.localMousePosition;
             Vector2 nodePos = contentViewContainer.WorldToLocal(mousePos);
+
             menu.AppendSeparator();
             menu.AppendAction("Add Dialogue", _ => AddNode(NodeType.Dialogue, nodePos));
             menu.AppendAction("Add Choice", _ => AddNode(NodeType.Choice, nodePos));
@@ -456,8 +482,11 @@ namespace Yang.Dialogue.Editor
             foreach (Port port in ports)
             {
                 if (startPort.direction == port.direction) continue;
+
                 if (startPort.node == port.node) continue;
+
                 if (startPort.portType != port.portType) continue;
+
                 compatiblePorts.Add(port);
             }
 
@@ -467,7 +496,9 @@ namespace Yang.Dialogue.Editor
         public override EventPropagation DeleteSelection()
         {
             Focusable focused = panel?.focusController?.focusedElement;
+
             if (focused == this) return base.DeleteSelection();
+
             return EventPropagation.Stop;
         }
 
@@ -475,6 +506,7 @@ namespace Yang.Dialogue.Editor
         private void AddNode(NodeType type, Vector2 position)
         {
             if (window.SO == null) return;
+
             DialogueSO so = window.SO;
             Undo.RecordObject(so, "Create Node");
             NodeData data = new(type) { position = position };
@@ -492,12 +524,14 @@ namespace Yang.Dialogue.Editor
             node.GraphPosition = data.position;
             node.SetPosition(new(data.position, Vector2.zero));
             node.SetPorts();
-            if (data.expended)
-                node.EnsureExtension();
+
+            if (data.expended) node.EnsureExtension();
+
             node.SetExpendedWithoutNotify(data.expended);
             node.RefreshExpandedState();
             node.EnableInClassList("dlg-debug-current", data.guid == debugNodeGuid);
             AddElement(node);
+
             return node;
         }
 
@@ -532,6 +566,7 @@ namespace Yang.Dialogue.Editor
         private string BuildCopy()
         {
             if (window.SO == null) return "";
+
             DialogueSO so = window.SO;
             CopyData data = new();
             HashSet<string> guids = new();
@@ -539,8 +574,11 @@ namespace Yang.Dialogue.Editor
             foreach (string guid in selectedGuids)
             {
                 if (guid == so.StartGuid) continue;
+
                 NodeData nodeData = window.GetNode(guid);
+
                 if (string.IsNullOrEmpty(nodeData.guid)) continue;
+
                 data.nodes.Add(nodeData);
                 guids.Add(guid);
             }
@@ -548,6 +586,7 @@ namespace Yang.Dialogue.Editor
             if (data.nodes.Count == 0)
             {
                 jsonCopyData = "";
+
                 return jsonCopyData;
             }
 
@@ -556,27 +595,33 @@ namespace Yang.Dialogue.Editor
             for (int i = 0; i < links.Count; i++)
             {
                 LinkData link = links[i];
-                if (guids.Contains(link.nodeGuid) && guids.Contains(link.targetGuid))
-                    data.links.Add(link);
+
+                if (guids.Contains(link.nodeGuid) && guids.Contains(link.targetGuid)) data.links.Add(link);
             }
 
             jsonCopyData = JsonUtility.ToJson(data);
+
             return jsonCopyData;
         }
 
         private void UnserializeNode(string operationName, string data)
         {
             if (window.SO == null || string.IsNullOrEmpty(data)) return;
+
             CopyData copyData = JsonUtility.FromJson<CopyData>(data);
+
             if (copyData == null || copyData.nodes == null || copyData.nodes.Count == 0) return;
+
             ClearSelection();
             Vector2 nodeCenterPos = Vector2.zero;
-            foreach (NodeData nodeData in copyData.nodes)
-                nodeCenterPos += nodeData.position;
+
+            foreach (NodeData nodeData in copyData.nodes) nodeCenterPos += nodeData.position;
+
             nodeCenterPos /= copyData.nodes.Count;
             Vector2 newCenterPos = contentViewContainer.WorldToLocal(layout.size * 0.5f);
             Vector2 addedPos = newCenterPos - nodeCenterPos;
             DialogueSO so = window.SO;
+
             Undo.RecordObject(so, "Paste Node");
             Dictionary<string, string> guidMap = new();
             List<NodeData> pastedNodes = new(copyData.nodes.Count);
@@ -603,8 +648,11 @@ namespace Yang.Dialogue.Editor
                 for (int i = 0; i < copyData.links.Count; i++)
                 {
                     LinkData link = copyData.links[i];
+
                     if (!guidMap.TryGetValue(link.nodeGuid, out string source)) continue;
+
                     if (!guidMap.TryGetValue(link.targetGuid, out string target)) continue;
+
                     window.Links.Add(new LinkData { nodeGuid = source, targetGuid = target, outPortIndex = link.outPortIndex });
                 }
 
@@ -633,16 +681,15 @@ namespace Yang.Dialogue.Editor
         private void MenuActionRemove(DropdownMenuAction menuAction)
         {
             if (window.SO == null) return;
+
             List<GraphElement> elements = new();
 
             foreach (ISelectable selected in selection)
             {
-                if (selected is GraphElement element && (element is not BaseNode node || node.GUID != window.SO.StartGuid))
-                    elements.Add(element);
+                if (selected is GraphElement element && (element is not BaseNode node || node.GUID != window.SO.StartGuid)) elements.Add(element);
             }
 
-            if (elements.Count > 0)
-                DeleteElements(elements);
+            if (elements.Count > 0) DeleteElements(elements);
         }
 
         [System.Serializable]

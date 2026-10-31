@@ -13,8 +13,9 @@ namespace Yang.Dialogue.Editor
             IReadOnlyList<Locale> locales = LocalizationEditorSettings.GetLocales();
             IReadOnlyList<LocalizationTableCollection> collections = LocalizationEditorSettings.GetStringTableCollections();
             Dictionary<(string, int), string> linkMap = new();
-            foreach (LinkData link in so.EditorLinks)
-                linkMap[(link.nodeGuid, link.outPortIndex)] = link.targetGuid;
+
+            foreach (LinkData link in so.EditorLinks) linkMap[(link.nodeGuid, link.outPortIndex)] = link.targetGuid;
+
             List<List<string>> rows = new();
             List<string> header = new() { "ID", "Type", "Next", "Message", "Data", "SpeakerTable", "TextTable", "SpeakerKey", "TextKey", "X", "Y" };
 
@@ -36,14 +37,13 @@ namespace Yang.Dialogue.Editor
             rows.Add(header);
             int localeCount = locales.Count;
             EmitNode(so.EditorStartNode, so, locales, collections, linkMap, rows, localeCount);
-            foreach (NodeData node in so.EditorNodes)
-                EmitNode(node, so, locales, collections, linkMap, rows, localeCount);
+
+            foreach (NodeData node in so.EditorNodes) EmitNode(node, so, locales, collections, linkMap, rows, localeCount);
+
             return CsvUtility.ToCsv(rows);
         }
 
-        private static void EmitNode(NodeData node, DialogueSO so, IReadOnlyList<Locale> locales,
-            IReadOnlyList<LocalizationTableCollection> collections, Dictionary<(string, int), string> linkMap,
-            List<List<string>> rows, int localeCount)
+        private static void EmitNode(NodeData node, DialogueSO so, IReadOnlyList<Locale> locales, IReadOnlyList<LocalizationTableCollection> collections, Dictionary<(string, int), string> linkMap, List<List<string>> rows, int localeCount)
         {
             string px = node.position.x.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string py = node.position.y.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -59,8 +59,8 @@ namespace Yang.Dialogue.Editor
                         (string name, string key, System.Guid guid, long id) speaker = GetReference(collections, opt[0].data, opt[1].data);
                         (string name, string key, System.Guid guid, long id) text = GetReference(collections, opt[2].data, opt[3].data);
                         string message = opt[4].data[0].ToString();
-                        List<string> row = MakeRow(node.guid, "Dialogue", Next(linkMap, node.guid, 0),
-                            message, "", speaker.name, text.name, speaker.key, text.key, px, py, localeCount);
+                        List<string> row = MakeRow(node.guid, "Dialogue", Next(linkMap, node.guid, 0), message, "", speaker.name, text.name, speaker.key, text.key, px, py, localeCount);
+
                         FillLocaleColumns(row, locales, collections, speaker, text);
                         SetIdentity(row, localeCount, speaker, text);
                         rows.Add(row);
@@ -73,6 +73,7 @@ namespace Yang.Dialogue.Editor
                         (string name, string key, System.Guid guid, long id) text = GetReference(collections, opt[2].data);
                         string message = opt[3].data[0].ToString();
                         List<string> row = MakeRow(node.guid, "Choice", "", message, "", speaker.name, text.name, speaker.key, "", px, py, localeCount);
+
                         FillLocaleColumns(row, locales, collections, speaker, default);
                         SetIdentity(row, localeCount, speaker, text);
                         rows.Add(row);
@@ -86,6 +87,7 @@ namespace Yang.Dialogue.Editor
                             string conditions = ConditionsToString(data, 3);
                             string optionData = hide ? (conditions.Length == 0 ? "hide" : "hide; " + conditions) : conditions;
                             List<string> optionRow = MakeRow("", "Option", Next(linkMap, node.guid, i), "", optionData, "", "", "", option.key, "", "", localeCount);
+
                             FillLocaleColumns(optionRow, locales, collections, default, option);
                             SetIdentity(optionRow, localeCount, default, option);
                             rows.Add(optionRow);
@@ -105,6 +107,7 @@ namespace Yang.Dialogue.Editor
                             IReadOnlyList<GenericData> data = events[i].data;
                             string id = data.Count > 0 ? data[0].ToString() : "";
                             string arguments = CommandNode.ArgumentsToString(data, true);
+
                             rows.Add(MakeRow("", "Instruction", "", id, arguments, "", "", "", "", "", "", localeCount));
                         }
                     }
@@ -122,6 +125,7 @@ namespace Yang.Dialogue.Editor
                             IReadOnlyList<GenericData> data = commands[i].data;
                             string id = data.Count > 0 ? data[0].ToString() : "";
                             string arguments = CommandNode.ArgumentsToString(data, true);
+
                             rows.Add(MakeRow("", "Instruction", "", id, arguments, "", "", "", "", "", "", localeCount));
                         }
                     }
@@ -141,8 +145,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private static List<string> MakeRow(string id, string type, string next, string message, string data,
-            string speakerTable, string textTable, string speakerKey, string textKey, string x, string y, int localeCount)
+        private static List<string> MakeRow(string id, string type, string next, string message, string data, string speakerTable, string textTable, string speakerKey, string textKey, string x, string y, int localeCount)
         {
             List<string> row = new() { id, type, next, message, data, speakerTable, textTable, speakerKey, textKey, x, y };
 
@@ -153,13 +156,13 @@ namespace Yang.Dialogue.Editor
             }
 
             row.AddRange(new[] { "", "", "", "" });
-            for (int i = 0; i < localeCount * 2; i++)
-                row.Add("");
+
+            for (int i = 0; i < localeCount * 2; i++) row.Add("");
+
             return row;
         }
 
-        private static (string name, string key, System.Guid guid, long id) GetReference(IReadOnlyList<LocalizationTableCollection> collections,
-            IReadOnlyList<GenericData> table, IReadOnlyList<GenericData> entry = null)
+        private static (string name, string key, System.Guid guid, long id) GetReference(IReadOnlyList<LocalizationTableCollection> collections, IReadOnlyList<GenericData> table, IReadOnlyList<GenericData> entry = null)
         {
             string name = table[0].ToString();
             System.Guid guid = table[1].GetGuid();
@@ -183,8 +186,7 @@ namespace Yang.Dialogue.Editor
             return (name, key, guid, id);
         }
 
-        private static void SetIdentity(List<string> row, int localeCount, (string name, string key, System.Guid guid, long id) speaker,
-            (string name, string key, System.Guid guid, long id) text)
+        private static void SetIdentity(List<string> row, int localeCount, (string name, string key, System.Guid guid, long id) speaker, (string name, string key, System.Guid guid, long id) text)
         {
             int start = 11 + localeCount * 2;
             row[start] = speaker.guid == System.Guid.Empty ? "" : speaker.guid.ToString("N");
@@ -193,10 +195,7 @@ namespace Yang.Dialogue.Editor
             row[start + 3] = text.id == 0 ? "" : text.id.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private static void FillLocaleColumns(List<string> row, IReadOnlyList<Locale> locales,
-            IReadOnlyList<LocalizationTableCollection> collections,
-            (string name, string key, System.Guid guid, long id) speaker,
-            (string name, string key, System.Guid guid, long id) text)
+        private static void FillLocaleColumns(List<string> row, IReadOnlyList<Locale> locales, IReadOnlyList<LocalizationTableCollection> collections, (string name, string key, System.Guid guid, long id) speaker, (string name, string key, System.Guid guid, long id) text)
         {
             LocalizationTableCollection speakerCollection = collections.ResolveCollection(speaker.name, speaker.guid);
             LocalizationTableCollection textCollection = collections.ResolveCollection(text.name, text.guid);
@@ -207,6 +206,7 @@ namespace Yang.Dialogue.Editor
                 int column = 11 + i * 2;
                 StringTableEntry speakerEntry = FindLocalizedEntry(speakerCollection, locale, speaker.id, speaker.key);
                 StringTableEntry textEntry = FindLocalizedEntry(textCollection, locale, text.id, text.key);
+
                 row[column] = speakerEntry?.Value ?? "";
                 row[column + 1] = textEntry?.Value ?? "";
                 int presenceColumn = 11 + locales.Count * 2 + 4 + i * 2;
@@ -222,6 +222,7 @@ namespace Yang.Dialogue.Editor
             foreach (LazyLoadReference<LocalizationTable> reference in collection.Tables)
             {
                 if (reference.asset is not StringTable table || table.LocaleIdentifier != locale) continue;
+
                 return id != 0 ? table.GetEntry(id) : table.GetEntry(key);
             }
 
@@ -239,6 +240,7 @@ namespace Yang.Dialogue.Editor
             {
                 IReadOnlyList<GenericData> data = optionDatas[i].data;
                 int fieldId = data[0].GetInt();
+
                 if (fieldId <= 0) continue;
 
                 switch (data[1].Type)
@@ -266,9 +268,11 @@ namespace Yang.Dialogue.Editor
         private static string WaitToString(IReadOnlyList<DataWrapper> optionDatas)
         {
             IReadOnlyList<GenericData> data = optionDatas[0].data;
-            if (data[1].TryGetFloat(out float seconds))
-                return seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            if (data[1].TryGetFloat(out float seconds)) return seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
             string reason = data[1].ToString();
+
             return string.IsNullOrEmpty(reason) ? "notify" : $"notify:{reason}";
         }
 
@@ -279,6 +283,7 @@ namespace Yang.Dialogue.Editor
             for (int j = start; j + 2 < data.Count; j += 3)
             {
                 int fieldId = data[j].GetInt();
+
                 if (fieldId <= 0) continue;
 
                 switch (data[j + 1].Type)

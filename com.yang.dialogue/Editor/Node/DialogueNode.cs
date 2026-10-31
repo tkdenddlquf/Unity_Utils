@@ -58,8 +58,9 @@ namespace Yang.Dialogue.Editor
                 {
                     TableReference reference = speakerOverride.TableReference;
                     System.Guid guid = reference.TableCollectionNameGuid;
-                    if (guid == System.Guid.Empty)
-                        guid = collections.ResolveCollection(reference.TableCollectionName, guid)?.TableCollectionNameReference.TableCollectionNameGuid ?? guid;
+
+                    if (guid == System.Guid.Empty) guid = collections.ResolveCollection(reference.TableCollectionName, guid)?.TableCollectionNameReference.TableCollectionNameGuid ?? guid;
+
                     speakerTable = new(new(reference.TableCollectionName), new(guid));
                 }
 
@@ -71,14 +72,16 @@ namespace Yang.Dialogue.Editor
                 {
                     TableReference reference = textOverride.TableReference;
                     System.Guid guid = reference.TableCollectionNameGuid;
-                    if (guid == System.Guid.Empty)
-                        guid = collections.ResolveCollection(reference.TableCollectionName, guid)?.TableCollectionNameReference.TableCollectionNameGuid ?? guid;
+
+                    if (guid == System.Guid.Empty) guid = collections.ResolveCollection(reference.TableCollectionName, guid)?.TableCollectionNameReference.TableCollectionNameGuid ?? guid;
+
                     textTable = new(new(reference.TableCollectionName), new(guid));
                 }
 
                 DataWrapper speakerEntry = new(new(GenericData.DataType.String), new(GenericData.DataType.Long));
                 DataWrapper textEntry = new(new(GenericData.DataType.String), new(GenericData.DataType.Long));
                 DataWrapper message = new(new GenericData(GenericData.DataType.String));
+
                 optionDatas.Add(speakerTable);
                 optionDatas.Add(speakerEntry);
                 optionDatas.Add(textTable);
@@ -86,8 +89,7 @@ namespace Yang.Dialogue.Editor
                 optionDatas.Add(message);
             }
 
-            if (portDatas.Count == 0)
-                portDatas.Add(new());
+            if (portDatas.Count == 0) portDatas.Add(new());
         }
 
         private void SetOptions()
@@ -123,7 +125,9 @@ namespace Yang.Dialogue.Editor
         private void SetPreviewField(string fieldName, List<GenericData> table, List<GenericData> entry)
         {
             TextField field = textsElement.Q<TextField>(fieldName);
+
             if (field == null) return;
+
             field.SetValueWithoutNotify(ResolvePreview(table[0].ToString(), table[1].GetGuid(), entry[0].ToString(), entry[1].GetLong()));
             field.isReadOnly = !window.CanEditLocalizedText(table, entry);
         }
@@ -133,21 +137,23 @@ namespace Yang.Dialogue.Editor
             bool speaker = field.name == "Speaker Text";
             List<GenericData> table = optionDatas[speaker ? 0 : 2].data;
             List<GenericData> entry = optionDatas[speaker ? 1 : 3].data;
-            if (!window.EditLocalizedText(table, entry, value))
-                SetPreviewField(field.name, table, entry);
+
+            if (!window.EditLocalizedText(table, entry, value)) SetPreviewField(field.name, table, entry);
         }
 
         private string ResolvePreview(string tableName, System.Guid tableGuid, string key, long id)
         {
             LocalizationTableCollection collection = collections.ResolveCollection(tableName, tableGuid, id, key);
+
             return collection == null ? "" : new EntryData(id, key, collection.Tables).GetText(window.Language);
         }
 
         private static List<long> GetEntryIds(List<EntryData> entries)
         {
             List<long> ids = new() { 0 };
-            foreach (EntryData entry in entries)
-                ids.Add(entry.id);
+
+            foreach (EntryData entry in entries) ids.Add(entry.id);
+
             return ids;
         }
 
@@ -155,13 +161,16 @@ namespace Yang.Dialogue.Editor
         {
             long id = data[1].GetLong();
             int index = id != 0 ? entries.FindIndex(entry => entry.id == id) : -1;
+
             return index >= 0 ? index : entries.FindIndex(entry => entry.key == data[0].ToString());
         }
 
         private string FormatEntry(bool speaker, long id)
         {
             if (id == 0) return "";
+
             EntryData entry = (speaker ? speakerEntries : textEntries).Find(value => value.id == id);
+
             return entry.key ?? "";
         }
 
@@ -172,28 +181,30 @@ namespace Yang.Dialogue.Editor
             int index = GetTableIndex(optionData[0].ToString(), optionData[1].GetGuid());
             string name = speaker ? "Speaker Table" : "Text Table";
             PopupField<System.Guid> field = new(name, tableIds, index + 1) { name = name, formatSelectedValueCallback = FormatTable, formatListItemCallback = FormatTable };
+
             field.AddToClassList("dlg-field");
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnTableKeyDownEvent);
             extensionContainer.Add(field);
 
-            if (index != -1)
-            {
-                window.GetEntriesInto(collections[index], entries);
-            }
+            if (index != -1) window.GetEntriesInto(collections[index], entries);
         }
 
         private string FormatTable(System.Guid id)
         {
             int index = tableIds.IndexOf(id) - 1;
+
             return index >= 0 ? tables[index] : "";
         }
 
         private int GetTableIndex(string value, System.Guid guid)
         {
             LocalizationTableCollection match = collections.ResolveCollection(value, guid);
+
             for (int i = 0; i < collections.Count; i++)
+
                 if (collections[i] == match) return i;
+
             return -1;
         }
 
@@ -202,13 +213,18 @@ namespace Yang.Dialogue.Editor
             if (evt.keyCode == KeyCode.Delete)
             {
                 PopupField<System.Guid> tableField = evt.target.FindParentInCurrent<PopupField<System.Guid>>();
+
                 if (tableField == null) return;
+
                 DialogueSO so = window.SO;
                 bool speaker = tableField.name == "Speaker Table";
                 PopupField<long> entryField = extensionContainer.Q<PopupField<long>>(speaker ? "Speaker Entry" : "Text Entry");
+
                 if (entryField == null) return;
+
                 List<GenericData> tableOptionData = optionDatas[speaker ? 0 : 2].data;
                 List<GenericData> entryOptionData = optionDatas[speaker ? 1 : 3].data;
+
                 Undo.RecordObject(so, "Delete Table Option");
                 tableField.value = System.Guid.Empty;
                 entryField.SetValueWithoutNotify(0);
@@ -220,15 +236,17 @@ namespace Yang.Dialogue.Editor
                 if (speaker)
                 {
                     TextField textField = textsElement.Q<TextField>("Speaker Text");
-                    if (textField != null)
-                        textField.SetValueWithoutNotify("");
+
+                    if (textField != null) textField.SetValueWithoutNotify("");
+
                     speakerEntries.Clear();
                 }
                 else
                 {
                     TextField textField = textsElement.Q<TextField>("Text Text");
-                    if (textField != null)
-                        textField.SetValueWithoutNotify("");
+
+                    if (textField != null) textField.SetValueWithoutNotify("");
+
                     textEntries.Clear();
                 }
 
@@ -248,6 +266,7 @@ namespace Yang.Dialogue.Editor
                 VisualElement target = evt.target as VisualElement;
                 bool speaker = target.name == "Speaker Table";
                 LocalizationTableCollection collection = collections[index];
+
                 Undo.RecordObject(so, "Change Table");
                 List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
@@ -265,15 +284,17 @@ namespace Yang.Dialogue.Editor
                         if (speaker)
                         {
                             TextField textField = textsElement.Q<TextField>("Speaker Text");
-                            if (textField != null)
-                                textField.SetValueWithoutNotify("");
+
+                            if (textField != null) textField.SetValueWithoutNotify("");
+
                             speakerEntries.Clear();
                         }
                         else
                         {
                             TextField textField = textsElement.Q<TextField>("Text Text");
-                            if (textField != null)
-                                textField.SetValueWithoutNotify("");
+
+                            if (textField != null) textField.SetValueWithoutNotify("");
+
                             textEntries.Clear();
                         }
                     }
@@ -281,8 +302,8 @@ namespace Yang.Dialogue.Editor
                     List<EntryData> entries = speaker ? speakerEntries : textEntries;
                     window.GetEntriesInto(collection, entries);
                     PopupField<long> updatedField = extensionContainer.Q<PopupField<long>>(speaker ? "Speaker Entry" : "Text Entry");
-                    if (updatedField != null)
-                        updatedField.choices = GetEntryIds(entries);
+
+                    if (updatedField != null) updatedField.choices = GetEntryIds(entries);
                 }
 
                 optionData[0] = new(collection.TableCollectionName);
@@ -317,14 +338,14 @@ namespace Yang.Dialogue.Editor
                 if (speaker)
                 {
                     TextField textField = textsElement.Q<TextField>("Speaker Text");
-                    if (textField != null)
-                        textField.SetValueWithoutNotify(entryData.GetText(window.Language));
+
+                    if (textField != null) textField.SetValueWithoutNotify(entryData.GetText(window.Language));
                 }
                 else
                 {
                     TextField textField = textsElement.Q<TextField>("Text Text");
-                    if (textField != null)
-                        textField.SetValueWithoutNotify(entryData.GetText(window.Language));
+
+                    if (textField != null) textField.SetValueWithoutNotify(entryData.GetText(window.Language));
                 }
             }
         }
@@ -334,10 +355,13 @@ namespace Yang.Dialogue.Editor
             if (evt.keyCode == KeyCode.Delete)
             {
                 PopupField<long> field = evt.target.FindParentInCurrent<PopupField<long>>();
+
                 if (field == null) return;
+
                 DialogueSO so = window.SO;
                 bool speaker = field.name == "Speaker Entry";
                 List<GenericData> optionData = optionDatas[speaker ? 1 : 3].data;
+
                 Undo.RecordObject(so, "Delete Entry Option");
                 field.SetValueWithoutNotify(0);
                 optionData[0] = new(GenericData.DataType.String);
@@ -346,14 +370,14 @@ namespace Yang.Dialogue.Editor
                 if (speaker)
                 {
                     TextField textField = textsElement.Q<TextField>("Speaker Text");
-                    if (textField != null)
-                        textField.SetValueWithoutNotify("");
+
+                    if (textField != null) textField.SetValueWithoutNotify("");
                 }
                 else
                 {
                     TextField textField = textsElement.Q<TextField>("Text Text");
-                    if (textField != null)
-                        textField.SetValueWithoutNotify("");
+
+                    if (textField != null) textField.SetValueWithoutNotify("");
                 }
 
                 EditorUtility.SetDirty(so);
@@ -382,14 +406,14 @@ namespace Yang.Dialogue.Editor
                     if (speaker)
                     {
                         TextField textField = textsElement.Q<TextField>("Speaker Text");
-                        if (textField != null)
-                            textField.SetValueWithoutNotify(entryData.GetText(window.Language));
+
+                        if (textField != null) textField.SetValueWithoutNotify(entryData.GetText(window.Language));
                     }
                     else
                     {
                         TextField textField = textsElement.Q<TextField>("Text Text");
-                        if (textField != null)
-                            textField.SetValueWithoutNotify(entryData.GetText(window.Language));
+
+                        if (textField != null) textField.SetValueWithoutNotify(entryData.GetText(window.Language));
                     }
 
                     EditorUtility.SetDirty(so);

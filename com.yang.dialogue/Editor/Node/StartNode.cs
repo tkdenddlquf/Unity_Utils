@@ -17,8 +17,7 @@ namespace Yang.Dialogue.Editor
 
         private void SetDefault()
         {
-            if (portDatas.Count == 0)
-                portDatas.Add(new());
+            if (portDatas.Count == 0) portDatas.Add(new());
         }
     }
 }

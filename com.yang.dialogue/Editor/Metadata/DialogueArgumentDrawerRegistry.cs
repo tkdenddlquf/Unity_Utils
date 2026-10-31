@@ -18,6 +18,7 @@ namespace Yang.Dialogue.Editor
             foreach (Attribute attribute in field.GetCustomAttributes())
             {
                 if (!drawers.TryGetValue(attribute.GetType(), out DialogueArgumentDrawer drawer)) continue;
+
                 element = drawer.CreateField(field, attribute, label, value, onChanged);
                 return true;
             }
@@ -29,11 +30,13 @@ namespace Yang.Dialogue.Editor
         private static void Ensure()
         {
             if (drawers != null) return;
+
             drawers = new Dictionary<Type, DialogueArgumentDrawer>();
 
             foreach (Type type in TypeCache.GetTypesWithAttribute<DialogueArgumentDrawerAttribute>())
             {
                 if (type.IsAbstract || !typeof(DialogueArgumentDrawer).IsAssignableFrom(type)) continue;
+
                 DialogueArgumentDrawer drawer = Activator.CreateInstance(type) as DialogueArgumentDrawer;
 
                 foreach (DialogueArgumentDrawerAttribute attribute in type.GetCustomAttributes<DialogueArgumentDrawerAttribute>())

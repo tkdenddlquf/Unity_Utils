@@ -12,6 +12,7 @@ namespace Yang.Dialogue
         public virtual async Awaitable<int> OnChoice(RunnerText speaker, RunnerChoiceCollection texts, string message, IRunnerToken token)
         {
             await Awaitable.NextFrameAsync();
+
             return -1;
         }
 

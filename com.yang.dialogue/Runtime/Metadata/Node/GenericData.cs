@@ -40,6 +40,7 @@ namespace Yang.Dialogue
             {
                 result.type = DataType.Int;
                 result.intValue = i;
+
                 return result;
             }
 
@@ -47,6 +48,7 @@ namespace Yang.Dialogue
             {
                 result.type = DataType.Long;
                 result.longValue = l;
+
                 return result;
             }
 
@@ -54,6 +56,7 @@ namespace Yang.Dialogue
             {
                 result.type = DataType.Float;
                 result.floatValue = f;
+
                 return result;
             }
 
@@ -61,6 +64,7 @@ namespace Yang.Dialogue
             {
                 result.type = DataType.Bool;
                 result.intValue = b ? 1 : 0;
+
                 return result;
             }
 
@@ -68,6 +72,7 @@ namespace Yang.Dialogue
             {
                 result.type = DataType.Color;
                 result.colorValue = c;
+
                 return result;
             }
 
@@ -75,11 +80,13 @@ namespace Yang.Dialogue
             {
                 result.type = DataType.Guid;
                 result.stringValue = g.ToString();
+
                 return result;
             }
 
             result.type = DataType.String;
             result.stringValue = data;
+
             return result;
         }
 
@@ -144,6 +151,7 @@ namespace Yang.Dialogue
             {
                 intValue = value
             };
+
             return result;
         }
 
@@ -217,6 +225,7 @@ namespace Yang.Dialogue
         public readonly bool TryGetGuid(out Guid value)
         {
             if (type == DataType.Guid && Guid.TryParse(stringValue, out value)) return true;
+
             value = default;
             return false;
         }

@@ -79,35 +79,37 @@ namespace Yang.Dialogue
         public async Awaitable<bool> ApplyGraphChangesAsync()
         {
             if (so == null || applyingGraphChanges) return false;
+
             applyingGraphChanges = true;
             graphGeneration++;
 
             try
             {
-                if (!loadCompletion.IsCompleted)
-                    await loadCompletion;
+                if (!loadCompletion.IsCompleted) await loadCompletion;
+
                 if (this == null) return false;
+
                 List<RunnerToken> currentTokens = new(tokens.Values);
 
                 for (int i = 0; i < currentTokens.Count; i++)
                 {
                     RunnerToken token = currentTokens[i];
                     token.JumpRevision++;
-                    if (token.State == TokenState.Running)
-                        token.SetState(TokenState.Paused);
+
+                    if (token.State == TokenState.Running) token.SetState(TokenState.Paused);
                 }
 
                 List<Task> activeExecutions = new();
 
                 foreach (RunnerToken token in currentTokens)
                 {
-                    if (token.IsExecuting)
-                        activeExecutions.Add(token.ExecutionCompletion.Task);
+                    if (token.IsExecuting) activeExecutions.Add(token.ExecutionCompletion.Task);
                 }
 
-                if (activeExecutions.Count > 0)
-                    await Task.WhenAll(activeExecutions);
+                if (activeExecutions.Count > 0) await Task.WhenAll(activeExecutions);
+
                 if (this == null) return false;
+
                 runnerNode.SetDatas(so);
                 runtimeContentHash = so.GetRuntimeContentHash();
                 int resetCount = 0;
@@ -126,6 +128,7 @@ namespace Yang.Dialogue
                 }
 
                 if (resetCount > 0) Debug.LogWarning($"Dialogue graph reapplied: {resetCount} flow(s) reset to Start because their nodes were removed.", this);
+
                 return true;
             }
             finally
@@ -139,6 +142,7 @@ namespace Yang.Dialogue
         public async Awaitable StartDialogueAsync(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null)
         {
             if (so == null || applyingGraphChanges) return;
+
             int generation = graphGeneration;
             RunnerToken requestedToken = null;
             int request = 0;
@@ -146,6 +150,7 @@ namespace Yang.Dialogue
             if (tokens.TryGetValue(key, out requestedToken))
             {
                 if (requestedToken.State == TokenState.Running) return;
+
                 request = ++requestedToken.JumpRevision;
             }
 
@@ -154,12 +159,12 @@ namespace Yang.Dialogue
             if (!pendingLoad.IsCompleted)
             {
                 await pendingLoad;
+
                 if (applyingGraphChanges || generation != graphGeneration) return;
 
                 if (requestedToken != null)
                 {
-                    if (!tokens.TryGetValue(key, out RunnerToken pendingToken) || !ReferenceEquals(pendingToken, requestedToken) || requestedToken.JumpRevision != request)
-                        return;
+                    if (!tokens.TryGetValue(key, out RunnerToken pendingToken) || !ReferenceEquals(pendingToken, requestedToken) || requestedToken.JumpRevision != request) return;
                 }
                 else if (tokens.ContainsKey(key)) return;
             }
@@ -167,22 +172,20 @@ namespace Yang.Dialogue
             if (tokens.TryGetValue(key, out RunnerToken token))
             {
                 if (token.State == TokenState.Running) return;
-                if (requestedToken == null)
-                    request = ++token.JumpRevision;
+
+                if (requestedToken == null) request = ++token.JumpRevision;
 
                 if (token.IsExecuting)
                 {
                     await token.ExecutionCompletion.Task;
 
                     if (applyingGraphChanges || graphGeneration != generation || token.JumpRevision != request) return;
-                    if (!tokens.TryGetValue(key, out RunnerToken current) || !ReferenceEquals(current, token) || token.State != TokenState.Paused)
-                        return;
+
+                    if (!tokens.TryGetValue(key, out RunnerToken current) || !ReferenceEquals(current, token) || token.State != TokenState.Paused) return;
                 }
 
-                if (runnerNode.CheckNode(nodeName))
-                    token.TargetNode = nodeName;
-                else if (string.IsNullOrEmpty(token.TargetNode))
-                    token.TargetNode = so.StartGuid;
+                if (runnerNode.CheckNode(nodeName)) token.TargetNode = nodeName;
+                else if (string.IsNullOrEmpty(token.TargetNode)) token.TargetNode = so.StartGuid;
 
                 token.NodeIndex = runnerNode.GetNodeIndex(token.TargetNode);
                 token.SetView(views ?? (token.Views.Count > 0 ? token.Views : Views));
@@ -254,8 +257,7 @@ namespace Yang.Dialogue
             token.JumpRevision++;
             token.SetState(TokenState.Stopped);
 
-            if (!token.IsExecuting)
-                CompleteDialogue(key, token);
+            if (!token.IsExecuting) CompleteDialogue(key, token);
         }
 
         public void PauseDialogue(string key)
@@ -269,14 +271,12 @@ namespace Yang.Dialogue
 
         public void StopAllDialogue()
         {
-            foreach (string key in new List<string>(tokens.Keys))
-                StopDialogue(key);
+            foreach (string key in new List<string>(tokens.Keys)) StopDialogue(key);
         }
 
         public void PauseAllDialogue()
         {
-            foreach (string key in new List<string>(tokens.Keys))
-                PauseDialogue(key);
+            foreach (string key in new List<string>(tokens.Keys)) PauseDialogue(key);
         }
 
         public void JumpNode(string key, string nodeName) => _ = RequestJumpNodeAsync(key, nodeName);
@@ -285,6 +285,7 @@ namespace Yang.Dialogue
         public async Awaitable<bool> RequestJumpNodeAsync(string key, string nodeName)
         {
             RunnerToken token = await BeginJumpAsync(key, nodeName);
+
             return token != null;
         }
 
@@ -292,8 +293,8 @@ namespace Yang.Dialogue
         public async Awaitable JumpNodeAsync(string key, string nodeName)
         {
             RunnerToken token = await BeginJumpAsync(key, nodeName);
-            if (token != null && token.IsExecuting)
-                await token.ExecutionCompletion.Task;
+
+            if (token != null && token.IsExecuting) await token.ExecutionCompletion.Task;
         }
 
         #region View
@@ -348,12 +349,13 @@ namespace Yang.Dialogue
             StopAllDialogue();
             // Retired executions must finish before a newly loaded flow uses the same Views.
             List<Task> retiredExecutions = new();
-            if (!loadCompletion.IsCompleted)
-                retiredExecutions.Add(loadCompletion);
+
+            if (!loadCompletion.IsCompleted) retiredExecutions.Add(loadCompletion);
 
             foreach (RunnerToken token in tokens.Values)
             {
                 if (!token.IsExecuting) continue;
+
                 token.NotifyStoppedAfterRetire = true;
                 retiredExecutions.Add(token.ExecutionCompletion.Task);
             }
@@ -456,22 +458,27 @@ namespace Yang.Dialogue
 
         private async Awaitable<RunnerToken> BeginJumpAsync(string key, string nodeName)
         {
-            if (applyingGraphChanges || !tokens.TryGetValue(key, out RunnerToken token) || !runnerNode.CheckNode(nodeName))
-                return null;
+            if (applyingGraphChanges || !tokens.TryGetValue(key, out RunnerToken token) || !runnerNode.CheckNode(nodeName)) return null;
+
             int generation = graphGeneration;
             int request = ++token.JumpRevision;
-            if (!loadCompletion.IsCompleted)
-                await loadCompletion;
+
+            if (!loadCompletion.IsCompleted) await loadCompletion;
+
             if (applyingGraphChanges || generation != graphGeneration || token.JumpRevision != request) return null;
+
             if (!tokens.TryGetValue(key, out RunnerToken active) || !ReferenceEquals(active, token)) return null;
-            if (token.State == TokenState.Running)
-                token.SetState(TokenState.Paused);
-            if (token.IsExecuting)
-                await token.ExecutionCompletion.Task;
-            if (applyingGraphChanges || generation != graphGeneration || token.JumpRevision != request || token.State != TokenState.Paused)
-                return null;
+
+            if (token.State == TokenState.Running) token.SetState(TokenState.Paused);
+
+            if (token.IsExecuting) await token.ExecutionCompletion.Task;
+
+            if (applyingGraphChanges || generation != graphGeneration || token.JumpRevision != request || token.State != TokenState.Paused) return null;
+
             if (!tokens.TryGetValue(key, out RunnerToken current) || !ReferenceEquals(current, token)) return null;
+
             StartDialogue(key, nodeName, token.Views);
+
             return token;
         }
 
@@ -483,8 +490,8 @@ namespace Yang.Dialogue
                 {
                     token.NotifyStoppedAfterRetire = false;
                     token.RefreshView();
-                    foreach (IDialogueView view in token.Views)
-                        view.OnStopped(key);
+
+                    foreach (IDialogueView view in token.Views) view.OnStopped(key);
                 }
 
                 return;
@@ -495,20 +502,23 @@ namespace Yang.Dialogue
             switch (token.State)
             {
                 case TokenState.Paused:
-                    foreach (IDialogueView view in token.Views)
-                        view.OnPaused(key);
+
+                    foreach (IDialogueView view in token.Views) view.OnPaused(key);
+
                     break;
 
                 case TokenState.Stopped:
                     tokens.Remove(key);
-                    foreach (IDialogueView view in token.Views)
-                        view.OnStopped(key);
+
+                    foreach (IDialogueView view in token.Views) view.OnStopped(key);
+
                     break;
 
                 case TokenState.Ended:
                     tokens.Remove(key);
-                    foreach (IDialogueView view in token.Views)
-                        view.OnEnded(key);
+
+                    foreach (IDialogueView view in token.Views) view.OnEnded(key);
+
                     break;
             }
         }

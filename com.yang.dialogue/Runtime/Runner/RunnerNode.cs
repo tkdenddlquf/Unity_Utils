@@ -25,6 +25,7 @@ namespace Yang.Dialogue
         public void SetDatas(DialogueSO so)
         {
             if (so == null) return;
+
             so.GetDatas(nodes, links);
             nodeIndices.Clear();
             runtimeNodes = new NodeData[nodes.Count];
@@ -42,8 +43,8 @@ namespace Yang.Dialogue
             foreach (KeyValuePair<RunnerPort, RunnerPort> pair in links)
             {
                 int sourceIndex = nodeIndices[pair.Key.guid];
-                if (pair.Key.portIndex > maxPortIndices[sourceIndex])
-                    maxPortIndices[sourceIndex] = pair.Key.portIndex;
+
+                if (pair.Key.portIndex > maxPortIndices[sourceIndex]) maxPortIndices[sourceIndex] = pair.Key.portIndex;
             }
 
             runtimeLinks = new int[runtimeNodes.Length][];
@@ -70,16 +71,16 @@ namespace Yang.Dialogue
             {
                 int sourceIndex = nodeIndices[pair.Key.guid];
                 int targetIndex = nodeIndices[pair.Value.guid];
+
                 runtimeLinks[sourceIndex][pair.Key.portIndex] = targetIndex;
             }
 
             for (int i = 0; i < runtimeNodes.Length; i++)
             {
                 NodeData node = runtimeNodes[i];
-                if (node.type == NodeType.Command)
-                    commandCache[i] = CompileCommands(node.OptionDatas);
-                else if (node.type == NodeType.Event)
-                    eventCache[i] = CompileCommands(node.OptionDatas);
+
+                if (node.type == NodeType.Command) commandCache[i] = CompileCommands(node.OptionDatas);
+                else if (node.type == NodeType.Event) eventCache[i] = CompileCommands(node.OptionDatas);
             }
 
             nodes.Clear();
@@ -93,7 +94,9 @@ namespace Yang.Dialogue
             for (int i = 0; i < optionDatas.Count; i++)
             {
                 IReadOnlyList<GenericData> datas = optionDatas[i].data;
+
                 if (datas.Count == 0 || !datas[0].TryGetString(out string id) || string.IsNullOrWhiteSpace(id)) continue;
+
                 int writeIndex = 0;
                 int argumentCount = (datas.Count - 1) / 2;
                 RunnerArgument[] arguments = new RunnerArgument[argumentCount];
@@ -102,11 +105,12 @@ namespace Yang.Dialogue
                 for (int j = 1; j + 1 < datas.Count; j += 2)
                 {
                     if (!datas[j].TryGetInt(out int fieldId) || fieldId <= 0 || !fieldIds.Add(fieldId)) continue;
+
                     arguments[writeIndex++] = new RunnerArgument(fieldId, datas[j + 1]);
                 }
 
-                if (writeIndex != arguments.Length)
-                    System.Array.Resize(ref arguments, writeIndex);
+                if (writeIndex != arguments.Length) System.Array.Resize(ref arguments, writeIndex);
+
                 commands.Add(new RunnerCommand(id, arguments));
             }
 
@@ -134,6 +138,7 @@ namespace Yang.Dialogue
                         for (int i = 0; i < token.Views.Count; i++)
                         {
                             await token.Views[i].OnDialogue(speaker, text, message[0].ToString(), token);
+
                             if (token.State != TokenState.Running) return -1;
                         }
                     }
@@ -158,16 +163,16 @@ namespace Yang.Dialogue
                                             float value = runnerTrigger.GetFloatValue(fieldId);
                                             float checkValue = datas[j + 1].GetFloat();
                                             ValueCheckType type = datas[j + 2].GetEnum<ValueCheckType>();
-                                            if (!CheckValue(value, checkValue, type))
-                                                allExist = false;
+
+                                            if (!CheckValue(value, checkValue, type)) allExist = false;
                                         }
                                         break;
                                     case GenericData.DataType.Bool:
                                         {
                                             bool value = runnerTrigger.GetBoolValue(fieldId);
                                             bool checkValue = datas[j + 1].GetBool();
-                                            if (value != checkValue)
-                                                allExist = false;
+
+                                            if (value != checkValue) allExist = false;
                                         }
                                         break;
                                 }
@@ -187,11 +192,13 @@ namespace Yang.Dialogue
                         {
                             IReadOnlyList<GenericData> datas = optionDatas[i].data;
                             int fieldId = datas[0].GetInt();
+
                             if (fieldId <= 0) continue;
 
                             switch (datas[1].Type)
                             {
                                 case GenericData.DataType.Float:
+
                                     switch (datas[2].GetEnum<ValueSetterType>())
                                     {
                                         case ValueSetterType.Plus:
@@ -228,6 +235,7 @@ namespace Yang.Dialogue
                         for (int i = 0; i < events.Length; i++)
                         {
                             runnerEvent.OnEvent(events[i]);
+
                             if (token.State != TokenState.Running) return -1;
                         }
                     }
@@ -267,8 +275,9 @@ namespace Yang.Dialogue
                                             float checkValue = textEntry[dataIndex + 1].GetFloat();
                                             ValueCheckType type = textEntry[dataIndex + 2].GetEnum<ValueCheckType>();
                                             bool check = CheckValue(value, checkValue, type);
-                                            if (!check)
-                                                isValid = false;
+
+                                            if (!check) isValid = false;
+
                                             conditions[j] = new(fieldId, check, checkValue, type);
                                         }
                                         break;
@@ -277,8 +286,9 @@ namespace Yang.Dialogue
                                             bool value = runnerTrigger.GetBoolValue(fieldId);
                                             bool checkValue = textEntry[dataIndex + 1].GetBool();
                                             bool check = value == checkValue;
-                                            if (!check)
-                                                isValid = false;
+
+                                            if (!check) isValid = false;
+
                                             conditions[j] = new(fieldId, check, checkValue);
                                         }
                                         break;
@@ -286,19 +296,23 @@ namespace Yang.Dialogue
                             }
 
                             if (hide && !isValid) continue;
+
                             choiceDatas.Set(choiceIndex++, new RunnerChoiceText(i, textTableKey, textEntryKey, textTableGuid, textEntry[1].GetLong(), isValid, conditions));
                         }
 
                         choiceDatas.SetCount(choiceIndex);
+
                         if (choiceIndex == 0) return -1;
+
                         int index = -1;
 
                         foreach (IDialogueView view in token.Views)
                         {
                             int result = await view.OnChoice(speaker, choiceDatas, message[0].ToString(), token);
+
                             if (token.State != TokenState.Running) return -1;
-                            if (result >= 0 && result < choiceIndex && choiceDatas[result].isValid)
-                                index = result;
+
+                            if (result >= 0 && result < choiceIndex && choiceDatas[result].isValid) index = result;
                         }
 
                         return index < 0 ? -1 : choiceDatas[index].portIndex;
@@ -306,13 +320,14 @@ namespace Yang.Dialogue
                 case NodeType.Wait:
                     {
                         IReadOnlyList<GenericData> datas = nodeData.OptionDatas[0].data;
-                        if (datas[1].TryGetFloat(out float second))
-                            await token.Delay(second);
+
+                        if (datas[1].TryGetFloat(out float second)) await token.Delay(second);
                         else
                         {
                             for (int i = 0; i < token.Views.Count; i++)
                             {
                                 await token.Views[i].OnMessage(datas[1].ToString(), token);
+
                                 if (token.State != TokenState.Running) return -1;
                             }
                         }
@@ -325,6 +340,7 @@ namespace Yang.Dialogue
                         for (int i = 0; i < token.Views.Count; i++)
                         {
                             await token.Views[i].OnCommand(commands, token);
+
                             if (token.State != TokenState.Running) return -1;
                         }
                     }
@@ -349,6 +365,7 @@ namespace Yang.Dialogue
         public bool CheckNode(string nodeName)
         {
             if (string.IsNullOrEmpty(nodeName) || !nodeIndices.ContainsKey(nodeName)) return false;
+
             return true;
         }
 
@@ -367,6 +384,7 @@ namespace Yang.Dialogue
             }
 
             targetIndex = portLinks[portIndex];
+
             return targetIndex >= 0;
         }
 
@@ -375,22 +393,34 @@ namespace Yang.Dialogue
             switch (type)
             {
                 case ValueCheckType.Less:
+
                     if (value >= checkValue) return false;
+
                     break;
                 case ValueCheckType.Equal:
+
                     if (!Mathf.Approximately(checkValue, value)) return false;
+
                     break;
                 case ValueCheckType.LessEqual:
+
                     if (value > checkValue) return false;
+
                     break;
                 case ValueCheckType.Greater:
+
                     if (value <= checkValue) return false;
+
                     break;
                 case ValueCheckType.NotEqual:
+
                     if (Mathf.Approximately(checkValue, value)) return false;
+
                     break;
                 case ValueCheckType.GreaterEqual:
+
                     if (value < checkValue) return false;
+
                     break;
             }
 

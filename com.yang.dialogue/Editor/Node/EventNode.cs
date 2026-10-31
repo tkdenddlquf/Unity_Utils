@@ -12,6 +12,7 @@ namespace Yang.Dialogue.Editor
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             if (evt.target != this) return;
+
             evt.menu.AppendAction("Add Event", _ => CreateCommand());
             evt.menu.AppendSeparator();
         }

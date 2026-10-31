@@ -10,12 +10,14 @@ namespace Yang.Dialogue.Editor
         public static void SetTables(this IReadOnlyList<LocalizationTableCollection> collections, List<string> tables)
         {
             tables.Clear();
+
             if (collections == null) return;
 
             foreach (LocalizationTableCollection collection in collections)
             {
                 string tableName = collection.TableCollectionName;
                 string group = collection.Group;
+
                 tables.Add(string.IsNullOrEmpty(group) ? tableName : $"{group}/{tableName}");
             }
         }
@@ -24,32 +26,37 @@ namespace Yang.Dialogue.Editor
         {
             ids.Clear();
             ids.Add(Guid.Empty);
-            foreach (LocalizationTableCollection collection in collections)
-                ids.Add(collection.TableCollectionNameReference.TableCollectionNameGuid);
+
+            foreach (LocalizationTableCollection collection in collections) ids.Add(collection.TableCollectionNameReference.TableCollectionNameGuid);
         }
 
-        public static LocalizationTableCollection ResolveCollection(this IReadOnlyList<LocalizationTableCollection> collections,
-            string name, Guid guid, long entryId = 0, string entryKey = null)
+        public static LocalizationTableCollection ResolveCollection(this IReadOnlyList<LocalizationTableCollection> collections, string name, Guid guid, long entryId = 0, string entryKey = null)
         {
             foreach (LocalizationTableCollection collection in collections)
-                if (guid != Guid.Empty && collection.TableCollectionNameReference.TableCollectionNameGuid == guid)
-                    return collection;
+
+                if (guid != Guid.Empty && collection.TableCollectionNameReference.TableCollectionNameGuid == guid) return collection;
+
             foreach (LocalizationTableCollection collection in collections)
+
                 if (!string.IsNullOrEmpty(name) && collection.TableCollectionName == name) return collection;
+
             LocalizationTableCollection match = FindUniqueEntryCollection(collections, entryId, null);
+
             return match ?? FindUniqueEntryCollection(collections, 0, entryKey);
         }
 
         private static LocalizationTableCollection FindUniqueEntryCollection(IReadOnlyList<LocalizationTableCollection> collections, long id, string key)
         {
             if (id == 0 && string.IsNullOrEmpty(key)) return null;
+
             LocalizationTableCollection match = null;
 
             foreach (LocalizationTableCollection collection in collections)
             {
-                if (id != 0 ? collection.SharedData.GetEntry(id) == null : collection.SharedData.GetEntry(key) == null)
-                    continue;
+                if (id != 0 ? collection.SharedData.GetEntry(id) == null : collection.SharedData.GetEntry(key) == null) continue;
+
                 if (match != null) return null;
+
                 match = collection;
             }
 
@@ -59,12 +66,14 @@ namespace Yang.Dialogue.Editor
         public static SharedTableData.SharedTableEntry ResolveEntry(this LocalizationTableCollection collection, long id, string key)
         {
             SharedTableData.SharedTableEntry entry = id != 0 ? collection.SharedData.GetEntry(id) : null;
+
             return entry ?? (string.IsNullOrEmpty(key) ? null : collection.SharedData.GetEntry(key));
         }
 
         public static void SetEntries(this LocalizationTableCollection collection, List<EntryData> entries)
         {
             entries.Clear();
+
             if (collection == null) return;
 
             foreach (SharedTableData.SharedTableEntry current in collection.SharedData.Entries)

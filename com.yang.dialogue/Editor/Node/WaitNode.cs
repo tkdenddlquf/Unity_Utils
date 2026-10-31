@@ -44,6 +44,7 @@ namespace Yang.Dialogue.Editor
                 EnumField typeField = GetTypeField(eResult);
                 FloatField secondsField = GetSecondsField(optionData[1].GetFloat());
                 TextField eventField = GetReasonField(optionData[1].ToString());
+
                 extensionContainer.Add(typeField);
                 extensionContainer.Add(secondsField);
                 extensionContainer.Add(eventField);
@@ -100,6 +101,7 @@ namespace Yang.Dialogue.Editor
             EnumField field = new("Type", waitType);
             field.AddToClassList("dlg-field");
             field.RegisterValueChangedCallback(ChangedCallback);
+
             return field;
         }
 
@@ -108,6 +110,7 @@ namespace Yang.Dialogue.Editor
             FloatField field = new("Seconds") { value = data };
             field.AddToClassList("dlg-field");
             field.RegisterValueChangedCallback(ChangedCallback);
+
             return field;
         }
 
@@ -116,6 +119,7 @@ namespace Yang.Dialogue.Editor
             TextField field = new("Reason") { value = data };
             field.AddToClassList("dlg-field");
             field.RegisterValueChangedCallback(ChangedCallback);
+
             return field;
         }
 

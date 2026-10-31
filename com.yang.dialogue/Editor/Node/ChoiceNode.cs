@@ -47,6 +47,7 @@ namespace Yang.Dialogue.Editor
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             if (evt.target != this) return;
+
             DropdownMenu menu = evt.menu;
             menu.AppendAction("Add Choice Port", _ => CreateTextEntry());
             menu.AppendSeparator();
@@ -70,8 +71,9 @@ namespace Yang.Dialogue.Editor
                 {
                     TableReference reference = speakerOverride.TableReference;
                     System.Guid guid = reference.TableCollectionNameGuid;
-                    if (guid == System.Guid.Empty)
-                        guid = collections.ResolveCollection(reference.TableCollectionName, guid)?.TableCollectionNameReference.TableCollectionNameGuid ?? guid;
+
+                    if (guid == System.Guid.Empty) guid = collections.ResolveCollection(reference.TableCollectionName, guid)?.TableCollectionNameReference.TableCollectionNameGuid ?? guid;
+
                     speakerTable = new(new(reference.TableCollectionName), new(guid));
                 }
 
@@ -83,21 +85,22 @@ namespace Yang.Dialogue.Editor
                 {
                     TableReference reference = textOverride.TableReference;
                     System.Guid guid = reference.TableCollectionNameGuid;
-                    if (guid == System.Guid.Empty)
-                        guid = collections.ResolveCollection(reference.TableCollectionName, guid)?.TableCollectionNameReference.TableCollectionNameGuid ?? guid;
+
+                    if (guid == System.Guid.Empty) guid = collections.ResolveCollection(reference.TableCollectionName, guid)?.TableCollectionNameReference.TableCollectionNameGuid ?? guid;
+
                     textTable = new(new(reference.TableCollectionName), new(guid));
                 }
 
                 DataWrapper speakerEntry = new(new(GenericData.DataType.String), new(GenericData.DataType.Long));
                 DataWrapper message = new(new GenericData(GenericData.DataType.String));
+
                 optionDatas.Add(speakerTable);
                 optionDatas.Add(speakerEntry);
                 optionDatas.Add(textTable);
                 optionDatas.Add(message);
             }
 
-            if (portDatas.Count == 0)
-                portDatas.Add(new(new(GenericData.DataType.String), new(GenericData.DataType.Long), new(GenericData.DataType.Bool)));
+            if (portDatas.Count == 0) portDatas.Add(new(new(GenericData.DataType.String), new(GenericData.DataType.Long), new(GenericData.DataType.Bool)));
         }
 
         private void SetOptions()
@@ -113,8 +116,8 @@ namespace Yang.Dialogue.Editor
                 IReadOnlyList<GenericData> portOptions = portDatas[i].data;
                 VisualElement itemContainer = AddTextEntryField(portDatas[i].data);
                 Toggle hide = itemContainer.FindParent<Port>().Q<Toggle>("Hide");
-                if (portOptions.Count > 3)
-                    hide.style.display = DisplayStyle.Flex;
+
+                if (portOptions.Count > 3) hide.style.display = DisplayStyle.Flex;
                 else hide.style.display = DisplayStyle.None;
 
                 for (int j = 3; j < portOptions.Count; j += 3)
@@ -127,6 +130,7 @@ namespace Yang.Dialogue.Editor
                             {
                                 float value = portOptions[j + 1].GetFloat();
                                 ValueCheckType type = portOptions[j + 2].GetEnum<ValueCheckType>();
+
                                 itemContainer.Add(GetConditionFloatField(fieldId, value, type));
                             }
                             break;
@@ -153,6 +157,7 @@ namespace Yang.Dialogue.Editor
             field.RegisterValueChangedCallback(evt => OnPreviewChanged(field, evt.newValue));
             field.AddToClassList("dlg-preview");
             textsElement.Add(field);
+
             return field;
         }
 
@@ -160,7 +165,9 @@ namespace Yang.Dialogue.Editor
         {
             bool speaker = field.name == "Speaker Text";
             int index = textsElement.IndexOf(field) - 1;
+
             if (!speaker && (index < 0 || index >= portDatas.Count)) return;
+
             List<GenericData> table = optionDatas[speaker ? 0 : 2].data;
             List<GenericData> entry = speaker ? optionDatas[1].data : portDatas[index].data;
 
@@ -175,9 +182,12 @@ namespace Yang.Dialogue.Editor
         {
             bool speaker = field.name == "Speaker Text";
             int index = textsElement.IndexOf(field) - 1;
+
             if (!speaker && (index < 0 || index >= portDatas.Count)) return;
+
             List<GenericData> tableData = optionDatas[speaker ? 0 : 2].data;
             List<GenericData> entryData = speaker ? optionDatas[1].data : portDatas[index].data;
+
             field.isReadOnly = !window.CanEditLocalizedText(tableData, entryData);
         }
 
@@ -185,8 +195,7 @@ namespace Yang.Dialogue.Editor
         {
             for (int i = 0; i < textsElement.childCount; i++)
             {
-                if (textsElement[i] is TextField field)
-                    RefreshPreview(field);
+                if (textsElement[i] is TextField field) RefreshPreview(field);
             }
         }
 
@@ -205,8 +214,9 @@ namespace Yang.Dialogue.Editor
         private static List<long> GetEntryIds(List<EntryData> entries)
         {
             List<long> ids = new() { 0 };
-            foreach (EntryData entry in entries)
-                ids.Add(entry.id);
+
+            foreach (EntryData entry in entries) ids.Add(entry.id);
+
             return ids;
         }
 
@@ -214,13 +224,16 @@ namespace Yang.Dialogue.Editor
         {
             long id = data[1].GetLong();
             int index = id != 0 ? entries.FindIndex(entry => entry.id == id) : -1;
+
             return index >= 0 ? index : entries.FindIndex(entry => entry.key == data[0].ToString());
         }
 
         private string FormatEntry(bool speaker, long id)
         {
             if (id == 0) return "";
+
             EntryData entry = (speaker ? speakerEntries : textEntries).Find(value => value.id == id);
+
             return entry.key ?? "";
         }
 
@@ -231,6 +244,7 @@ namespace Yang.Dialogue.Editor
             int index = GetTableIndex(optionData[0].ToString(), optionData[1].GetGuid());
             string name = speaker ? "Speaker Table" : "Text Table";
             PopupField<System.Guid> field = new(name, tableIds, index + 1) { name = name, formatSelectedValueCallback = FormatTable, formatListItemCallback = FormatTable };
+
             field.AddToClassList("dlg-field");
             field.RegisterValueChangedCallback(ChangedCallback);
             field.RegisterCallback<KeyDownEvent>(OnTableKeyDownEvent);
@@ -240,21 +254,22 @@ namespace Yang.Dialogue.Editor
             {
                 LocalizationTableCollection collection = collections[index];
                 List<EntryData> entries = speaker ? speakerEntries : textEntries;
+
                 window.GetEntriesInto(collection, entries);
 
                 if (speaker)
                 {
                     PopupField<long> updatedField = extensionContainer.Q<PopupField<long>>("Speaker Entry");
-                    if (updatedField != null)
-                        updatedField.choices = GetEntryIds(entries);
+
+                    if (updatedField != null) updatedField.choices = GetEntryIds(entries);
                 }
                 else
                 {
                     for (int i = 0; i < outputContainer.childCount; i++)
                     {
                         PopupField<long> updatedField = outputContainer[i].Q<PopupField<long>>("Text Entry");
-                        if (updatedField != null)
-                            updatedField.choices = GetEntryIds(entries);
+
+                        if (updatedField != null) updatedField.choices = GetEntryIds(entries);
                     }
                 }
             }
@@ -263,14 +278,18 @@ namespace Yang.Dialogue.Editor
         private string FormatTable(System.Guid id)
         {
             int index = tableIds.IndexOf(id) - 1;
+
             return index >= 0 ? tables[index] : "";
         }
 
         private int GetTableIndex(string value, System.Guid guid)
         {
             LocalizationTableCollection match = collections.ResolveCollection(value, guid);
+
             for (int i = 0; i < collections.Count; i++)
+
                 if (collections[i] == match) return i;
+
             return -1;
         }
 
@@ -279,10 +298,13 @@ namespace Yang.Dialogue.Editor
             if (evt.keyCode == KeyCode.Delete)
             {
                 PopupField<System.Guid> field = evt.target.FindParentInCurrent<PopupField<System.Guid>>();
+
                 if (field == null) return;
+
                 DialogueSO so = window.SO;
                 bool speaker = field.name == "Speaker Table";
                 List<GenericData> tableOptionData = optionDatas[speaker ? 0 : 2].data;
+
                 Undo.RecordObject(so, "Delete Table Option");
 
                 if (speaker)
@@ -314,10 +336,10 @@ namespace Yang.Dialogue.Editor
                         entryOptionData[0] = new(GenericData.DataType.String);
                         entryOptionData[1] = new(GenericData.DataType.Long);
                         PopupField<long> entryField = outputContainer[i].Q<PopupField<long>>("Text Entry");
-                        if (entryField != null)
-                            entryField.SetValueWithoutNotify(0);
-                        if (textsElement[i + 1] is TextField textField)
-                            textField.SetValueWithoutNotify("");
+
+                        if (entryField != null) entryField.SetValueWithoutNotify(0);
+
+                        if (textsElement[i + 1] is TextField textField) textField.SetValueWithoutNotify("");
                     }
 
                     textEntries.Clear();
@@ -342,6 +364,7 @@ namespace Yang.Dialogue.Editor
                 VisualElement target = evt.target as VisualElement;
                 bool speaker = target.name == "Speaker Table";
                 LocalizationTableCollection collection = collections[index];
+
                 Undo.RecordObject(so, "Change Table");
                 List<GenericData> optionData = optionDatas[speaker ? 0 : 2].data;
 
@@ -376,10 +399,10 @@ namespace Yang.Dialogue.Editor
                             entryOptionData[0] = new(GenericData.DataType.String);
                             entryOptionData[1] = new(GenericData.DataType.Long);
                             PopupField<long> entryField = outputContainer[i].Q<PopupField<long>>("Text Entry");
-                            if (entryField != null)
-                                entryField.SetValueWithoutNotify(0);
-                            if (textsElement[i + 1] is TextField textField)
-                                textField.SetValueWithoutNotify("");
+
+                            if (entryField != null) entryField.SetValueWithoutNotify(0);
+
+                            if (textsElement[i + 1] is TextField textField) textField.SetValueWithoutNotify("");
                         }
 
                         textEntries.Clear();
@@ -392,16 +415,16 @@ namespace Yang.Dialogue.Editor
                 if (speaker)
                 {
                     PopupField<long> updatedField = extensionContainer.Q<PopupField<long>>("Speaker Entry");
-                    if (updatedField != null)
-                        updatedField.choices = GetEntryIds(entries);
+
+                    if (updatedField != null) updatedField.choices = GetEntryIds(entries);
                 }
                 else
                 {
                     for (int i = 0; i < outputContainer.childCount; i++)
                     {
                         PopupField<long> updatedField = outputContainer[i].Q<PopupField<long>>("Text Entry");
-                        if (updatedField != null)
-                            updatedField.choices = GetEntryIds(entries);
+
+                        if (updatedField != null) updatedField.choices = GetEntryIds(entries);
                     }
                 }
 
@@ -449,9 +472,12 @@ namespace Yang.Dialogue.Editor
             if (evt.keyCode == KeyCode.Delete)
             {
                 PopupField<long> field = evt.target.FindParentInCurrent<PopupField<long>>();
+
                 if (field == null) return;
+
                 DialogueSO so = window.SO;
                 List<GenericData> optionData;
+
                 Undo.RecordObject(so, "Delete Entry Option");
 
                 if (field.name == "Speaker Entry")
@@ -469,9 +495,10 @@ namespace Yang.Dialogue.Editor
                 {
                     Port port = evt.target.FindParent<Port>();
                     int index = port.parent.IndexOf(port);
+
                     optionData = portDatas[index].data;
-                    if (textsElement[index + 1] is TextField textField)
-                        textField.SetValueWithoutNotify("");
+
+                    if (textsElement[index + 1] is TextField textField) textField.SetValueWithoutNotify("");
                 }
 
                 field.SetValueWithoutNotify(0);
@@ -491,6 +518,7 @@ namespace Yang.Dialogue.Editor
             {
                 DialogueSO so = window.SO;
                 List<GenericData> optionData = optionDatas[1].data;
+
                 Undo.RecordObject(so, "Change Speaker Entry");
                 EntryData entryData = speakerEntries[index];
                 optionData[0] = new(entryData.key);
@@ -514,11 +542,7 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
             Undo.RecordObject(so, "Create Choice Entry");
-            DataWrapper portOption = new(
-                new(GenericData.DataType.String),
-                new(GenericData.DataType.Long),
-                new(GenericData.DataType.Bool)
-            );
+            DataWrapper portOption = new(new(GenericData.DataType.String), new(GenericData.DataType.Long), new(GenericData.DataType.Bool));
             AddTextEntryField(portOption.data);
             portDatas.Add(portOption);
             RefreshExpandedState();
@@ -537,6 +561,7 @@ namespace Yang.Dialogue.Editor
             VisualElement itemContainer = new();
             VisualElement buttonContainer = new();
             VisualElement line = new();
+
             portElement.AddToClassList("dlg-port-row");
             groupContainer.AddToClassList("dlg-port-col");
             entryContainer.AddToClassList("dlg-port-entry");
@@ -565,8 +590,8 @@ namespace Yang.Dialogue.Editor
                     CreateConditionField(itemContainer, fieldId, type))) { text = "+" };
             Button removeButton = new(() =>
             {
-                if (RemovePort(port))
-                    textsElement.Remove(textField);
+                if (RemovePort(port)) textsElement.Remove(textField);
+
             })
             { text = "X" };
             entryContainer.Add(field);
@@ -591,15 +616,14 @@ namespace Yang.Dialogue.Editor
             }
 
             RefreshPreview(textField);
+
             return itemContainer;
         }
 
         private void CreateConditionField(VisualElement itemContainer, int fieldId, System.Type type)
         {
-            if (type == typeof(float))
-                CreateConditionFloatField(itemContainer, fieldId);
-            else if (type == typeof(bool))
-                CreateConditionBoolField(itemContainer, fieldId);
+            if (type == typeof(float)) CreateConditionFloatField(itemContainer, fieldId);
+            else if (type == typeof(bool)) CreateConditionBoolField(itemContainer, fieldId);
         }
 
         private void RemoveConditionField(VisualElement itemElement)
@@ -633,14 +657,18 @@ namespace Yang.Dialogue.Editor
             if (evt.keyCode == KeyCode.Delete)
             {
                 PopupField<string> field = evt.target.FindParentInCurrent<PopupField<string>>();
+
                 if (field == null) return;
+
                 DialogueSO so = window.SO;
                 VisualElement itemElement = field.FindParent<VisualElement>("Item Element");
                 Port port = itemElement.FindParent<Port>();
+
                 Undo.RecordObject(so, "Delete Condition Option");
                 field.value = "";
                 int portIndex = port.parent.IndexOf(port);
                 int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3;
+
                 portDatas[portIndex].data[itemIndex] = new(GenericData.DataType.Int);
                 EditorUtility.SetDirty(so);
                 window.SetUnsaved();
@@ -652,6 +680,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             Port port = evt.target.FindParent<Port>();
             int portIndex = port.parent.IndexOf(port);
+
             Undo.RecordObject(so, "Change Text Entry");
             portDatas[portIndex].data[2] = new(evt.newValue);
             EditorUtility.SetDirty(so);
@@ -667,9 +696,11 @@ namespace Yang.Dialogue.Editor
                 DialogueSO so = window.SO;
                 Port port = evt.target.FindParent<Port>();
                 int portIndex = port.parent.IndexOf(port);
+
                 Undo.RecordObject(so, "Change Text Entry");
                 List<GenericData> portData = portDatas[portIndex].data;
                 EntryData entryData = textEntries[index];
+
                 portData[0] = new(entryData.key);
                 portData[1] = new(entryData.id);
                 TextField textField = textsElement.Query<TextField>("Text Text").AtIndex(portIndex);
@@ -692,6 +723,7 @@ namespace Yang.Dialogue.Editor
             Port port = itemElement.FindParent<Port>();
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3;
+
             Undo.RecordObject(so, "Change Condition Option");
             List<GenericData> data = portDatas[portIndex].data;
             int fieldId = DialogueVariableSchemaUtility.GetFieldId(evt.newValue);
@@ -703,21 +735,16 @@ namespace Yang.Dialogue.Editor
                 data[itemIndex] = new GenericData(fieldId);
                 data[itemIndex + 1] = new GenericData(0f);
                 data[itemIndex + 2] = new GenericData(ValueCheckType.Less);
-                ReplaceConditionRow(itemElement, (itemIndex - 3) / 3,
-                    GetConditionFloatField(fieldId, 0f, ValueCheckType.Less));
+                ReplaceConditionRow(itemElement, (itemIndex - 3) / 3, GetConditionFloatField(fieldId, 0f, ValueCheckType.Less));
             }
             else if (selectedType == typeof(bool) && currentType != GenericData.DataType.Bool)
             {
                 data[itemIndex] = new GenericData(fieldId);
                 data[itemIndex + 1] = new GenericData(false);
                 data[itemIndex + 2] = new GenericData(GenericData.DataType.Enum);
-                ReplaceConditionRow(itemElement, (itemIndex - 3) / 3,
-                    GetConditionBoolField(fieldId, false));
+                ReplaceConditionRow(itemElement, (itemIndex - 3) / 3, GetConditionBoolField(fieldId, false));
             }
-            else
-            {
-                data[itemIndex] = new(fieldId);
-            }
+            else data[itemIndex] = new(fieldId);
 
             EditorUtility.SetDirty(so);
             window.SetUnsaved();
@@ -738,6 +765,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             int portIndex = port.parent.IndexOf(port);
             List<GenericData> portData = portDatas[portIndex].data;
+
             Undo.RecordObject(so, "Add Condition Float Field");
             itemContainer.Add(GetConditionFloatField(fieldId, 0, ValueCheckType.Less));
             portData.Add(new(fieldId));
@@ -756,6 +784,7 @@ namespace Yang.Dialogue.Editor
             DialogueVariableSchemaUtility.GetKeys(conditions);
             int index = conditions.IndexOf(DialogueVariableSchemaUtility.GetLabel(fieldId));
             PopupField<string> field = new("Variable", conditions, index);
+
             field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedConditionCallback);
             field.RegisterCallback<KeyDownEvent>(OnConditionKeyDownEvent);
@@ -770,6 +799,7 @@ namespace Yang.Dialogue.Editor
             itemElement.Add(floatField);
             itemElement.Add(typeField);
             itemElement.Add(remove);
+
             return itemElement;
         }
 
@@ -780,6 +810,7 @@ namespace Yang.Dialogue.Editor
             Port port = itemElement.FindParent<Port>();
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3 + 1;
+
             Undo.RecordObject(so, "Change Condition Float Option");
             portDatas[portIndex].data[itemIndex] = new(evt.newValue);
             EditorUtility.SetDirty(so);
@@ -793,6 +824,7 @@ namespace Yang.Dialogue.Editor
             Port port = itemElement.FindParent<Port>();
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3 + 2;
+
             Undo.RecordObject(so, "Change Condition Type Option");
             portDatas[portIndex].data[itemIndex] = new(evt.newValue);
             EditorUtility.SetDirty(so);
@@ -807,6 +839,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             int portIndex = port.parent.IndexOf(port);
             List<GenericData> portData = portDatas[portIndex].data;
+
             Undo.RecordObject(so, "Add Condition Bool Field");
             itemContainer.Add(GetConditionBoolField(fieldId, false));
             portData.Add(new(fieldId));
@@ -825,6 +858,7 @@ namespace Yang.Dialogue.Editor
             DialogueVariableSchemaUtility.GetKeys(conditions);
             int index = conditions.IndexOf(DialogueVariableSchemaUtility.GetLabel(fieldId));
             PopupField<string> field = new("Variable", conditions, index);
+
             field.AddToClassList("dlg-grow");
             field.RegisterValueChangedCallback(ChangedConditionCallback);
             field.RegisterCallback<KeyDownEvent>(OnConditionKeyDownEvent);
@@ -834,6 +868,7 @@ namespace Yang.Dialogue.Editor
             itemElement.Add(field);
             itemElement.Add(toggle);
             itemElement.Add(remove);
+
             return itemElement;
         }
 
@@ -844,6 +879,7 @@ namespace Yang.Dialogue.Editor
             Port port = itemElement.FindParent<Port>();
             int portIndex = port.parent.IndexOf(port);
             int itemIndex = 3 + itemElement.parent.IndexOf(itemElement) * 3 + 1;
+
             Undo.RecordObject(so, "Change Condition Bool Option");
             portDatas[portIndex].data[itemIndex] = new(evt.newValue);
             EditorUtility.SetDirty(so);
@@ -866,6 +902,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
             List<GenericData> optionData = optionDatas[3].data;
             TextField field = new("Message") { value = optionData[0].ToString() };
+
             field.AddToClassList("dlg-field");
             field.RegisterValueChangedCallback(MessageChangedCallback);
             extensionContainer.Add(field);

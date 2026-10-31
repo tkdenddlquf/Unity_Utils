@@ -14,6 +14,7 @@ namespace Yang.Dialogue.Editor
             Button button = new(Open) { text = "Edit" };
             Button exportButton = new(ExportCsv) { text = "Export CSV" };
             Button importButton = new(ImportCsv) { text = "Import CSV" };
+
             root.Bind(serializedObject);
             root.Add(GetHeader("Override Settings"));
             root.Add(GetField("speakerTable"));
@@ -23,15 +24,20 @@ namespace Yang.Dialogue.Editor
             root.Add(exportButton);
             root.Add(importButton);
             serializedObject.ApplyModifiedProperties();
+
             return root;
         }
 
         private void ExportCsv()
         {
             DialogueSO so = target as DialogueSO;
+
             if (so == null) return;
+
             string path = EditorUtility.SaveFilePanel("Export Dialogue CSV", "", so.name + ".csv", "csv");
+
             if (string.IsNullOrEmpty(path)) return;
+
             string csv = DialogueCsvExporter.Export(so);
             System.IO.File.WriteAllText(path, csv, new System.Text.UTF8Encoding(true));
             EditorUtility.RevealInFinder(path);
@@ -40,9 +46,13 @@ namespace Yang.Dialogue.Editor
         private void ImportCsv()
         {
             DialogueSO so = target as DialogueSO;
+
             if (so == null) return;
+
             string path = EditorUtility.OpenFilePanel("Import Dialogue CSV", "", "csv");
+
             if (string.IsNullOrEmpty(path)) return;
+
             string csv = System.IO.File.ReadAllText(path);
 
             if (!DialogueCsvImporter.Preview(so, csv, out string preview))
@@ -57,8 +67,8 @@ namespace Yang.Dialogue.Editor
             {
                 DialogueEditorWindow window = DialogueEditorWindow.Open();
                 window.SO = so;
-                if (!string.IsNullOrEmpty(message))
-                    EditorUtility.DisplayDialog("Import Complete", message, "OK");
+
+                if (!string.IsNullOrEmpty(message)) EditorUtility.DisplayDialog("Import Complete", message, "OK");
             }
             else EditorUtility.DisplayDialog("Import Failed", message, "OK");
         }
@@ -76,12 +86,14 @@ namespace Yang.Dialogue.Editor
             header.style.fontSize = 14;
             header.style.marginTop = 6;
             header.style.marginBottom = 4;
+
             return header;
         }
 
         private PropertyField GetField(string propName)
         {
             SerializedProperty prop = serializedObject.FindProperty(propName);
+
             return new(prop);
         }
     }

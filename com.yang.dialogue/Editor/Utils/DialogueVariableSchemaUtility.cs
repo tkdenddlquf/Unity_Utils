@@ -34,6 +34,7 @@ namespace Yang.Dialogue.Editor
         private static void Ensure()
         {
             if (variables != null) return;
+
             variables = new List<Variable>();
             HashSet<int> fieldIds = new();
 
@@ -42,6 +43,7 @@ namespace Yang.Dialogue.Editor
                 foreach (FieldInfo field in type.GetFields(BindingFlags.Instance | BindingFlags.Public))
                 {
                     if (field.IsStatic || (field.FieldType != typeof(float) && field.FieldType != typeof(bool))) continue;
+
                     DialogueVariableAttribute attribute = field.GetCustomAttribute<DialogueVariableAttribute>();
 
                     if (attribute == null || attribute.FieldId <= 0 || !fieldIds.Add(attribute.FieldId))
@@ -72,8 +74,7 @@ namespace Yang.Dialogue.Editor
 
             foreach (Variable variable in variables)
             {
-                if (variable.type == valueType)
-                    target.Add(GetDisplayLabel(variable));
+                if (variable.type == valueType) target.Add(GetDisplayLabel(variable));
             }
         }
 
@@ -82,8 +83,8 @@ namespace Yang.Dialogue.Editor
             Ensure();
             target.Clear();
             target.Add("");
-            foreach (Variable variable in variables)
-                target.Add(GetDisplayLabel(variable));
+
+            foreach (Variable variable in variables) target.Add(GetDisplayLabel(variable));
         }
 
         public static Type GetValueType(int fieldId)
@@ -102,8 +103,9 @@ namespace Yang.Dialogue.Editor
         {
             Ensure();
             List<VariableInfo> result = new(variables.Count);
-            foreach (Variable variable in variables)
-                result.Add(new VariableInfo(variable.fieldId, GetDisplayLabel(variable), variable.type));
+
+            foreach (Variable variable in variables) result.Add(new VariableInfo(variable.fieldId, GetDisplayLabel(variable), variable.type));
+
             return result;
         }
 

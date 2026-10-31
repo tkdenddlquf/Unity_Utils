@@ -34,10 +34,12 @@ namespace Yang.Dialogue.Editor
         {
             DialogueSO so = window.SO;
             NodeData data = window.GetNode(GUID);
+
             Undo.RecordObject(so, "Node Expended Change");
             data.expended = !data.expended;
-            if (data.expended)
-                EnsureExtension();
+
+            if (data.expended) EnsureExtension();
+
             SetExpendedWithoutNotify(data.expended);
             window.SetNode(GUID, data);
             EditorUtility.SetDirty(so);
@@ -51,6 +53,7 @@ namespace Yang.Dialogue.Editor
         public void EnsureExtension()
         {
             if (extensionBuilt) return;
+
             extensionBuilt = true;
             BuildExtension();
             RefreshExpandedState();
@@ -76,6 +79,7 @@ namespace Yang.Dialogue.Editor
             port.portName = "Input";
             AddPortAccent(port);
             inputContainer.Add(port);
+
             return port;
         }
 
@@ -83,9 +87,11 @@ namespace Yang.Dialogue.Editor
         {
             Port port = InstantiatePort(Orientation.Horizontal, Direction.Output, Port.Capacity.Single, typeof(bool));
             port.portName = "Output";
-            if (accent)
-                AddPortAccent(port);
+
+            if (accent) AddPortAccent(port);
+
             outputContainer.Add(port);
+
             return port;
         }
 
@@ -96,6 +102,7 @@ namespace Yang.Dialogue.Editor
             line.AddToClassList("dlg-port-line--cap");
             VisualElement connector = port.Q("connector");
             int index = connector != null && port.IndexOf(connector) >= 0 ? port.IndexOf(connector) + 1 : 1;
+
             port.Insert(index, line);
             RegisterPortJump(line, port);
         }
@@ -107,9 +114,11 @@ namespace Yang.Dialogue.Editor
             bar.RegisterCallback<MouseDownEvent>(evt =>
             {
                 if (evt.clickCount < 2) return;
+
                 string target = NextConnectedGuid(port, ref cycle);
-                if (!string.IsNullOrEmpty(target))
-                    window.FocusNode(target);
+
+                if (!string.IsNullOrEmpty(target)) window.FocusNode(target);
+
                 evt.StopPropagation();
             });
         }
@@ -134,13 +143,14 @@ namespace Yang.Dialogue.Editor
 
             for (int i = 0; i < links.Count; i++)
             {
-                if (links[i].targetGuid == GUID)
-                    sources.Add(links[i].nodeGuid);
+                if (links[i].targetGuid == GUID) sources.Add(links[i].nodeGuid);
             }
 
             if (sources.Count == 0) return "";
+
             int pick = cycle % sources.Count;
             cycle = (cycle + 1) % sources.Count;
+
             return sources[pick];
         }
 
@@ -152,14 +162,16 @@ namespace Yang.Dialogue.Editor
             {
                 int portIndex = port.parent.IndexOf(port);
                 List<LinkData> links = window.Links;
+
                 Undo.RecordObject(so, "Remove Port");
 
                 for (int i = links.Count - 1; i >= 0; i--)
                 {
                     LinkData link = links[i];
+
                     if (link.nodeGuid != GUID) continue;
-                    if (link.outPortIndex == portIndex)
-                        links.RemoveAt(i);
+
+                    if (link.outPortIndex == portIndex) links.RemoveAt(i);
                     else if (link.outPortIndex > portIndex)
                     {
                         link.outPortIndex--;
@@ -187,11 +199,11 @@ namespace Yang.Dialogue.Editor
             for (int i = 0; i < links.Count; i++)
             {
                 LinkData link = links[i];
+
                 if (link.nodeGuid != GUID) continue;
-                if (link.outPortIndex == a)
-                    link.outPortIndex = b;
-                else if (link.outPortIndex == b)
-                    link.outPortIndex = a;
+
+                if (link.outPortIndex == a) link.outPortIndex = b;
+                else if (link.outPortIndex == b) link.outPortIndex = a;
                 else continue;
                 links[i] = link;
             }
@@ -222,6 +234,7 @@ namespace Yang.Dialogue.Editor
 
                     string oldGuid = GUID;
                     NodeData data = window.GetNode(oldGuid);
+
                     Undo.RecordObject(so, "Change GUID");
                     data.guid = evt.newValue;
                     window.SetNode(oldGuid, data);
@@ -244,8 +257,7 @@ namespace Yang.Dialogue.Editor
                             changed = true;
                         }
 
-                        if (changed)
-                            links[i] = link;
+                        if (changed) links[i] = link;
                     }
 
                     GUID = data.guid;

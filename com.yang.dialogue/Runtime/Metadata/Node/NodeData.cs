@@ -42,10 +42,10 @@ namespace Yang.Dialogue
             type = data.type;
             portDatas = new();
             optionDatas = new();
-            foreach (DataWrapper datas in data.portDatas)
-                portDatas.Add(new(datas));
-            foreach (DataWrapper datas in data.optionDatas)
-                optionDatas.Add(new(datas));
+
+            foreach (DataWrapper datas in data.portDatas) portDatas.Add(new(datas));
+
+            foreach (DataWrapper datas in data.optionDatas) optionDatas.Add(new(datas));
 
 #if UNITY_EDITOR
             position = data.position;
@@ -59,6 +59,7 @@ namespace Yang.Dialogue
             NodeData copy = this;
             copy.portDatas = CopyWrappers(portDatas);
             copy.optionDatas = CopyWrappers(optionDatas);
+
             return copy;
         }
 
@@ -69,14 +70,16 @@ namespace Yang.Dialogue
             hash.Add(type);
             AddWrappersHash(ref hash, portDatas);
             AddWrappersHash(ref hash, optionDatas);
+
             return hash.ToHashCode();
         }
 
         private static List<DataWrapper> CopyWrappers(List<DataWrapper> source)
         {
             List<DataWrapper> result = new(source.Count);
-            for (int i = 0; i < source.Count; i++)
-                result.Add(new DataWrapper(source[i]));
+
+            for (int i = 0; i < source.Count; i++) result.Add(new DataWrapper(source[i]));
+
             return result;
         }
 
@@ -88,8 +91,8 @@ namespace Yang.Dialogue
             {
                 List<GenericData> values = wrappers[i].data;
                 hash.Add(values.Count);
-                for (int j = 0; j < values.Count; j++)
-                    hash.Add(values[j].GetRuntimeHashCode());
+
+                for (int j = 0; j < values.Count; j++) hash.Add(values[j].GetRuntimeHashCode());
             }
         }
 

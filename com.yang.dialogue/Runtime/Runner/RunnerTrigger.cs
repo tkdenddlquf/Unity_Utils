@@ -14,8 +14,8 @@ namespace Yang.Dialogue
         public void SetDatas(IReadOnlyList<RunnerValue> values)
         {
             ClearValues();
-            foreach (RunnerValue value in values)
-                this.values.Add(value.FieldId, value);
+
+            foreach (RunnerValue value in values) this.values.Add(value.FieldId, value);
         }
 
         public void ClearValues() => values.Clear();
@@ -27,8 +27,9 @@ namespace Yang.Dialogue
         public bool RemoveValue(int fieldId)
         {
             if (!values.Remove(fieldId)) return false;
-            if (callbacks.TryGetValue(fieldId, out System.Action callback))
-                callback?.Invoke();
+
+            if (callbacks.TryGetValue(fieldId, out System.Action callback)) callback?.Invoke();
+
             OnAnyValueChanged?.Invoke(fieldId);
             return true;
         }
@@ -37,28 +38,32 @@ namespace Yang.Dialogue
         public float GetFloatValue(int fieldId)
         {
             if (values.TryGetValue(fieldId, out RunnerValue value)) return value.GetFloatValue();
+
             return 0;
         }
 
         public bool GetBoolValue(int fieldId)
         {
             if (values.TryGetValue(fieldId, out RunnerValue value)) return value.GetBoolValue();
+
             return false;
         }
 
         public void SetValue(int fieldId, float value)
         {
             values[fieldId] = new(fieldId, value);
-            if (callbacks.TryGetValue(fieldId, out System.Action callback))
-                callback?.Invoke();
+
+            if (callbacks.TryGetValue(fieldId, out System.Action callback)) callback?.Invoke();
+
             OnAnyValueChanged?.Invoke(fieldId);
         }
 
         public void SetValue(int fieldId, bool value)
         {
             values[fieldId] = new(fieldId, value);
-            if (callbacks.TryGetValue(fieldId, out System.Action callback))
-                callback?.Invoke();
+
+            if (callbacks.TryGetValue(fieldId, out System.Action callback)) callback?.Invoke();
+
             OnAnyValueChanged?.Invoke(fieldId);
         }
         #endregion

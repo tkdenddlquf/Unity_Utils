@@ -19,7 +19,9 @@ namespace Yang.Dialogue.Editor
             void Track(float pointerY)
             {
                 VisualElement container = row.parent;
+
                 if (container == null) return;
+
                 placeholder.RemoveFromHierarchy();
                 currentTarget = TargetIndex(container, row, pointerY, lockedCount);
                 int insert = Mathf.Clamp(currentTarget, lockedCount, container.childCount);
@@ -45,17 +47,20 @@ namespace Yang.Dialogue.Editor
             {
                 int to = currentTarget;
                 VisualElement container = row.parent;
+
                 EndDrag();
 
                 if (container != null)
                 {
                     container.Insert(originalIndex, row);
                     int from = originalIndex;
+
                     while (from < to)
                     {
                         swapAdjacent(from, from + 1);
                         from++;
                     }
+
                     while (from > to)
                     {
                         swapAdjacent(from - 1, from);
@@ -68,7 +73,9 @@ namespace Yang.Dialogue.Editor
             grip.RegisterCallback<PointerDownEvent>(evt =>
             {
                 VisualElement container = row.parent;
+
                 if (container == null) return;
+
                 dragging = true;
                 originalIndex = container.IndexOf(row);
                 currentTarget = originalIndex;
@@ -96,6 +103,7 @@ namespace Yang.Dialogue.Editor
             grip.RegisterCallback<PointerMoveEvent>(evt =>
             {
                 if (!dragging) return;
+
                 Track(evt.position.y);
                 FollowPointer(evt.position.y);
                 evt.StopPropagation();
@@ -103,6 +111,7 @@ namespace Yang.Dialogue.Editor
             grip.RegisterCallback<PointerUpEvent>(evt =>
             {
                 if (!dragging) return;
+
                 Commit();
                 grip.ReleasePointer(evt.pointerId);
                 evt.StopPropagation();
@@ -110,8 +119,10 @@ namespace Yang.Dialogue.Editor
             grip.RegisterCallback<PointerCaptureOutEvent>(_ =>
             {
                 if (!dragging) return;
+
                 Commit();
             });
+
             return grip;
         }
 
@@ -123,9 +134,10 @@ namespace Yang.Dialogue.Editor
             for (int i = locked; i < count; i++)
             {
                 VisualElement child = container[i];
+
                 if (child == row) continue;
-                if (child.worldBound.center.y < pointerY)
-                    above++;
+
+                if (child.worldBound.center.y < pointerY) above++;
             }
 
             return locked + above;

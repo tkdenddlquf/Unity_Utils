@@ -108,12 +108,14 @@ namespace Yang.Dialogue
         public readonly float GetFloatValue()
         {
             if (type == ValueType.Float) return value;
+
             return 0;
         }
 
         public readonly bool GetBoolValue()
         {
             if (type == ValueType.Bool) return value == 1;
+
             return false;
         }
     }

@@ -51,7 +51,7 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        public IReadOnlyList<LocalizationTableCollection> collections;
+        [System.NonSerialized] public IReadOnlyList<LocalizationTableCollection> collections;
 
         private DialogueGraph graph;
         private IVisualElementScheduledItem localizationRefresh;
@@ -170,18 +170,22 @@ namespace Yang.Dialogue.Editor
             graph.StretchToParentSize();
             rootVisualElement.Add(graph);
             rootVisualElement.RegisterCallback<GeometryChangedEvent>(OnWindowGeometryChanged);
+
             Undo.undoRedoPerformed -= RequestRebuild;
             Undo.undoRedoPerformed += RequestRebuild;
             Undo.postprocessModifications -= OnPostprocessModifications;
             Undo.postprocessModifications += OnPostprocessModifications;
+
             EditorApplication.quitting -= CheckSave;
             EditorApplication.quitting += CheckSave;
             EditorApplication.projectChanged -= ScheduleLocalizationRefresh;
             EditorApplication.projectChanged += ScheduleLocalizationRefresh;
+
             graph.graphViewChanged -= OnGraphViewChanged;
             graph.graphViewChanged += OnGraphViewChanged;
             graph.viewTransformChanged -= OnViewTransformChanged;
             graph.viewTransformChanged += OnViewTransformChanged;
+
             LocalizationEditorSettings.EditorEvents.CollectionAdded -= OnLocalizationCollectionChanged;
             LocalizationEditorSettings.EditorEvents.CollectionAdded += OnLocalizationCollectionChanged;
             LocalizationEditorSettings.EditorEvents.CollectionRemoved -= OnLocalizationCollectionChanged;
@@ -196,6 +200,7 @@ namespace Yang.Dialogue.Editor
             LocalizationEditorSettings.EditorEvents.LocaleAdded += OnLocaleChanged;
             LocalizationEditorSettings.EditorEvents.LocaleRemoved -= OnLocaleChanged;
             LocalizationEditorSettings.EditorEvents.LocaleRemoved += OnLocaleChanged;
+
             graph.RegisterCallback<KeyDownEvent>(OnKeyDownEvent);
             BuildEmptyGraphMessage();
             BuildTopRightBar();
@@ -208,12 +213,16 @@ namespace Yang.Dialogue.Editor
             FlushViewState();
             rootVisualElement.UnregisterCallback<GeometryChangedEvent>(OnWindowGeometryChanged);
             rootVisualElement.Remove(graph);
+
             Undo.undoRedoPerformed -= RequestRebuild;
             Undo.postprocessModifications -= OnPostprocessModifications;
+
             EditorApplication.quitting -= CheckSave;
             EditorApplication.projectChanged -= ScheduleLocalizationRefresh;
+
             graph.graphViewChanged -= OnGraphViewChanged;
             graph.viewTransformChanged -= OnViewTransformChanged;
+
             LocalizationEditorSettings.EditorEvents.CollectionAdded -= OnLocalizationCollectionChanged;
             LocalizationEditorSettings.EditorEvents.CollectionRemoved -= OnLocalizationCollectionChanged;
             LocalizationEditorSettings.EditorEvents.TableEntryAdded -= OnLocalizationEntryChanged;
@@ -221,14 +230,16 @@ namespace Yang.Dialogue.Editor
             LocalizationEditorSettings.EditorEvents.TableEntryModified -= OnLocalizationEntryModified;
             LocalizationEditorSettings.EditorEvents.LocaleAdded -= OnLocaleChanged;
             LocalizationEditorSettings.EditorEvents.LocaleRemoved -= OnLocaleChanged;
+
             localizationRefresh?.Pause();
             searchRefresh?.Pause();
             viewSave?.Pause();
             searchRefresh = null;
             debugRunner = null;
             debugFlows.Clear();
-            if (emptyGraphMessage != null)
-                rootVisualElement.Remove(emptyGraphMessage);
+
+            if (emptyGraphMessage != null) rootVisualElement.Remove(emptyGraphMessage);
+
             emptyGraphMessage = null;
             viewSave = null;
             graph.UnregisterCallback<KeyDownEvent>(OnKeyDownEvent);
@@ -281,7 +292,9 @@ namespace Yang.Dialogue.Editor
         {
             searchIndexDirty = true;
             BuildLanguageDropdown();
+
             if (SO == null) return;
+
             collections = LocalizationEditorSettings.GetStringTableCollections();
             collections.SetTables(Tables);
             lastLocalizationSync = SynchronizeLocalizationReferences();
@@ -291,6 +304,7 @@ namespace Yang.Dialogue.Editor
         private (int nodes, int references, int updated, int unresolved) SynchronizeLocalizationReferences()
         {
             if (SO == null) return default;
+
             localizationIssues.Clear();
             int scanned = 0, references = 0, updated = 0, unresolved = 0;
             bool recorded = false;
@@ -299,7 +313,9 @@ namespace Yang.Dialogue.Editor
             {
                 NodeData node = Nodes[i];
                 List<DataWrapper> options = node.EditorOptionDatas;
+
                 if (node.type != NodeType.Dialogue && node.type != NodeType.Choice) continue;
+
                 scanned++;
 
                 if (node.type == NodeType.Dialogue && options.Count >= 4)
@@ -325,9 +341,7 @@ namespace Yang.Dialogue.Editor
             return (scanned, references, updated, unresolved);
         }
 
-        private void RepairReferences(string nodeGuid, List<DataWrapper> tablesData, int tableIndex,
-            List<DataWrapper> entriesData, int start, int count,
-            ref int references, ref int updated, ref int unresolved, ref bool recorded)
+        private void RepairReferences(string nodeGuid, List<DataWrapper> tablesData, int tableIndex, List<DataWrapper> entriesData, int start, int count, ref int references, ref int updated, ref int unresolved, ref bool recorded)
         {
             List<GenericData> table = tablesData[tableIndex].data;
             string storedName = table[0].ToString();
@@ -340,6 +354,7 @@ namespace Yang.Dialogue.Editor
                 {
                     List<GenericData> entry = entriesData[i].data;
                     collection = collections.ResolveCollection(null, System.Guid.Empty, entry[1].GetLong(), entry[0].ToString());
+
                     if (collection != null) break;
                 }
             }
@@ -377,7 +392,9 @@ namespace Yang.Dialogue.Editor
                 List<GenericData> data = entriesData[i].data;
                 string key = data[0].ToString();
                 long id = data[1].GetLong();
+
                 if (id == 0 && string.IsNullOrEmpty(key)) continue;
+
                 references++;
                 SharedTableData.SharedTableEntry entry = collection.ResolveEntry(id, key);
 
@@ -426,8 +443,8 @@ namespace Yang.Dialogue.Editor
             {
                 LocaleIdentifier system = Application.systemLanguage;
                 index = locales.FindIndex(locale => locale.Identifier == system);
-                if (index < 0)
-                    index = 0;
+
+                if (index < 0) index = 0;
             }
 
             Language = locales[index].Identifier;
@@ -484,14 +501,17 @@ namespace Yang.Dialogue.Editor
             topRightBar.style.borderBottomColor = new Color(0.22f, 0.26f, 0.34f);
             topRightBar.style.borderLeftColor = new Color(0.22f, 0.26f, 0.34f);
             rootVisualElement.Add(topRightBar);
+
             toolbarTitle = new Label("Dialogue Tools");
             toolbarTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
             toolbarTitle.style.fontSize = 13;
             toolbarTitle.style.color = new Color(0.88f, 0.92f, 1f);
             toolbarTitle.style.marginBottom = 4;
+
             collapseButton = new Button(ToggleTools) { text = "−", tooltip = "Collapse or expand dialogue tools" };
             collapseButton.style.width = 24;
             collapseButton.style.marginLeft = 6;
+
             VisualElement heading = new();
             heading.style.flexDirection = FlexDirection.Row;
             heading.style.alignItems = Align.Center;
@@ -499,6 +519,7 @@ namespace Yang.Dialogue.Editor
             heading.Add(toolbarTitle);
             heading.Add(collapseButton);
             topRightBar.Add(heading);
+
             assetBar = new VisualElement();
             StyleBar(assetBar);
             assetBar.style.marginTop = 6;
@@ -507,6 +528,7 @@ namespace Yang.Dialogue.Editor
             assetField.RegisterValueChangedCallback(evt => SO = evt.newValue as DialogueSO);
             assetBar.Add(assetField);
             topRightBar.Add(assetBar);
+
             searchBar = new VisualElement();
             StyleBar(searchBar);
             searchBar.style.flexDirection = FlexDirection.Column;
@@ -525,6 +547,7 @@ namespace Yang.Dialogue.Editor
                     unityTextAlign = TextAnchor.MiddleLeft,
                 }
             };
+
             searchField = new TextField()
             {
                 name = "node-search",
@@ -536,6 +559,7 @@ namespace Yang.Dialogue.Editor
             searchField.style.marginRight = 4;
             searchField.style.marginTop = 0;
             searchField.style.marginBottom = 0;
+
             searchSuggestions = new ScrollView(ScrollViewMode.Vertical) { name = "node-suggestions" };
             ScrollView suggestions = searchSuggestions;
             suggestions.style.display = DisplayStyle.None;
@@ -551,11 +575,13 @@ namespace Yang.Dialogue.Editor
             suggestions.style.borderRightColor = new Color(0.35f, 0.35f, 0.35f);
             suggestions.style.borderBottomColor = new Color(0.35f, 0.35f, 0.35f);
             suggestions.style.borderLeftColor = new Color(0.35f, 0.35f, 0.35f);
+
             searchField.RegisterValueChangedCallback(_ =>
             {
                 searchRefresh ??= searchField.schedule.Execute(() => RefreshSuggestions(searchField, suggestions, searchField.value));
                 searchRefresh.ExecuteLater(SEARCH_REFRESH_DEBOUNCE_MS);
             });
+
             searchField.RegisterCallback<KeyDownEvent>(evt =>
             {
                 if (evt.keyCode == KeyCode.DownArrow || evt.keyCode == KeyCode.UpArrow)
@@ -573,9 +599,9 @@ namespace Yang.Dialogue.Editor
                     SearchNode(searchField, suggestions, evt.shiftKey);
                     evt.StopPropagation();
                 }
-
             });
             searchField.RegisterCallback<FocusOutEvent>(_ => suggestions.schedule.Execute(() => HideSuggestions(suggestions)).StartingIn(150));
+
             Button searchButton = new(() => SearchNode(searchField, suggestions)) { text = "Go" };
             searchButton.style.marginLeft = 0;
             searchButton.style.marginRight = 0;
@@ -584,6 +610,7 @@ namespace Yang.Dialogue.Editor
             inputRow.Add(searchLabel);
             inputRow.Add(searchField);
             inputRow.Add(searchButton);
+
             backButton = new(NavigateBack) { text = "←", tooltip = "Return to previous graph location" };
             forwardButton = new(NavigateForward) { text = "→", tooltip = "Go to next graph location" };
             backButton.style.width = 25;
@@ -592,6 +619,7 @@ namespace Yang.Dialogue.Editor
             inputRow.Add(forwardButton);
             RefreshNavigationButtons();
             searchBar.Add(inputRow);
+
             searchStatus = new Label("Enter: next result · Shift+Enter: previous result");
             searchStatus.style.color = new Color(0.65f, 0.70f, 0.8f);
             searchStatus.style.fontSize = 10;
@@ -599,10 +627,12 @@ namespace Yang.Dialogue.Editor
             searchBar.Add(searchStatus);
             searchBar.Add(suggestions);
             topRightBar.Add(searchBar);
+
             repairBar = new VisualElement();
             StyleBar(repairBar);
             repairBar.style.justifyContent = Justify.FlexEnd;
             repairBar.style.marginTop = 6;
+
             refreshButton = new(RefreshEditor)
             {
                 text = "↻  Refresh",
@@ -612,6 +642,7 @@ namespace Yang.Dialogue.Editor
             refreshButton.style.marginRight = 4;
             refreshButton.style.marginTop = 0;
             refreshButton.style.marginBottom = 0;
+
             Button repairButton = new(RepairData)
             {
                 text = "✓  Validate / Repair",
@@ -624,6 +655,7 @@ namespace Yang.Dialogue.Editor
             repairBar.Add(refreshButton);
             repairBar.Add(repairButton);
             topRightBar.Add(repairBar);
+
             BuildDebugBar();
             // Keep search suggestions above the following toolbar rows.
             searchBar.BringToFront();
@@ -633,20 +665,23 @@ namespace Yang.Dialogue.Editor
         {
             toolsCollapsed = !toolsCollapsed;
             assetBar.style.display = toolsCollapsed ? DisplayStyle.None : DisplayStyle.Flex;
-            if (languageBar != null)
-                languageBar.style.display = toolsCollapsed ? DisplayStyle.None : DisplayStyle.Flex;
+
+            if (languageBar != null) languageBar.style.display = toolsCollapsed ? DisplayStyle.None : DisplayStyle.Flex;
+
             searchBar.style.display = toolsCollapsed ? DisplayStyle.None : DisplayStyle.Flex;
             repairBar.style.display = toolsCollapsed ? DisplayStyle.None : DisplayStyle.Flex;
-            if (debugBar != null)
-                debugBar.style.display = toolsCollapsed || !Application.isPlaying ? DisplayStyle.None : DisplayStyle.Flex;
-            if (toolsCollapsed)
-                HideSuggestions(searchSuggestions);
+
+            if (debugBar != null) debugBar.style.display = toolsCollapsed || !Application.isPlaying ? DisplayStyle.None : DisplayStyle.Flex;
+
+            if (toolsCollapsed) HideSuggestions(searchSuggestions);
+
             collapseButton.text = toolsCollapsed ? "+" : "−";
         }
 
         private void OnWindowGeometryChanged(GeometryChangedEvent evt)
         {
             if (topRightBar == null) return;
+
             topRightBar.style.width = Mathf.Min(420f, Mathf.Max(200f, evt.newRect.width - 24f));
         }
 
@@ -665,8 +700,7 @@ namespace Yang.Dialogue.Editor
 
         private void UpdateEmptyGraphMessage()
         {
-            if (emptyGraphMessage != null)
-                emptyGraphMessage.style.display = SO == null ? DisplayStyle.Flex : DisplayStyle.None;
+            if (emptyGraphMessage != null) emptyGraphMessage.style.display = SO == null ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private void BuildDebugBar()
@@ -675,21 +709,25 @@ namespace Yang.Dialogue.Editor
             debugBar.style.flexDirection = FlexDirection.Column;
             debugBar.style.marginTop = 8;
             debugBar.style.display = DisplayStyle.None;
+
             Label title = new("Play Mode · Runner Debug");
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
             title.style.marginBottom = 4;
             debugBar.Add(title);
+
             debugRunnerField = new ObjectField("Runner") { objectType = typeof(DialogueRunner), allowSceneObjects = true };
             debugRunnerField.RegisterValueChangedCallback(evt =>
             {
                 debugRunner = evt.newValue as DialogueRunner;
-                if (debugRunner != null && debugRunner.Dialogue != null && debugRunner.Dialogue != SO)
-                    SO = debugRunner.Dialogue;
+
+                if (debugRunner != null && debugRunner.Dialogue != null && debugRunner.Dialogue != SO) SO = debugRunner.Dialogue;
+
                 lastDebugFollowGuid = null;
                 nextGraphDiffCheck = 0;
                 RefreshDebugState();
             });
             debugBar.Add(debugRunnerField);
+
             debugFlowField = new PopupField<string>("Flow", new List<string> { "(no active flow)" }, 0);
             debugFlowField.RegisterValueChangedCallback(_ =>
             {
@@ -697,27 +735,32 @@ namespace Yang.Dialogue.Editor
                 RefreshDebugState();
             });
             debugBar.Add(debugFlowField);
+
             debugStatus = new Label("Run the game to inspect a flow.");
             debugStatus.style.whiteSpace = WhiteSpace.Normal;
             debugStatus.style.color = new Color(0.72f, 0.84f, 0.95f);
             debugBar.Add(debugStatus);
+
             debugApplyStatus = new Label("Runtime graph status unavailable.");
             debugApplyStatus.style.whiteSpace = WhiteSpace.Normal;
             debugApplyStatus.style.fontSize = 11;
             debugApplyStatus.style.marginTop = 4;
             debugBar.Add(debugApplyStatus);
+
             debugApplyButton = new Button(ApplyDebugGraphChanges)
             {
                 text = "Apply graph changes to Runner",
                 tooltip = "Pause all flows, wait for active callbacks, and rebuild this Runner's runtime graph. Flows remain paused until explicitly resumed."
             };
             debugBar.Add(debugApplyButton);
+
             debugFollow = new Toggle("Follow active node") { value = true };
             debugFollow.RegisterValueChangedCallback(evt =>
             {
                 if (evt.newValue) lastDebugFollowGuid = null;
             });
             debugBar.Add(debugFollow);
+
             VisualElement jumpRow = new();
             StyleBar(jumpRow);
             debugKeyField = new TextField("New key") { value = "main", tooltip = "Flow key used when no flow is active." };
@@ -739,6 +782,7 @@ namespace Yang.Dialogue.Editor
         private async void ApplyDebugGraphChanges()
         {
             if (!CanDebugJump || debugRunner == null) return;
+
             DialogueRunner runner = debugRunner;
             debugJumpInProgress = true;
             debugApplyButton.SetEnabled(false);
@@ -759,8 +803,8 @@ namespace Yang.Dialogue.Editor
             catch (System.Exception exception)
             {
                 Debug.LogException(exception, runner);
-                if (this != null)
-                    debugApplyStatus.text = "Graph apply failed. Check the Console.";
+
+                if (this != null) debugApplyStatus.text = "Graph apply failed. Check the Console.";
             }
             finally
             {
@@ -788,12 +832,14 @@ namespace Yang.Dialogue.Editor
             DialogueSO dialogue = SO;
             string selectedKey = debugFlowField.value;
             List<DialogueFlowState> flows = new();
+
             runner.GetFlowStates(flows);
             bool selectedFlowExists = false;
 
             for (int i = 0; i < flows.Count; i++)
             {
                 if (flows[i].Key != selectedKey) continue;
+
                 selectedFlowExists = true;
                 break;
             }
@@ -813,12 +859,8 @@ namespace Yang.Dialogue.Editor
                 string nextFlowAction = selectedFlowExists
                     ? $"Flow '{targetKey}' will restart at the selected node."
                     : $"A new flow with key '{targetKey}' will start at the selected node.";
-                bool confirmed = EditorUtility.DisplayDialog(
-                    "Apply graph changes and jump?",
-                    "This node belongs to a graph with unapplied edits.\n\n" +
-                    "Applying will pause every flow on this Runner and wait for its active callbacks to finish. " +
-                    "Other flows will remain paused.\n\n" + nextFlowAction,
-                    "Apply and Jump", "Cancel");
+                bool confirmed = EditorUtility.DisplayDialog("Apply graph changes and jump?", "This node belongs to a graph with unapplied edits.\n\n" + "Applying will pause every flow on this Runner and wait for its active callbacks to finish. " + "Other flows will remain paused.\n\n" + nextFlowAction, "Apply and Jump", "Cancel");
+
                 if (!confirmed) return;
             }
 
@@ -834,19 +876,17 @@ namespace Yang.Dialogue.Editor
 
                     if (!applied)
                     {
-                        if (this != null)
-                            EditorUtility.DisplayDialog("Graph not applied", "The Runner could not apply the graph changes. No jump was performed.", "OK");
+                        if (this != null) EditorUtility.DisplayDialog("Graph not applied", "The Runner could not apply the graph changes. No jump was performed.", "OK");
+
                         return;
                     }
                 }
 
-                if (this == null || runner == null || !Application.isPlaying || SO != dialogue || debugRunner != runner || runner.Dialogue != dialogue)
-                    return;
+                if (this == null || runner == null || !Application.isPlaying || SO != dialogue || debugRunner != runner || runner.Dialogue != dialogue) return;
 
                 if (runner.IsApplyingGraphChanges || runner.HasPendingGraphChanges)
                 {
-                    EditorUtility.DisplayDialog("Graph changed again",
-                    "The graph changed while it was being applied. No jump was performed. Apply the latest changes and try again.", "OK");
+                    EditorUtility.DisplayDialog("Graph changed again", "The graph changed while it was being applied. No jump was performed. Apply the latest changes and try again.", "OK");
                     return;
                 }
 
@@ -863,6 +903,7 @@ namespace Yang.Dialogue.Editor
                 for (int i = 0; i < flows.Count; i++)
                 {
                     if (flows[i].Key != targetKey) continue;
+
                     flowExists = true;
                     break;
                 }
@@ -873,8 +914,8 @@ namespace Yang.Dialogue.Editor
 
                     if (!jumped)
                     {
-                        if (this != null)
-                            debugStatus.text = "Jump was canceled because the flow changed.";
+                        if (this != null) debugStatus.text = "Jump was canceled because the flow changed.";
+
                         return;
                     }
                 }
@@ -884,8 +925,8 @@ namespace Yang.Dialogue.Editor
             catch (System.Exception exception)
             {
                 Debug.LogException(exception, runner);
-                if (this != null)
-                    EditorUtility.DisplayDialog("Graph test failed", "The graph apply or test request failed. Check the Console for details.\n\n" + exception.Message, "OK");
+
+                if (this != null) EditorUtility.DisplayDialog("Graph test failed", "The graph apply or test request failed. Check the Console for details.\n\n" + exception.Message, "OK");
             }
             finally
             {
@@ -919,9 +960,10 @@ namespace Yang.Dialogue.Editor
                 }
             }
 
-            if (debugBar != null)
-                debugBar.style.display = playing && !toolsCollapsed ? DisplayStyle.Flex : DisplayStyle.None;
+            if (debugBar != null) debugBar.style.display = playing && !toolsCollapsed ? DisplayStyle.Flex : DisplayStyle.None;
+
             if (!playing || EditorApplication.timeSinceStartup < nextDebugRefresh) return;
+
             nextDebugRefresh = EditorApplication.timeSinceStartup + 0.2;
             RefreshDebugState();
         }
@@ -933,11 +975,12 @@ namespace Yang.Dialogue.Editor
             if (debugRunner == null && SO != null && EditorApplication.timeSinceStartup >= nextRunnerLookup)
             {
                 nextRunnerLookup = EditorApplication.timeSinceStartup + 1;
-                DialogueRunner[] runners = Object.FindObjectsByType<DialogueRunner>(FindObjectsSortMode.None);
+                DialogueRunner[] runners = FindObjectsByType<DialogueRunner>();
 
                 for (int i = 0; i < runners.Length; i++)
                 {
                     if (runners[i].Dialogue != SO) continue;
+
                     debugRunner = runners[i];
                     nextGraphDiffCheck = 0;
                     debugRunnerField.SetValueWithoutNotify(debugRunner);
@@ -946,14 +989,16 @@ namespace Yang.Dialogue.Editor
             }
 
             debugFlows.Clear();
-            if (debugRunner != null)
-                debugRunner.GetFlowStates(debugFlows);
+
+            if (debugRunner != null) debugRunner.GetFlowStates(debugFlows);
+
             string selectedKey = debugFlowField.value;
             List<string> choices = new();
-            for (int i = 0; i < debugFlows.Count; i++)
-                choices.Add(debugFlows[i].Key);
-            if (choices.Count == 0)
-                choices.Add("(no active flow)");
+
+            for (int i = 0; i < debugFlows.Count; i++) choices.Add(debugFlows[i].Key);
+
+            if (choices.Count == 0) choices.Add("(no active flow)");
+
             bool different = choices.Count != debugFlowField.choices.Count;
 
             if (!different)
@@ -961,15 +1006,16 @@ namespace Yang.Dialogue.Editor
                 for (int i = 0; i < choices.Count; i++)
                 {
                     if (choices[i] == debugFlowField.choices[i]) continue;
+
                     different = true;
                     break;
                 }
             }
 
-            if (different)
-                debugFlowField.choices = choices;
-            if (!choices.Contains(selectedKey))
-                selectedKey = choices[0];
+            if (different) debugFlowField.choices = choices;
+
+            if (!choices.Contains(selectedKey)) selectedKey = choices[0];
+
             debugFlowField.SetValueWithoutNotify(selectedKey);
 
             if (debugRunner == null)
@@ -1006,7 +1052,9 @@ namespace Yang.Dialogue.Editor
             for (int i = 0; i < debugFlows.Count; i++)
             {
                 DialogueFlowState flow = debugFlows[i];
+
                 if (flow.Key != selectedKey) continue;
+
                 NodeData node = GetNode(flow.NodeGuid);
                 debugStatus.text = debugRunner.TryGetRuntimeNodeType(flow.NodeGuid, out NodeType runtimeType)
                     ? $"{flow.State} · {runtimeType} (runtime snapshot) · {flow.NodeGuid}"
@@ -1041,8 +1089,8 @@ namespace Yang.Dialogue.Editor
             (int nodes, int references, int updated, int unresolved) result = lastLocalizationSync;
             refreshButton.text = $"↻ Updated {result.updated} / Missing {result.unresolved}";
             Debug.Log($"Dialogue localization refresh: nodes={result.nodes}, references={result.references}, updated={result.updated}, unresolved={result.unresolved}", SO);
-            foreach (string issue in localizationIssues)
-                Debug.LogWarning(issue, SO);
+
+            foreach (string issue in localizationIssues) Debug.LogWarning(issue, SO);
         }
 
         private const int MAX_SUGGESTIONS = 10;
@@ -1060,8 +1108,9 @@ namespace Yang.Dialogue.Editor
                 matchingQuery = null;
                 searchMatches.Clear();
                 matchingIndex = -1;
-                if (searchStatus != null)
-                    searchStatus.text = "Enter: next result · Shift+Enter: previous result";
+
+                if (searchStatus != null) searchStatus.text = "Enter: next result · Shift+Enter: previous result";
+
                 HideSuggestions(container);
                 return;
             }
@@ -1075,6 +1124,7 @@ namespace Yang.Dialogue.Editor
                 suggestionResults.Add(result);
                 suggestionItems.Add(item);
                 container.Add(item);
+
                 if (++shown >= MAX_SUGGESTIONS) break;
             }
 
@@ -1088,6 +1138,7 @@ namespace Yang.Dialogue.Editor
             Label type = new(result.Node.type.ToString());
             Label id = new(result.Node.guid);
             Label match = new(result.Match);
+
             header.style.flexDirection = FlexDirection.Row;
             header.style.alignItems = Align.Center;
             type.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -1123,6 +1174,7 @@ namespace Yang.Dialogue.Editor
                 NavigateToSearchResult(result.Node.guid, container);
                 evt.StopPropagation();
             });
+
             return item;
         }
 
@@ -1138,13 +1190,13 @@ namespace Yang.Dialogue.Editor
         private void MoveSuggestion(int delta)
         {
             if (suggestionResults.Count == 0 || searchSuggestions.style.display.value == DisplayStyle.None) return;
+
             selectedSuggestion = selectedSuggestion < 0 ? (delta > 0 ? 0 : suggestionResults.Count - 1)
                 : (selectedSuggestion + delta + suggestionResults.Count) % suggestionResults.Count;
 
             for (int i = 0; i < suggestionItems.Count; i++)
             {
-                if (i == selectedSuggestion)
-                    suggestionItems[i].style.backgroundColor = new Color(0.18f, 0.28f, 0.44f, 0.75f);
+                if (i == selectedSuggestion) suggestionItems[i].style.backgroundColor = new Color(0.18f, 0.28f, 0.44f, 0.75f);
                 else suggestionItems[i].style.backgroundColor = StyleKeyword.Null;
             }
 
@@ -1161,13 +1213,16 @@ namespace Yang.Dialogue.Editor
         private void SearchNode(TextField field, VisualElement suggestions, bool reverse = false)
         {
             if (SO == null) return;
+
             string query = field.value?.Trim();
+
             if (string.IsNullOrEmpty(query)) return;
+
             EnsureMatches(query);
             NodeData exact = GetNode(query);
             string guid;
-            if (!string.IsNullOrEmpty(exact.guid))
-                guid = exact.guid;
+
+            if (!string.IsNullOrEmpty(exact.guid)) guid = exact.guid;
             else if (selectedSuggestion >= 0 && selectedSuggestion < suggestionResults.Count)
             {
                 guid = suggestionResults[selectedSuggestion].Node.guid;
@@ -1194,13 +1249,13 @@ namespace Yang.Dialogue.Editor
         private void EnsureMatches(string query)
         {
             if (!searchIndexDirty && matchingQuery == query) return;
+
             EnsureSearchIndex();
             searchMatches.Clear();
 
             foreach (NodeSearchDocument document in searchIndex)
             {
-                if (TryMatchNode(document, query, out NodeSearchResult result))
-                    searchMatches.Add(result);
+                if (TryMatchNode(document, query, out NodeSearchResult result)) searchMatches.Add(result);
             }
 
             matchingQuery = query;
@@ -1221,6 +1276,7 @@ namespace Yang.Dialogue.Editor
         private void UpdateSearchStatus()
         {
             if (searchStatus == null) return;
+
             searchStatus.text = searchMatches.Count == 0 ? "No matches"
                 : matchingIndex < 0 ? $"{searchMatches.Count} matches · Enter: next · Shift+Enter: previous"
                 : $"Result {matchingIndex + 1} / {searchMatches.Count} · Enter: next · Shift+Enter: previous";
@@ -1229,14 +1285,14 @@ namespace Yang.Dialogue.Editor
         private List<NodeData> AllNodes()
         {
             List<NodeData> nodes = new();
+
             if (SO == null) return nodes;
-            if (!string.IsNullOrEmpty(SO.StartGuid))
-                nodes.Add(SO.EditorStartNode);
+
+            if (!string.IsNullOrEmpty(SO.StartGuid)) nodes.Add(SO.EditorStartNode);
 
             for (int i = 0; i < Nodes.Count; i++)
             {
-                if (!string.IsNullOrEmpty(Nodes[i].guid))
-                    nodes.Add(Nodes[i]);
+                if (!string.IsNullOrEmpty(Nodes[i].guid)) nodes.Add(Nodes[i]);
             }
 
             return nodes;
@@ -1245,6 +1301,7 @@ namespace Yang.Dialogue.Editor
         private void EnsureSearchIndex()
         {
             if (!searchIndexDirty) return;
+
             searchIndex.Clear();
 
             foreach (NodeData node in AllNodes())
@@ -1266,13 +1323,14 @@ namespace Yang.Dialogue.Editor
             for (int i = 0; i < wrappers.Count; i++)
             {
                 List<GenericData> values = wrappers[i].data;
+
                 if (values == null) continue;
 
                 for (int j = 0; j < values.Count; j++)
                 {
                     string value = values[j].ToString();
-                    if (!string.IsNullOrEmpty(value))
-                        target.Add(value);
+
+                    if (!string.IsNullOrEmpty(value)) target.Add(value);
                 }
             }
         }
@@ -1327,8 +1385,7 @@ namespace Yang.Dialogue.Editor
 
                 if (ports != null)
                 {
-                    for (int i = 0; i < ports.Count; i++)
-                        AddLocalizedEntry(options[2], ports[i], target);
+                    for (int i = 0; i < ports.Count; i++) AddLocalizedEntry(options[2], ports[i], target);
                 }
             }
         }
@@ -1337,15 +1394,16 @@ namespace Yang.Dialogue.Editor
         {
             List<GenericData> tableData = tableWrapper.data;
             List<GenericData> entryData = entryWrapper.data;
-            if (collections == null || tableData == null || tableData.Count < 2 || entryData == null || entryData.Count < 2)
-                return;
-            LocalizationTableCollection collection = collections.ResolveCollection(
-                tableData[0].ToString(), tableData[1].GetGuid(),
-                entryData[1].GetLong(), entryData[0].ToString());
+
+            if (collections == null || tableData == null || tableData.Count < 2 || entryData == null || entryData.Count < 2) return;
+
+            LocalizationTableCollection collection = collections.ResolveCollection(tableData[0].ToString(), tableData[1].GetGuid(), entryData[1].GetLong(), entryData[0].ToString());
+
             if (collection == null) return;
+
             string text = new EntryData(entryData[1].GetLong(), entryData[0].ToString(), collection.Tables).GetText(Language);
-            if (!string.IsNullOrEmpty(text))
-                target.Add(text);
+
+            if (!string.IsNullOrEmpty(text)) target.Add(text);
         }
 
         private static bool TryMatchValues(IReadOnlyList<string> values, string query, out string match)
@@ -1353,6 +1411,7 @@ namespace Yang.Dialogue.Editor
             for (int i = 0; values != null && i < values.Count; i++)
             {
                 if (!Contains(values[i], query)) continue;
+
                 match = values[i];
                 return true;
             }
@@ -1367,7 +1426,9 @@ namespace Yang.Dialogue.Editor
         private static string Shorten(string value)
         {
             const int maxLength = 60;
+
             if (string.IsNullOrEmpty(value) || value.Length <= maxLength) return value ?? "";
+
             return value.Substring(0, maxLength - 1) + "…";
         }
 
@@ -1383,6 +1444,7 @@ namespace Yang.Dialogue.Editor
         private void OnLanguageChanged(ChangeEvent<Locale> evt)
         {
             if (evt.newValue == null) return;
+
             Language = evt.newValue.Identifier;
             ResetView();
         }
@@ -1390,7 +1452,9 @@ namespace Yang.Dialogue.Editor
         public void GetEntriesInto(LocalizationTableCollection collection, List<EntryData> target)
         {
             target.Clear();
+
             if (collection == null) return;
+
             collection.SetEntries(target);
         }
 
@@ -1406,22 +1470,19 @@ namespace Yang.Dialogue.Editor
         private void CheckSave()
         {
             if (!hasUnsavedChanges) return;
-            bool save = EditorUtility.DisplayDialog(
-                "Unsaved Changes",
-                "There are unsaved dialogue changes. Save before continuing?",
-                "Save",
-                "Don't Save"
-            );
-            if (save)
-                SaveChanges();
+
+            bool save = EditorUtility.DisplayDialog("Unsaved Changes", "There are unsaved dialogue changes. Save before continuing?", "Save", "Don't Save");
+
+            if (save) SaveChanges();
             else DiscardChanges();
         }
 
         public override void SaveChanges()
         {
             if (SO == null) return;
-            if (hasUnsavedChanges)
-                EditorUtility.SetDirty(SO);
+
+            if (hasUnsavedChanges) EditorUtility.SetDirty(SO);
+
             AssetDatabase.SaveAssetIfDirty(SO);
             saveData = JsonUtility.ToJson(SO);
             base.SaveChanges();
@@ -1430,6 +1491,7 @@ namespace Yang.Dialogue.Editor
         public override void DiscardChanges()
         {
             if (SO == null) return;
+
             JsonUtility.FromJsonOverwrite(saveData, SO);
             ResetView();
             base.DiscardChanges();
@@ -1439,8 +1501,8 @@ namespace Yang.Dialogue.Editor
         {
             nextGraphDiffCheck = 0;
             hasUnsavedChanges = true;
-            if (searchChanged)
-                searchIndexDirty = true;
+
+            if (searchChanged) searchIndexDirty = true;
         }
 
         private UndoPropertyModification[] OnPostprocessModifications(UndoPropertyModification[] mods)
@@ -1470,8 +1532,11 @@ namespace Yang.Dialogue.Editor
         private void OnViewTransformChanged(GraphView graphView)
         {
             if (SO == null) return;
+
             string key = ViewStateKey(SO);
+
             if (string.IsNullOrEmpty(key)) return;
+
             IResolvedStyle style = graph.contentViewContainer.resolvedStyle;
             pendingViewKey = key;
             pendingViewState = new ViewState { position = style.translate, scale = style.scale.value };
@@ -1482,6 +1547,7 @@ namespace Yang.Dialogue.Editor
         private static string ViewStateKey(DialogueSO asset)
         {
             string path = AssetDatabase.GetAssetPath(asset);
+
             return string.IsNullOrEmpty(path) ? null : "Yang.Dialogue.Editor.View." + AssetDatabase.AssetPathToGUID(path);
         }
 
@@ -1492,6 +1558,7 @@ namespace Yang.Dialogue.Editor
             if (!string.IsNullOrEmpty(key) && EditorPrefs.HasKey(key))
             {
                 ViewState state = JsonUtility.FromJson<ViewState>(EditorPrefs.GetString(key));
+
                 if (state != null && state.scale.x > 0f && state.scale.y > 0f) return state;
             }
 
@@ -1501,6 +1568,7 @@ namespace Yang.Dialogue.Editor
         private void FlushViewState()
         {
             if (string.IsNullOrEmpty(pendingViewKey) || pendingViewState == null) return;
+
             EditorPrefs.SetString(pendingViewKey, JsonUtility.ToJson(pendingViewState));
             pendingViewKey = null;
             pendingViewState = null;
@@ -1508,27 +1576,29 @@ namespace Yang.Dialogue.Editor
 
         private NavigationState CaptureNavigation()
         {
-            return new NavigationState(graph.viewTransform.position, graph.viewTransform.scale, graph.FirstSelectedGuid());
+            IResolvedStyle style = graph.contentViewContainer.resolvedStyle;
+
+            return new NavigationState(style.translate, style.scale.value, graph.FirstSelectedGuid());
         }
 
         private void AddNavigation(List<NavigationState> history, NavigationState state)
         {
-            if (history.Count == NAVIGATION_LIMIT)
-                history.RemoveAt(0);
+            if (history.Count == NAVIGATION_LIMIT) history.RemoveAt(0);
+
             history.Add(state);
         }
 
         private void RefreshNavigationButtons()
         {
-            if (backButton != null)
-                backButton.SetEnabled(backHistory.Count > 0);
-            if (forwardButton != null)
-                forwardButton.SetEnabled(forwardHistory.Count > 0);
+            if (backButton != null) backButton.SetEnabled(backHistory.Count > 0);
+
+            if (forwardButton != null) forwardButton.SetEnabled(forwardHistory.Count > 0);
         }
 
         private void NavigateBack()
         {
             if (backHistory.Count == 0) return;
+
             AddNavigation(forwardHistory, CaptureNavigation());
             NavigationState previous = backHistory[backHistory.Count - 1];
             backHistory.RemoveAt(backHistory.Count - 1);
@@ -1538,6 +1608,7 @@ namespace Yang.Dialogue.Editor
         private void NavigateForward()
         {
             if (forwardHistory.Count == 0) return;
+
             AddNavigation(backHistory, CaptureNavigation());
             NavigationState next = forwardHistory[forwardHistory.Count - 1];
             forwardHistory.RemoveAt(forwardHistory.Count - 1);
@@ -1560,8 +1631,8 @@ namespace Yang.Dialogue.Editor
             for (int i = 0; i < history.Count; i++)
             {
                 NavigationState item = history[i];
-                if (item.SelectedGuid == previous)
-                    history[i] = new NavigationState(item.Position, item.Scale, current);
+
+                if (item.SelectedGuid == previous) history[i] = new NavigationState(item.Position, item.Scale, current);
             }
         }
 
@@ -1575,24 +1646,25 @@ namespace Yang.Dialogue.Editor
 
         public string ReadLocalizedText(List<GenericData> tableData, List<GenericData> entryData)
         {
-            LocalizationTableCollection collection = collections.ResolveCollection(
-                tableData[0].ToString(), tableData[1].GetGuid(),
-                entryData[1].GetLong(), entryData[0].ToString());
+            LocalizationTableCollection collection = collections.ResolveCollection(tableData[0].ToString(), tableData[1].GetGuid(), entryData[1].GetLong(), entryData[0].ToString());
+
             if (collection == null) return "";
+
             return new EntryData(entryData[1].GetLong(), entryData[0].ToString(), collection.Tables).GetText(Language);
         }
 
         public bool CanEditLocalizedText(List<GenericData> tableData, List<GenericData> entryData)
         {
             if (tableData == null || tableData.Count < 2 || entryData == null || entryData.Count < 2) return false;
-            LocalizationTableCollection collection = collections.ResolveCollection(
-                tableData[0].ToString(), tableData[1].GetGuid(),
-                entryData[1].GetLong(), entryData[0].ToString());
+
+            LocalizationTableCollection collection = collections.ResolveCollection(tableData[0].ToString(), tableData[1].GetGuid(), entryData[1].GetLong(), entryData[0].ToString());
+
             if (collection == null) return false;
 
             foreach (LazyLoadReference<LocalizationTable> reference in collection.Tables)
             {
                 if (reference.asset is not StringTable table || table.LocaleIdentifier != Language) continue;
+
                 return (entryData[1].GetLong() != 0 ? table.GetEntry(entryData[1].GetLong()) : table.GetEntry(entryData[0].ToString())) != null;
             }
 
@@ -1601,17 +1673,20 @@ namespace Yang.Dialogue.Editor
 
         public bool EditLocalizedText(List<GenericData> tableData, List<GenericData> entryData, string value)
         {
-            LocalizationTableCollection collection = collections.ResolveCollection(
-                tableData[0].ToString(), tableData[1].GetGuid(),
-                entryData[1].GetLong(), entryData[0].ToString());
+            LocalizationTableCollection collection = collections.ResolveCollection(tableData[0].ToString(), tableData[1].GetGuid(), entryData[1].GetLong(), entryData[0].ToString());
+
             if (collection == null) return false;
 
             foreach (LazyLoadReference<LocalizationTable> reference in collection.Tables)
             {
                 if (reference.asset is not StringTable table || table.LocaleIdentifier != Language) continue;
+
                 StringTableEntry entry = entryData[1].GetLong() != 0 ? table.GetEntry(entryData[1].GetLong()) : table.GetEntry(entryData[0].ToString());
+
                 if (entry == null) return false;
+
                 if (entry.Value == value) return true;
+
                 Undo.RecordObject(table, "Edit Dialogue Localization");
                 entry.Value = value;
                 EditorUtility.SetDirty(table);
@@ -1630,6 +1705,7 @@ namespace Yang.Dialogue.Editor
         public void FocusNode(string guid, bool select = false)
         {
             if (SO == null || string.IsNullOrEmpty(GetNode(guid).guid)) return;
+
             NavigationState from = CaptureNavigation();
             graph.FocusNode(guid, select);
             AddNavigation(backHistory, from);
@@ -1640,6 +1716,7 @@ namespace Yang.Dialogue.Editor
         public void RemoveEdge(Port port)
         {
             IEnumerator<Edge> enumerator = port.connections.GetEnumerator();
+
             while (enumerator.MoveNext())
             {
                 Edge edge = enumerator.Current;
@@ -1658,15 +1735,14 @@ namespace Yang.Dialogue.Editor
         private void RequestRebuild()
         {
             nextGraphDiffCheck = 0;
-            if (hasFocus)
-                ResetView();
+
+            if (hasFocus) ResetView();
             else pendingRebuild = true;
         }
 
         private void OnFocus()
         {
-            if (pendingRebuild)
-                ResetView();
+            if (pendingRebuild) ResetView();
         }
 
         private void ResetView()
@@ -1704,17 +1780,18 @@ namespace Yang.Dialogue.Editor
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)
         {
             if (SO == null || rebuildingGraph) return change;
+
             bool linksChanged = change.edgesToCreate != null && change.edgesToCreate.Count > 0;
-            if (linksChanged)
-                CreateEdge(change.edgesToCreate);
+
+            if (linksChanged) CreateEdge(change.edgesToCreate);
+
             bool nodesRemoved = false;
 
             if (change.elementsToRemove != null && change.elementsToRemove.Count > 0)
             {
                 for (int i = 0; i < change.elementsToRemove.Count; i++)
                 {
-                    if (change.elementsToRemove[i] is BaseNode node && node.GUID != SO.StartGuid)
-                        nodesRemoved = true;
+                    if (change.elementsToRemove[i] is BaseNode node && node.GUID != SO.StartGuid) nodesRemoved = true;
                 }
 
                 RemoveNode(change.elementsToRemove);
@@ -1722,12 +1799,13 @@ namespace Yang.Dialogue.Editor
                 linksChanged = true;
             }
 
-            if (change.movedElements != null)
-                MoveNode(change.movedElements);
-            if (linksChanged)
-                graph.RefreshPortColors();
+            if (change.movedElements != null) MoveNode(change.movedElements);
+
+            if (linksChanged) graph.RefreshPortColors();
+
             EditorUtility.SetDirty(SO);
             SetUnsaved(nodesRemoved);
+
             return change;
         }
         #endregion
@@ -1738,31 +1816,37 @@ namespace Yang.Dialogue.Editor
         private void EnsureNodeIndices()
         {
             if (!nodeIndicesDirty) return;
+
             nodeIndices.Clear();
-            for (int i = 0; i < Nodes.Count; i++)
-                nodeIndices.TryAdd(Nodes[i].guid, i);
+
+            for (int i = 0; i < Nodes.Count; i++) nodeIndices.TryAdd(Nodes[i].guid, i);
+
             nodeIndicesDirty = false;
         }
 
         public NodeData GetNode(string guid)
         {
             if (SO == null || string.IsNullOrEmpty(guid)) return default;
+
             if (guid == SO.StartGuid) return SO.EditorStartNode;
+
             EnsureNodeIndices();
+
             return nodeIndices.TryGetValue(guid, out int index) ? Nodes[index] : default;
         }
 
         public void SetNode(string guid, NodeData data)
         {
-            if (SO.StartGuid == guid)
-                SO.EditorStartNode = data;
+            if (SO.StartGuid == guid) SO.EditorStartNode = data;
             else
             {
                 EnsureNodeIndices();
+
                 if (!nodeIndices.TryGetValue(guid, out int index)) return;
+
                 Nodes[index] = data;
-                if (data.guid != guid)
-                    InvalidateNodeIndices();
+
+                if (data.guid != guid) InvalidateNodeIndices();
             }
         }
 
@@ -1773,12 +1857,14 @@ namespace Yang.Dialogue.Editor
             foreach (Edge edge in selectable)
             {
                 LinkData link = CreateLink(edge);
+
                 if (string.IsNullOrEmpty(link.nodeGuid) || string.IsNullOrEmpty(link.targetGuid)) continue;
+
                 // Virtualized edges may be hidden; enforce one link per output port in the serialized graph.
+
                 for (int i = Links.Count - 1; i >= 0; i--)
                 {
-                    if (Links[i].nodeGuid == link.nodeGuid && Links[i].outPortIndex == link.outPortIndex)
-                        Links.RemoveAt(i);
+                    if (Links[i].nodeGuid == link.nodeGuid && Links[i].outPortIndex == link.outPortIndex) Links.RemoveAt(i);
                 }
 
                 Links.Add(link);
@@ -1793,18 +1879,15 @@ namespace Yang.Dialogue.Editor
 
             foreach (T element in selectable)
             {
-                if (element is Edge edge)
-                    removedEdges.Add(CreateLink(edge));
-                else if (element is BaseNode node && node.GUID != SO.StartGuid)
-                    removedGuids.Add(node.GUID);
+                if (element is Edge edge) removedEdges.Add(CreateLink(edge));
+                else if (element is BaseNode node && node.GUID != SO.StartGuid) removedGuids.Add(node.GUID);
             }
 
             if (removedGuids.Count > 0)
             {
                 for (int i = Nodes.Count - 1; i >= 0; i--)
                 {
-                    if (removedGuids.Contains(Nodes[i].guid))
-                        Nodes.RemoveAt(i);
+                    if (removedGuids.Contains(Nodes[i].guid)) Nodes.RemoveAt(i);
                 }
 
                 InvalidateNodeIndices();
@@ -1813,8 +1896,8 @@ namespace Yang.Dialogue.Editor
             for (int i = Links.Count - 1; i >= 0; i--)
             {
                 LinkData link = Links[i];
-                if (removedGuids.Contains(link.nodeGuid) || removedGuids.Contains(link.targetGuid) || removedEdges.Contains(link))
-                    Links.RemoveAt(i);
+
+                if (removedGuids.Contains(link.nodeGuid) || removedGuids.Contains(link.targetGuid) || removedEdges.Contains(link)) Links.RemoveAt(i);
             }
         }
 
@@ -1841,8 +1924,8 @@ namespace Yang.Dialogue.Editor
             for (int i = Nodes.Count - 1; i >= 0; i--)
             {
                 NodeData node = Nodes[i];
-                if (string.IsNullOrEmpty(node.guid) || node.guid == startGuid || !validGuids.Add(node.guid))
-                    invalidNodes.Add(i);
+
+                if (string.IsNullOrEmpty(node.guid) || node.guid == startGuid || !validGuids.Add(node.guid)) invalidNodes.Add(i);
                 else portCounts.Add(node.guid, node.type == NodeType.Choice || node.type == NodeType.Condition ? node.PortDatas.Count : 1);
             }
 
@@ -1855,10 +1938,10 @@ namespace Yang.Dialogue.Editor
                 bool invalid = string.IsNullOrEmpty(link.nodeGuid) || string.IsNullOrEmpty(link.targetGuid) ||
                                link.outPortIndex < 0 || !validGuids.Contains(link.nodeGuid) || !validGuids.Contains(link.targetGuid) ||
                                link.outPortIndex >= portCounts[link.nodeGuid] || !seenLinks.Add(link);
-                if (!invalid && !seenPorts.Add((link.nodeGuid, link.outPortIndex)))
-                    invalid = true;
-                if (invalid)
-                    invalidLinks.Add(i);
+
+                if (!invalid && !seenPorts.Add((link.nodeGuid, link.outPortIndex))) invalid = true;
+
+                if (invalid) invalidLinks.Add(i);
             }
 
             if (invalidNodes.Count == 0 && invalidLinks.Count == 0)
@@ -1869,16 +1952,16 @@ namespace Yang.Dialogue.Editor
 
             Undo.RecordObject(SO, "Repair Dialogue Data");
             // The indices were collected backwards, so removal keeps the retained node/link identical to validation.
-            for (int i = 0; i < invalidNodes.Count; i++)
-                Nodes.RemoveAt(invalidNodes[i]);
-            for (int i = 0; i < invalidLinks.Count; i++)
-                Links.RemoveAt(invalidLinks[i]);
+
+            for (int i = 0; i < invalidNodes.Count; i++) Nodes.RemoveAt(invalidNodes[i]);
+
+            for (int i = 0; i < invalidLinks.Count; i++) Links.RemoveAt(invalidLinks[i]);
+
             InvalidateNodeIndices();
             EditorUtility.SetDirty(SO);
             SetUnsaved();
             graph.RebuildAll();
-            EditorUtility.DisplayDialog("Dialogue Repair",
-                $"Repair complete.\n\n• Removed nodes: {invalidNodes.Count}\n• Removed links: {invalidLinks.Count}\n\nSave the changes with Ctrl+S.", "OK");
+            EditorUtility.DisplayDialog("Dialogue Repair", $"Repair complete.\n\n• Removed nodes: {invalidNodes.Count}\n• Removed links: {invalidLinks.Count}\n\nSave the changes with Ctrl+S.", "OK");
         }
 
         private void MoveNode<T>(List<T> selectable) where T : ISelectable
@@ -1922,6 +2005,7 @@ namespace Yang.Dialogue.Editor
                     targetGuid = inputData.guid,
                     outPortIndex = outputPort.parent.IndexOf(outputPort),
                 };
+
                 return link;
             }
 

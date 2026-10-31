@@ -38,6 +38,7 @@ namespace Yang.Dialogue.Editor
                 if (table.LocaleIdentifier == identifier && table is StringTable stringTable)
                 {
                     StringTableEntry entry = id != 0 && stringTable.SharedData.GetEntry(id) != null ? stringTable.GetEntry(id) : stringTable.GetEntry(key);
+
                     if (entry == null) return "";
                     else return entry.Value;
                 }
