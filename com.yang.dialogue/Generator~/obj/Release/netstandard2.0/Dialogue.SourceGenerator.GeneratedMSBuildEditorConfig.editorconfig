@@ -1,0 +1,8 @@
+is_global = true
+build_property.RootNamespace = Dialogue.SourceGenerator
+build_property.ProjectDir = C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.CsWinRTUseWindowsUIXamlProjections = false
+build_property.EffectiveAnalysisLevelStyle = 
+build_property.EnableCodeStyleSeverity = 

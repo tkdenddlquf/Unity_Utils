@@ -41,28 +41,23 @@ namespace Yang.Dialogue
         }
     }
 
-    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
     public sealed class DialogueArgumentAttribute : Attribute
     {
-        public int FieldId { get; }
         public string DisplayName { get; }
 
-        public DialogueArgumentAttribute(int fieldId, string displayName = null)
-        {
-            FieldId = fieldId;
-            DisplayName = displayName;
-        }
+        public DialogueArgumentAttribute(string displayName) => DisplayName = displayName;
     }
 
-    [AttributeUsage(AttributeTargets.Field, AllowMultiple = true, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = true, Inherited = false)]
     public sealed class DialogueShowIfAttribute : Attribute
     {
-        public int FieldId { get; }
+        public string FieldName { get; }
         public object ExpectedValue { get; }
 
-        public DialogueShowIfAttribute(int fieldId, object expectedValue)
+        public DialogueShowIfAttribute(string fieldName, object expectedValue)
         {
-            FieldId = fieldId;
+            FieldName = fieldName;
             ExpectedValue = expectedValue;
         }
     }

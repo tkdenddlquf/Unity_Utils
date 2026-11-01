@@ -1,34 +1,33 @@
+using System;
 using System.Collections.Generic;
 
 namespace Yang.Dialogue
 {
-    public interface IDialogueInstruction
-    {
-        void ReadFrom(RunnerCommand command);
-    }
-
+    // The generated factories materialize instructions once when a graph is compiled.
     public readonly struct RunnerCommand
     {
         private readonly IReadOnlyList<RunnerArgument> arguments;
+        private readonly object instruction;
 
         public string ID { get; }
         public IReadOnlyList<RunnerArgument> Arguments => arguments;
 
-        public RunnerCommand(string id, IReadOnlyList<RunnerArgument> arguments)
+        public RunnerCommand(string id, IReadOnlyList<RunnerArgument> arguments, bool isEvent)
         {
             ID = id;
             this.arguments = arguments;
+            instruction = null;
+            instruction = DialogueInstructionRegistry.Create(id, isEvent, this);
         }
 
         public bool TryGet(int fieldId, out GenericData value)
         {
             for (int i = 0; i < arguments.Count; i++)
             {
-                if (arguments[i].FieldId == fieldId)
-                {
-                    value = arguments[i].Value;
-                    return true;
-                }
+                if (arguments[i].FieldId != fieldId) continue;
+
+                value = arguments[i].Value;
+                return true;
             }
 
             value = default;
@@ -53,23 +52,16 @@ namespace Yang.Dialogue
         public UnityEngine.Color32 GetColor(int fieldId, UnityEngine.Color32 fallback = default)
             => TryGet(fieldId, out GenericData value) && value.TryGetColor(out UnityEngine.Color32 result) ? result : fallback;
 
-        public System.Guid GetGuid(int fieldId, System.Guid fallback = default)
-            => TryGet(fieldId, out GenericData value) && value.TryGetGuid(out System.Guid result) ? result : fallback;
+        public Guid GetGuid(int fieldId, Guid fallback = default)
+            => TryGet(fieldId, out GenericData value) && value.TryGetGuid(out Guid result) ? result : fallback;
 
-        public T GetEnum<T>(int fieldId, T fallback = default) where T : struct, System.Enum
-            => TryGet(fieldId, out GenericData value) && value.TryGetEnum(out T result) ? result : fallback;
+        public int GetEnumInt(int fieldId, int fallback = 0)
+            => TryGet(fieldId, out GenericData value) && value.TryGetEnumInt(out int result) ? result : fallback;
 
-        public bool TryConvert<T>(string expectedId, out T result) where T : class, IDialogueInstruction, new()
+        public bool TryConvert<T>(out T result) where T : class
         {
-            if (ID != expectedId)
-            {
-                result = default;
-                return false;
-            }
-
-            result = new T();
-            result.ReadFrom(this);
-            return true;
+            result = instruction as T;
+            return result != null;
         }
     }
 

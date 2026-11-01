@@ -10,7 +10,7 @@ Unity용 노드 기반 대화 시스템. 그래프 에디터로 대화 흐름을
 
 ## 1. 설치
 
-수정된 로컬 배포본은 `com.yang.dialogue.tgz`로 제공합니다. Unity Package Manager의 **+ → Add package from tarball...**에서 해당 파일을 선택하세요. 기존에 동일한 `com.yang.dialogue`를 Git URL이나 다른 로컬 경로로 설치했다면 먼저 해당 패키지를 제거한 뒤 설치해야 합니다.
+이 배포본은 소스 ZIP이며, 생성기 DLL은 포함하지 않습니다. 설치 전에 아래 `Generator~/build.sh`(Windows는 `build.cmd`)로 DLL을 빌드해야 합니다. 기존에 동일한 `com.yang.dialogue`를 Git URL이나 다른 로컬 경로로 설치했다면 먼저 패키지를 제거하세요.
 
 ZIP 배포본을 쓰려면 압축 해제한 `com.yang.dialogue` 폴더를 Unity 프로젝트의 `Packages/` 안에 넣어 embedded package로 사용합니다. Git URL 의존성을 계속 사용하면 수정된 로컬 코드가 아니라 Git 저장소의 코드가 로드될 수 있습니다.
 
@@ -87,27 +87,16 @@ runner.StartDialogue("main"); // 현재 노드 시작점부터 재실행
 
 ### 3-2. Event와 Variable 스키마
 
-Event는 Command와 마찬가지로 ID와 인자를 선언합니다.
+Event는 게임 코드에 공개 필드만 선언하면 됩니다. 필드별 ID와 `ReadFrom()`은 필요하지 않습니다.
 
 ```csharp
-[DialogueEvent(OpenDoorEvent.ID, Menu = "Door/Open")]
-public class OpenDoorEvent : IDialogueInstruction
+[DialogueEvent("door.open", Menu = "Door/Open")]
+public class OpenDoorEvent
 {
-    public const string ID = "door.open";
-    public const int DoorIdField = 10;
-    public const int AnimatedField = 20;
-
-    [DialogueArgument(DoorIdField, "Door ID")]
+    [DialogueArgument("Door ID")]
     public string doorId;
 
-    [DialogueArgument(AnimatedField, "Animated")]
     public bool animated = true;
-
-    public void ReadFrom(RunnerCommand command)
-    {
-        doorId = command.GetString(DoorIdField);
-        animated = command.GetBool(AnimatedField, true);
-    }
 }
 ```
 
@@ -130,59 +119,50 @@ public class GameDialogueVariables
 }
 ```
 
-### 3-3. Command 스키마
+### 3-3. Command / Event 정적 바인딩
 
-Command 노드의 ID와 인자를 직접 입력하지 않으려면 게임 코드에 스키마 클래스를 선언합니다.
-공개 인스턴스 필드는 에디터에서 타입에 맞는 입력 필드로 자동 표시되며, 실제 그래프에는
-Command ID와 직렬화 가능한 값만 저장됩니다.
+### Source Generator 빌드 확인
+
+Windows에서는 **명령 프롬프트(CMD)**에서 `Generator~\build.cmd`를 실행하거나 **PowerShell**에서 `& ".\Generator~\build.ps1"`를 실행하세요. `build.cmd`는 PowerShell 실행 정책으로 인해 `.ps1` 파일을 직접 실행할 수 없는 경우에도 빌드를 시작할 수 있습니다. macOS/Linux에서는 `bash Generator~/build.sh`를 실행하세요.
+
+빌드 전 `dotnet --list-sdks`에 SDK 버전이 나와야 합니다. `dotnet --list-runtimes`만 나온다면 SDK를 설치해야 합니다. 패키지는 Roslyn 3.8.0을 NuGet에서 복원하므로 NuGet 접근 또는 사전에 복원된 패키지 캐시가 필요합니다.
+
+빌드가 성공하면 `Analyzers/Dialogue.SourceGenerator.dll`이 생성됩니다. **DLL이 생성되는 것과 Unity가 DLL을 인식해 코드를 생성하는 것은 별개**입니다. Unity 공식 설정에서는 `RoslynAnalyzer` 레이블과 모든 플랫폼 비활성화를 요구하고, Unity 버전·패키지 설치 방식에 따라 패키지 내부 DLL이 인식되지 않을 수 있습니다. 이 경우 프로젝트 `Assets` 아래에 DLL과 `.meta`를 함께 배치해 확인하세요. 동일 DLL을 두 위치에 동시에 인식시키지 않도록 주의하세요.
+
+오류가 발생하면 `dotnet restore` 단계인지 `dotnet build` 컴파일 단계인지 확인하고, 출력된 오류 코드(`NU...`, `CS...`, `MSB...`)를 기준으로 원인을 확인하세요.
+
+소스 제너레이터 DLL을 먼저 준비해야 합니다. Unity가 설치된 머신에서 **.NET SDK**와 NuGet 복원 환경을 사용해 패키지 루트의 `Generator~/build.sh`(Windows는 `build.cmd`)를 실행하면 `Analyzers/Dialogue.SourceGenerator.dll`과 `RoslynAnalyzer` 라벨이 포함된 `.meta`가 생성됩니다. 생성되는 `.meta`가 적용되지 않으면 Unity Plugin Inspector에서 플랫폼을 모두 해제하고 `RoslynAnalyzer` 라벨을 확인하세요. 생성기 소스는 프로젝트 빌드에 포함되지 않습니다. Unity 2023.1 호환성을 고려해 Roslyn 3.8을 사용합니다. Unity 버전에 따라 패키지의 생성기 호환성을 확인하세요.
+
+일반 명령은 아래처럼 **클래스와 공개 필드만 작성**합니다. `partial`, 인터페이스, 필드 ID, 수동 변환 코드는 필요하지 않습니다.
 
 ```csharp
-[DialogueCommand(MoveCharacterCommand.ID, Menu = "Character/Move")]
-public class MoveCharacterCommand : IDialogueInstruction
+[DialogueCommand("character.move", Menu = "Character/Move")]
+public class MoveCharacterCommand
 {
-    public const string ID = "character.move";
-    public const int TargetField = 10;
-    public const int PositionXField = 20;
-    public const int PositionYField = 30;
-    public const int DurationField = 40;
-
-    [DialogueArgument(TargetField, "Target")]
+    [DialogueArgument("Target")]
     [DialogueOptions(typeof(CharacterOptions), nameof(CharacterOptions.GetIDs))]
     public string target;
 
-    [DialogueArgument(PositionXField, "Position X")]
     public float x;
-
-    [DialogueArgument(PositionYField, "Position Y")]
     public float y;
-
-    [DialogueArgument(DurationField, "Duration")]
     public float duration = 0.5f;
-
-    public void ReadFrom(RunnerCommand command)
-    {
-        target = command.GetString(TargetField);
-        x = command.GetFloat(PositionXField);
-        y = command.GetFloat(PositionYField);
-        duration = command.GetFloat(DurationField, 0.5f);
-    }
 }
 
 public static class CharacterOptions
 {
-    public static IReadOnlyList<string> GetIDs()
-        => new[] { "alice", "bob", "shopkeeper" };
+    public static IReadOnlyList<string> GetIDs() => new[] { "alice", "bob", "shopkeeper" };
 }
 ```
 
-지원 필드 타입은 `string`, `int`, `float`, `long`, `bool`, `Color32`, `Guid`, `enum`입니다.
-`DialogueOptions`의 공급 메서드는 매개변수가 없는 static 메서드여야 하며
-`IEnumerable<string>`을 반환해야 합니다.
-스키마는 `IDialogueInstruction`을 구현하고 `ReadFrom`에서 필요한 인자를 직접 읽습니다.
-이 변환 과정은 런타임 리플렉션을 사용하지 않습니다.
-`DialogueArgument`의 양수 `FieldId`는 저장 식별자와 표시 순서를 겸하며 스키마 안에서 고유해야 합니다.
-변수명은 자유롭게 바꿀 수 있지만 한번 사용한 `FieldId`는 변경하거나 재사용하지 않는 것을 권장합니다.
-조건부 입력은 기준 필드의 ID를 사용합니다. 예: `[DialogueShowIf(AnimatedField, true)]`.
+**지원하는 필드:** 공개, 인스턴스, 변경 가능한 `string`, `int`, `float`, `long`, `bool`, `Color32`, `Guid`, `int` 기반 `enum`. 생성기는 지원하지 않는 공개 필드에서 컴파일 오류(`YDG001`)를 발생시킵니다. 기본 생성자가 필요하며, 제너레이터 대상 클래스는 중첩/제네릭/추상 클래스가 될 수 없습니다. `[NonSerialized]` 필드는 무시합니다.
+
+필드 표시 순서는 **필드 이름의 Ordinal 정렬**을 사용합니다. 저장 ID는 **필드 이름으로부터 안정적인 FNV-1a 해시를 계산**해 자동 생성하며, 에디터와 생성기는 같은 알고리즘을 사용합니다. 따라서 기존 필드 이름을 유지한 채 필드를 추가하거나 재정렬해도 기존 인자 ID는 바뀌지 않습니다. **필드 이름을 변경하면 저장 ID도 변경됩니다.** 해시 충돌은 스키마 오류로 처리합니다. 이전 버전의 수동 FieldId 데이터에 대한 마이그레이션은 제공하지 않습니다.
+
+`[DialogueArgument("표시명")]`은 선택 사항입니다. 문자열 선택지는 `[DialogueOptions(typeof(공급자), nameof(메서드))]`, 조건부 표시는 필드명을 참조하는 `[DialogueShowIf(nameof(animated), true)]`를 사용합니다. 옵션 공급자와 커스텀 Drawer는 에디터에서만 Reflection으로 찾습니다.
+
+생성기는 각 클래스의 값을 읽는 정적 팩토리와 런타임 등록 코드를 게임 어셈블리에 생성합니다. `RunnerNode.SetDatas()`가 그래프 데이터를 준비할 때 명령 객체를 **한 번 생성하고 캐싱**합니다. 실행 중에는 런타임 Reflection이나 필드별 탐색이 발생하지 않습니다. 캐시된 객체는 여러 View 및 반복 실행에서 공유되므로 **읽기 전용 설정값으로 사용**하세요. 게임 실행 상태를 명령 객체 필드에 기록하지 마세요.
+
+**세이브·로드:** DialogueSO의 설정 데이터는 세이브가 아니며, 기존의 노드 GUID/Trigger/View 상태 세이브 구조를 유지합니다. 게임의 저장 파일은 컴파일 시 생성되는 Command 객체 자체를 저장하지 않습니다. IL2CPP에서 정적 팩토리와 타입 생성 코드는 빌드에 직접 포함됩니다.
 
 필드에 전용 Attribute가 있으면 기본 입력 필드보다 먼저 적용되는 커스텀 Drawer를 등록할 수 있습니다.
 Attribute는 런타임 코드에, Drawer는 Editor 어셈블리에 선언합니다.
@@ -269,7 +249,7 @@ public class SampleDialogueView : DialogueViewBase
     {
         foreach (RunnerCommand command in commands)
         {
-            if (command.TryConvert(MoveCharacterCommand.ID, out MoveCharacterCommand move))
+            if (command.TryConvert(out MoveCharacterCommand move))
             {
                 // 게임 측 캐릭터 시스템에 명령 전달
                 MoveCharacter(move.target, move.x, move.y, move.duration);
@@ -436,7 +416,7 @@ scanSource.TrySetResult("result");
 
 - 컬럼: `ID, Type, Next, Message, Data` + 로케일별 `Speaker[code]` / `Text[code]` 및 `SpeakerPresent[code]` / `TextPresent[code]` (번역 엔트리 존재 여부). 빈 문자열 값과 엔트리가 없는 상태를 구분해 CSV 내보내기/가져오기를 진행합니다.
 - Choice 옵션, Condition 분기, Command/Event 명령은 소유 노드 아래 하위 행으로 표현됩니다.
-- Command/Event 인자는 `fieldId:type=value` 형식으로 왕복합니다. 지원 타입은 `string`, `int`, `float`, `long`, `bool`, `color`, `guid`, `enum`이며, 색상은 `#RRGGBBAA` 형식으로 저장됩니다.
+- Command/Event 인자는 `자동필드ID:type=value` 형식으로 왕복합니다. 지원 타입은 `string`, `int`, `float`, `long`, `bool`, `color`, `guid`, `enum`이며, 색상은 `#RRGGBBAA` 형식으로 저장됩니다.
 - 가져올 때 노드 ID가 **비어 있거나 중복**되면 노드마다 확인창이 떠서 *새 ID 생성 / 건너뛰기 / 모두 생성* 을 고를 수 있습니다.
 - 가리키는 노드가 없거나 건너뛴 링크는 가져오기 후 경고 메시지로 모아 알려줍니다.
 

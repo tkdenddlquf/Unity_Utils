@@ -1,0 +1,10 @@
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\bin\Release\netstandard2.0\Dialogue.SourceGenerator.deps.json
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\bin\Release\netstandard2.0\Dialogue.SourceGenerator.dll
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\bin\Release\netstandard2.0\Dialogue.SourceGenerator.pdb
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\obj\Release\netstandard2.0\Dialogue.SourceGenerator.csproj.AssemblyReference.cache
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\obj\Release\netstandard2.0\Dialogue.SourceGenerator.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\obj\Release\netstandard2.0\Dialogue.SourceGenerator.AssemblyInfoInputs.cache
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\obj\Release\netstandard2.0\Dialogue.SourceGenerator.AssemblyInfo.cs
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\obj\Release\netstandard2.0\Dialogue.SourceGenerator.csproj.CoreCompileInputs.cache
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\obj\Release\netstandard2.0\Dialogue.SourceGenerator.dll
+C:\Users\GEM\Downloads\com.yang.dialogue\Generator~\obj\Release\netstandard2.0\Dialogue.SourceGenerator.pdb

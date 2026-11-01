@@ -98,23 +98,22 @@ namespace Yang.Dialogue.Editor
                 }
 
                 List<SchemaField> supportedFields = new();
-                HashSet<int> fieldIds = new();
+                HashSet<string> fieldNames = new();
                 bool validSchema = true;
 
-                foreach (FieldInfo field in type.GetFields(BindingFlags.Instance | BindingFlags.Public))
+                foreach (FieldInfo field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
                 {
-                    if (field.IsStatic || field.IsNotSerialized || !IsSupported(field.FieldType)) continue;
+                    if (field.IsStatic || field.IsNotSerialized) continue;
 
-                    DialogueArgumentAttribute argument = field.GetCustomAttribute<DialogueArgumentAttribute>();
-
-                    if (argument == null || argument.FieldId <= 0 || !fieldIds.Add(argument.FieldId))
+                    if (field.IsInitOnly || !IsSupported(field.FieldType))
                     {
-                        Debug.LogWarning($"Dialogue schema '{type.FullName}' has a missing, invalid, or duplicate FieldId on '{field.Name}'. The schema was ignored.");
+                        Debug.LogWarning($"Dialogue schema '{type.FullName}' has an unsupported field '{field.Name}'. The schema was ignored.");
                         validSchema = false;
                         break;
                     }
 
-                    supportedFields.Add(new SchemaField { id = argument.FieldId, info = field, argument = argument });
+                    supportedFields.Add(new SchemaField { info = field, argument = field.GetCustomAttribute<DialogueArgumentAttribute>() });
+                    fieldNames.Add(field.Name);
                 }
 
                 if (!validSchema) continue;
@@ -123,9 +122,9 @@ namespace Yang.Dialogue.Editor
                 {
                     foreach (DialogueShowIfAttribute condition in field.info.GetCustomAttributes<DialogueShowIfAttribute>())
                     {
-                        if (condition.FieldId > 0 && condition.FieldId != field.id && fieldIds.Contains(condition.FieldId)) continue;
+                        if (!string.IsNullOrWhiteSpace(condition.FieldName) && condition.FieldName != field.info.Name && fieldNames.Contains(condition.FieldName)) continue;
 
-                        Debug.LogWarning($"Dialogue schema '{type.FullName}' has an invalid DialogueShowIf FieldId on '{field.info.Name}'. The schema was ignored.");
+                        Debug.LogWarning($"Dialogue schema '{type.FullName}' has an invalid DialogueShowIf field name on '{field.info.Name}'. The schema was ignored.");
                         validSchema = false;
                         break;
                     }
@@ -135,7 +134,24 @@ namespace Yang.Dialogue.Editor
 
                 if (!validSchema) continue;
 
-                supportedFields.Sort((a, b) => a.id.CompareTo(b.id));
+                supportedFields.Sort((a, b) => string.CompareOrdinal(a.info.Name, b.info.Name));
+
+                HashSet<int> storedIds = new();
+
+                for (int i = 0; i < supportedFields.Count; i++)
+                {
+                    SchemaField field = supportedFields[i];
+                    field.id = GetFieldId(field.info.Name);
+
+                    if (storedIds.Add(field.id)) continue;
+
+                    Debug.LogWarning($"Dialogue schema '{type.FullName}' has a field name hash collision. The schema was ignored.");
+                    validSchema = false;
+                    break;
+                }
+
+                if (!validSchema) continue;
+
                 object defaults = null;
 
                 try
@@ -171,10 +187,20 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        private static int GetFieldId(string name)
+        {
+            uint hash = 2166136261u;
+
+            for (int i = 0; i < name.Length; i++) hash = unchecked((hash ^ name[i]) * 16777619u);
+
+            int result = (int)(hash & 0x7fffffff);
+            return result == 0 ? 1 : result;
+        }
+
         private static bool IsSupported(Type type) =>
             type == typeof(string) || type == typeof(int) || type == typeof(float) ||
             type == typeof(long) || type == typeof(bool) || type == typeof(Color32) ||
-            type == typeof(Guid) || type.IsEnum;
+            type == typeof(Guid) || type.IsEnum && Enum.GetUnderlyingType(type) == typeof(int);
 
         private void EnsureDefaultData()
         {
@@ -270,7 +296,7 @@ namespace Yang.Dialogue.Editor
             DialogueSO so = window.SO;
 
             Undo.RecordObject(so, "Change Command Schema");
-            optionDatas[commandIndex] = CreateSchemaData(schema, optionDatas[commandIndex].data);
+            optionDatas[commandIndex] = CreateSchemaData(schema, null);
             RebuildCommandElement(commandElement);
             MarkChanged(so);
         }
@@ -289,7 +315,7 @@ namespace Yang.Dialogue.Editor
         private VisualElement CreateArgumentField(VisualElement commandElement, SchemaField schemaField, GenericData value)
         {
             FieldInfo field = schemaField.info;
-            string label = schemaField.argument.DisplayName;
+            string label = schemaField.argument?.DisplayName;
 
             label = string.IsNullOrWhiteSpace(label) ? ObjectNames.NicifyVariableName(field.Name) : label;
             ArgumentBinding binding = new() { commandElement = commandElement, fieldId = schemaField.id };
@@ -459,7 +485,18 @@ namespace Yang.Dialogue.Editor
 
                 foreach (DialogueShowIfAttribute condition in argumentElement.Field.info.GetCustomAttributes<DialogueShowIfAttribute>())
                 {
-                    if (!FindArgument(data, condition.FieldId, out GenericData source) || !MatchesExpectedValue(source, condition.ExpectedValue))
+                    int fieldId = 0;
+
+                    foreach (VisualElement candidate in commandElement.Children())
+                    {
+                        if (candidate is ArgumentElement element && element.Field.info.Name == condition.FieldName)
+                        {
+                            fieldId = element.Field.id;
+                            break;
+                        }
+                    }
+
+                    if (!FindArgument(data, fieldId, out GenericData source) || !MatchesExpectedValue(source, condition.ExpectedValue))
                     {
                         visible = false;
                         break;

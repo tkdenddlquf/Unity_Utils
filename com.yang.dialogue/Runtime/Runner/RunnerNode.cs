@@ -79,15 +79,15 @@ namespace Yang.Dialogue
             {
                 NodeData node = runtimeNodes[i];
 
-                if (node.type == NodeType.Command) commandCache[i] = CompileCommands(node.OptionDatas);
-                else if (node.type == NodeType.Event) eventCache[i] = CompileCommands(node.OptionDatas);
+                if (node.type == NodeType.Command) commandCache[i] = CompileCommands(node.OptionDatas, false);
+                else if (node.type == NodeType.Event) eventCache[i] = CompileCommands(node.OptionDatas, true);
             }
 
             nodes.Clear();
             links.Clear();
         }
 
-        private static RunnerCommand[] CompileCommands(IReadOnlyList<DataWrapper> optionDatas)
+        private static RunnerCommand[] CompileCommands(IReadOnlyList<DataWrapper> optionDatas, bool isEvent)
         {
             List<RunnerCommand> commands = new(optionDatas.Count);
 
@@ -111,7 +111,7 @@ namespace Yang.Dialogue
 
                 if (writeIndex != arguments.Length) System.Array.Resize(ref arguments, writeIndex);
 
-                commands.Add(new RunnerCommand(id, arguments));
+                commands.Add(new RunnerCommand(id, arguments, isEvent));
             }
 
             return commands.ToArray();

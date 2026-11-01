@@ -230,6 +230,18 @@ namespace Yang.Dialogue
             return false;
         }
 
+        public readonly bool TryGetEnumInt(out int value)
+        {
+            if (type == DataType.Enum)
+            {
+                value = intValue;
+                return true;
+            }
+
+            value = default;
+            return false;
+        }
+
         public readonly bool TryGetEnum<T>(out T value) where T : struct, Enum
         {
             if (type == DataType.Enum)
