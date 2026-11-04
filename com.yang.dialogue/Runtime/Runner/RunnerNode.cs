@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Yang.Dialogue
@@ -12,8 +15,6 @@ namespace Yang.Dialogue
         private RunnerCommand[][] commandCache = System.Array.Empty<RunnerCommand[]>();
         private RunnerCommand[][] eventCache = System.Array.Empty<RunnerCommand[]>();
 
-        private readonly Dictionary<string, NodeData> nodes = new();
-        private readonly Dictionary<RunnerPort, RunnerPort> links = new();
         private readonly Dictionary<string, int> nodeIndices = new();
 
         public void Init(RunnerEvent runnerEvent, RunnerTrigger runnerTrigger)
@@ -26,65 +27,63 @@ namespace Yang.Dialogue
         {
             if (so == null) return;
 
-            so.GetDatas(nodes, links);
-            nodeIndices.Clear();
-            runtimeNodes = new NodeData[nodes.Count];
+            // Build and validate a complete snapshot before replacing the currently running graph.
+            Dictionary<string, NodeData> sourceNodes = new();
+            Dictionary<RunnerPort, RunnerPort> sourceLinks = new();
+            so.GetDatas(sourceNodes, sourceLinks);
+            Dictionary<string, int> indices = new();
+            NodeData[] newNodes = new NodeData[sourceNodes.Count];
             int nodeIndex = 0;
 
-            foreach (KeyValuePair<string, NodeData> pair in nodes)
+            foreach (KeyValuePair<string, NodeData> pair in sourceNodes)
             {
-                nodeIndices.Add(pair.Key, nodeIndex);
-                runtimeNodes[nodeIndex++] = pair.Value;
+                if (string.IsNullOrWhiteSpace(pair.Key)) throw new InvalidOperationException("Dialogue graph contains a node with an empty GUID.");
+
+                indices.Add(pair.Key, nodeIndex);
+                newNodes[nodeIndex++] = pair.Value;
             }
 
-            int[] maxPortIndices = new int[runtimeNodes.Length];
-            System.Array.Fill(maxPortIndices, -1);
+            if (!indices.ContainsKey(so.StartGuid)) throw new InvalidOperationException($"Dialogue Start node '{so.StartGuid}' is missing.");
 
-            foreach (KeyValuePair<RunnerPort, RunnerPort> pair in links)
+            int[][] newLinks = new int[newNodes.Length][];
+            RunnerCommand[][] newCommandCache = new RunnerCommand[newNodes.Length][];
+            RunnerCommand[][] newEventCache = new RunnerCommand[newNodes.Length][];
+
+            for (int i = 0; i < newNodes.Length; i++)
             {
-                int sourceIndex = nodeIndices[pair.Key.guid];
-
-                if (pair.Key.portIndex > maxPortIndices[sourceIndex]) maxPortIndices[sourceIndex] = pair.Key.portIndex;
+                NodeData node = newNodes[i];
+                int count = node.type == NodeType.Start ? Math.Max(1, node.PortDatas.Count) : node.PortDatas.Count;
+                newLinks[i] = new int[count];
+                Array.Fill(newLinks[i], -1);
             }
 
-            runtimeLinks = new int[runtimeNodes.Length][];
-
-            for (int i = 0; i < runtimeLinks.Length; i++)
+            foreach (KeyValuePair<RunnerPort, RunnerPort> pair in sourceLinks)
             {
-                int portCount = maxPortIndices[i] + 1;
+                if (!indices.TryGetValue(pair.Key.guid, out int sourceIndex)) throw new InvalidOperationException($"Dialogue link source '{pair.Key.guid}' is missing.");
 
-                if (portCount == 0)
-                {
-                    runtimeLinks[i] = System.Array.Empty<int>();
-                    continue;
-                }
+                if (!indices.TryGetValue(pair.Value.guid, out int targetIndex)) throw new InvalidOperationException($"Dialogue link '{pair.Key.guid}' points to missing node '{pair.Value.guid}'.");
 
-                int[] targets = new int[portCount];
-                System.Array.Fill(targets, -1);
-                runtimeLinks[i] = targets;
+                if ((uint)pair.Key.portIndex >= (uint)newLinks[sourceIndex].Length) throw new InvalidOperationException($"Dialogue node '{pair.Key.guid}' has an invalid output port {pair.Key.portIndex}.");
+
+                newLinks[sourceIndex][pair.Key.portIndex] = targetIndex;
             }
 
-            commandCache = new RunnerCommand[runtimeNodes.Length][];
-            eventCache = new RunnerCommand[runtimeNodes.Length][];
-
-            foreach (KeyValuePair<RunnerPort, RunnerPort> pair in links)
+            for (int i = 0; i < newNodes.Length; i++)
             {
-                int sourceIndex = nodeIndices[pair.Key.guid];
-                int targetIndex = nodeIndices[pair.Value.guid];
+                NodeData node = newNodes[i];
 
-                runtimeLinks[sourceIndex][pair.Key.portIndex] = targetIndex;
+                if (node.type == NodeType.Command) newCommandCache[i] = CompileCommands(node.OptionDatas, false);
+                else if (node.type == NodeType.Event) newEventCache[i] = CompileCommands(node.OptionDatas, true);
             }
 
-            for (int i = 0; i < runtimeNodes.Length; i++)
-            {
-                NodeData node = runtimeNodes[i];
+            nodeIndices.Clear();
 
-                if (node.type == NodeType.Command) commandCache[i] = CompileCommands(node.OptionDatas, false);
-                else if (node.type == NodeType.Event) eventCache[i] = CompileCommands(node.OptionDatas, true);
-            }
+            foreach (KeyValuePair<string, int> pair in indices) nodeIndices.Add(pair.Key, pair.Value);
 
-            nodes.Clear();
-            links.Clear();
+            runtimeNodes = newNodes;
+            runtimeLinks = newLinks;
+            commandCache = newCommandCache;
+            eventCache = newEventCache;
         }
 
         private static RunnerCommand[] CompileCommands(IReadOnlyList<DataWrapper> optionDatas, bool isEvent)
@@ -137,7 +136,20 @@ namespace Yang.Dialogue
 
                         for (int i = 0; i < token.Views.Count; i++)
                         {
-                            await token.Views[i].OnDialogue(speaker, text, message[0].ToString(), token);
+                            IDialogueView view = token.Views[i];
+
+                            try
+                            {
+                                await view.OnDialogue(speaker, text, message[0].ToString(), token);
+                            }
+                            catch (OperationCanceledException) when (token.State != TokenState.Running)
+                            {
+                                throw;
+                            }
+                            catch (Exception exception)
+                            {
+                                throw new InvalidOperationException($"Dialogue View '{view.ViewID}' failed in OnDialogue at node '{nodeData.guid}'.", exception);
+                            }
 
                             if (token.State != TokenState.Running) return -1;
                         }
@@ -304,18 +316,24 @@ namespace Yang.Dialogue
 
                         if (choiceIndex == 0) return -1;
 
-                        int index = -1;
+                        if (token.Views.Count == 0) return -1;
 
-                        foreach (IDialogueView view in token.Views)
-                        {
-                            int result = await view.OnChoice(speaker, choiceDatas, message[0].ToString(), token);
+                        // All views receive the same choice simultaneously; first valid completion wins.
+                        TaskCompletionSource<int> firstChoice = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                        RunnerChoiceToken choiceToken = new(token);
+                        int[] remaining = { token.Views.Count };
+                        Task[] requests = new Task[remaining[0]];
+                        using CancellationTokenRegistration cancellation = choiceToken.CancellationToken.Register(static state => ((TaskCompletionSource<int>)state).TrySetResult(-1), firstChoice);
 
-                            if (token.State != TokenState.Running) return -1;
+                        for (int i = 0; i < token.Views.Count; i++)
+                            requests[i] = CollectChoiceAsync(token.Views[i], speaker, choiceDatas, message[0].ToString(), token, choiceToken, firstChoice, () => Interlocked.Decrement(ref remaining[0]) == 0, choiceIndex);
 
-                            if (result >= 0 && result < choiceIndex && choiceDatas[result].isValid) index = result;
-                        }
+                        _ = DisposeChoiceWhenFinishedAsync(requests, choiceToken);
+                        int index = await firstChoice.Task;
 
-                        return index < 0 ? -1 : choiceDatas[index].portIndex;
+                        if (token.State != TokenState.Running || index < 0) return -1;
+
+                        return choiceDatas[index].portIndex;
                     }
                 case NodeType.Wait:
                     {
@@ -326,7 +344,20 @@ namespace Yang.Dialogue
                         {
                             for (int i = 0; i < token.Views.Count; i++)
                             {
-                                await token.Views[i].OnMessage(datas[1].ToString(), token);
+                                IDialogueView view = token.Views[i];
+
+                                try
+                                {
+                                    await view.OnMessage(datas[1].ToString(), token);
+                                }
+                                catch (OperationCanceledException) when (token.State != TokenState.Running)
+                                {
+                                    throw;
+                                }
+                                catch (Exception exception)
+                                {
+                                    throw new InvalidOperationException($"Dialogue View '{view.ViewID}' failed in OnMessage at node '{nodeData.guid}'.", exception);
+                                }
 
                                 if (token.State != TokenState.Running) return -1;
                             }
@@ -339,7 +370,20 @@ namespace Yang.Dialogue
 
                         for (int i = 0; i < token.Views.Count; i++)
                         {
-                            await token.Views[i].OnCommand(commands, token);
+                            IDialogueView view = token.Views[i];
+
+                            try
+                            {
+                                await view.OnCommand(commands, token);
+                            }
+                            catch (OperationCanceledException) when (token.State != TokenState.Running)
+                            {
+                                throw;
+                            }
+                            catch (Exception exception)
+                            {
+                                throw new InvalidOperationException($"Dialogue View '{view.ViewID}' failed in OnCommand at node '{nodeData.guid}'.", exception);
+                            }
 
                             if (token.State != TokenState.Running) return -1;
                         }
@@ -348,6 +392,50 @@ namespace Yang.Dialogue
             }
 
             return -1;
+        }
+
+        private static async Task CollectChoiceAsync(IDialogueView view, RunnerText speaker, RunnerChoiceCollection choices, string message, RunnerToken token, RunnerChoiceToken choiceToken, TaskCompletionSource<int> firstChoice, Func<bool> isLast, int count)
+        {
+            try
+            {
+                int result = await view.OnChoice(speaker, choices, message, choiceToken);
+
+                if (token.State == TokenState.Running && !choiceToken.CancellationToken.IsCancellationRequested && result >= 0 && result < count && choices[result].isValid)
+                {
+                    if (firstChoice.TrySetResult(result)) choiceToken.Cancel();
+                }
+            }
+            catch (OperationCanceledException) when (token.State != TokenState.Running || choiceToken.CancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException($"Dialogue View '{view.ViewID}' failed in OnChoice at node '{token.TargetNode}'.", exception));
+            }
+            finally
+            {
+                if (isLast())
+                {
+                    firstChoice.TrySetResult(-1);
+                    choiceToken.Cancel();
+                }
+            }
+        }
+
+        private static async Task DisposeChoiceWhenFinishedAsync(Task[] requests, RunnerChoiceToken choiceToken)
+        {
+            try
+            {
+                await Task.WhenAll(requests);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                choiceToken.Dispose();
+            }
         }
 
         public bool TryGetNodeType(string guid, out NodeType type)

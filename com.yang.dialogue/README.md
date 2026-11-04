@@ -1,435 +1,124 @@
 # Dialogue
 
-Unity용 노드 기반 대화 시스템. 그래프 에디터로 대화 흐름을 작성하고, 런타임에서 `DialogueRunner`가 노드를 순회하며 `IDialogueView` 콜백으로 UI에 출력합니다. 텍스트는 Unity Localization(`com.unity.localization`)을 사용합니다.
+Unity에서 대화 흐름을 노드로 작성하고 실행하는 패키지입니다. 대사·선택지 UI는 사용자가 구현하며, 텍스트는 **Unity Localization**과 연동됩니다.
 
-- **Namespace**: `Yang.Dialogue` (런타임), `Yang.Dialogue.Editor` (에디터)
-- **Unity**: 2023.1 이상
-- **의존성**: `com.unity.localization` 1.5.3
+**요구 사항:** Unity 2023.1 이상, `com.unity.localization` 1.5.3
 
----
+## 설치
 
-## 1. 설치
+패키지 폴더(`com.yang.dialogue`)를 Unity 프로젝트의 `Packages/`에 넣어 사용합니다. 같은 패키지가 다른 경로에서 중복 설치되지 않았는지 확인하세요. 런타임 코드를 별도 어셈블리에서 사용한다면 `Dialogue.Runtime`을 참조합니다.
 
-이 배포본은 소스 ZIP이며, 생성기 DLL은 포함하지 않습니다. 설치 전에 아래 `Generator~/build.sh`(Windows는 `build.cmd`)로 DLL을 빌드해야 합니다. 기존에 동일한 `com.yang.dialogue`를 Git URL이나 다른 로컬 경로로 설치했다면 먼저 패키지를 제거하세요.
+## 대화 그래프 만들기
 
-ZIP 배포본을 쓰려면 압축 해제한 `com.yang.dialogue` 폴더를 Unity 프로젝트의 `Packages/` 안에 넣어 embedded package로 사용합니다. Git URL 의존성을 계속 사용하면 수정된 로컬 코드가 아니라 Git 저장소의 코드가 로드될 수 있습니다.
+1. **Project → Create → Dialogue/Node**에서 `DialogueSO`를 생성합니다.
+2. **Tools → Dialogue**를 열고 에셋을 선택합니다.
+3. 노드를 추가하고 출력 포트를 다음 노드에 연결합니다.
+4. 필요하면 `DialogueSO`의 **Speaker Table / Text Table**을 지정하고, 노드에서 Localization 키를 선택합니다.
+5. 게임 오브젝트에 `DialogueRunner`를 붙이고 `DialogueSO`와 View 컴포넌트를 연결합니다.
 
-**설치 확인:** `Tools → Dialogue` 창에서 우측 상단 `Refresh`를 누르면 Console에 `Dialogue Refresh clicked: source=...`가 나타나고 버튼 텍스트가 `Updated n / Missing n`으로 바뀝니다. `source`가 현재 설치한 `com.yang.dialogue` 경로인지 확인하세요. 이후 `Dialogue localization refresh: nodes=..., references=..., updated=..., unresolved=...`가 출력됩니다. 이 로그가 없거나 버튼 표시가 바뀌지 않으면 Unity가 이전 에디터 코드를 실행 중이거나 Console의 Log 필터가 꺼진 상태일 수 있습니다.
-
-Localization 의존성은 `com.unity.localization` 1.5.3이며, 런타임 어셈블리 참조가 필요하면 `Dialogue.Runtime`을 추가합니다.
-
----
-
-## 2. 핵심 구성요소
-
-| 타입 | 역할 |
+| 노드 | 역할 |
 | --- | --- |
-| `DialogueSO` | 대화 그래프를 담는 ScriptableObject 에셋 |
-| `DialogueRunner` | 그래프를 실행하는 MonoBehaviour. 시작/일시정지/저장/트리거 등을 제어 |
-| `IDialogueView` / `DialogueViewBase` | 노드 출력(대사·선택지 등)을 받는 UI 측 인터페이스 |
-| Attribute 스키마 | Command, Event, Trigger/Condition 입력 UI와 타입 정의 |
+| Start | 시작점 |
+| Dialogue | 화자와 대사 표시 |
+| Choice | 조건에 따른 선택지와 분기 |
+| Condition | 변수 값으로 분기 |
+| Trigger | 변수 값 설정·증감 |
+| Event | 등록된 게임 이벤트 호출 |
+| Wait | 시간 또는 View 신호 대기 |
+| Command | View에 명령과 인자 전달 |
 
-### 노드 타입 (`NodeType`)
-
-| 노드 | 동작 | View 콜백 |
-| --- | --- | --- |
-| Start | 그래프 시작점 | — |
-| Dialogue | 화자/대사 출력 | `OnDialogue` |
-| Choice | 선택지 출력, 선택한 포트로 분기 | `OnChoice` |
-| Condition | 트리거 값을 검사해 분기 | — |
-| Trigger | 트리거 값을 설정/증감 | — |
-| Event | 등록된 이벤트 콜백 실행 | — |
-| Wait | 초 단위 대기 또는 외부 신호 대기 | (신호 대기 시) `OnMessage` |
-| Command | 문자열 ID와 타입화된 인자를 View에 전달 | `OnCommand` |
-
----
-
-## 3. 사용 흐름
-
-### 3-1. 그래프 작성
-
-1. 상단 메뉴 **Tools ▸ Dialogue** 로 그래프 에디터를 엽니다.
-2. **Project ▸ Create ▸ Dialogue/Node** 로 `DialogueSO` 에셋을 만듭니다.
-3. 에디터에서 노드를 배치하고 포트를 연결합니다.
-4. Dialogue/Choice 노드의 화자·대사는 Localization String Table의 키로 지정합니다. (`DialogueSO`의 `SpeakerTable`, `TextTable`)
-
-**에디터 편의 기능**
-
-- **연결 표시 막대** — 포트 끝의 막대로 연결 여부를 표시합니다. *꽉 찬 막대* = 연결됨, *속이 빈 막대* = 미연결 (색은 초록/회색, 색 없이 모양만으로도 구분됩니다).
-- **연결 노드로 이동** — 포트의 막대를 더블클릭하면 연결된 노드로 화면이 이동합니다. 입력 포트에 여러 개가 연결돼 있으면 더블클릭할 때마다 순환합니다.
-- **통합 검색** — 우측 상단에서 노드 ID, 타입, 데이터 값, 현지화 텍스트를 검색합니다. 자동완성은 10개까지 표시하며, ↑/↓로 선택하고 Enter로 이동합니다. Enter를 반복하면 전체 일치 노드를 순서대로, Shift+Enter는 역순으로 탐색합니다. 검색어는 유지됩니다.
-- **탐색 기록** — 검색 및 포트 더블클릭으로 이동한 위치는 `←`/`→` 버튼으로 되돌아가거나 다시 이동할 수 있습니다(에셋당 작업 중 최대 50단계).
-- **작업 상태 유지** — Undo/Redo와 언어 변경 후에도 살아 있는 선택 노드를 복원합니다. 화면 이동·확대 상태는 에디터 로컬에 자동 저장하며 콘텐츠의 미저장 표시를 만들지 않습니다.
-- **빠른 편집** — Choice/Condition/Command 노드 제목의 `+` 버튼으로 항목을 추가할 수 있습니다. 우측 도구 패널에서 현재 DialogueSO를 직접 바꾸거나 패널을 접을 수 있습니다.
-- **Localization 직접 수정** — Dialogue/Choice의 텍스트 미리보기에서 현지화 키가 연결되어 있으면 현재 언어의 String Table 값을 직접 편집합니다. 이 변경은 **String Table에 즉시 저장**되고, 그래프의 Save/Discard와 별도로 관리됩니다. 다른 로케일은 언어 선택에서 바꾸며, 노드 데이터에 텍스트를 중복 보관하지 않습니다.
-- **CSV 가져오기 확인** — Inspector의 Import CSV에서 현재 노드·링크 수와 CSV의 노드·언어별 셀 수를 가져오기 전에 확인할 수 있습니다. 이는 내용 통계이며 정확한 변경 차이(diff)를 계산한 미리보기는 아닙니다.
-
-**플레이 모드 테스트:** 게임을 실행하면 우측 도구 패널에 `Play Mode · Runner Debug`가 표시됩니다. `Runner`에서 씬의 `DialogueRunner`를 지정하거나, 현재 DialogueSO를 사용하는 Runner를 자동 선택하게 둡니다. `Flow`에서 실행 키를 선택하면 현재 진행 중인 노드의 GUID와 상태가 나타나고 노드에 초록 테두리가 표시됩니다. `Follow active node`를 켜면 진행 중인 노드로 화면이 자동 이동합니다. 기존 흐름을 테스트할 때는 대상 노드를 선택하고 `Play / Jump selected`를 클릭하거나 노드를 우클릭해 `Play / Jump to this node`를 실행하세요. 흐름이 없다면 `New key` 값으로 선택 노드에서 새 실행을 시작합니다. **편집 변경사항이 아직 Runner에 적용되지 않았다면** 확인창이 표시되며, `Apply and Jump`를 선택하면 변경사항을 적용한 후 지정한 노드에서 실행합니다. 취소하면 재적용과 점프를 모두 수행하지 않습니다. 재적용 과정에서 다른 Flow는 일시정지 상태로 남고, 선택한 Flow만 해당 노드에서 재시작합니다. 이 기능은 **플레이 모드 전용**이며, ScriptableObject 데이터에 디버그 상태를 저장하지 않습니다.
-
-**플레이 중 그래프 수정 및 재적용:** Runner는 초기화 시 `NodeData`의 포트·옵션 리스트까지 복사한 **독립 실행 스냅샷**을 사용합니다. 따라서 플레이 중 노드를 추가·삭제하거나 분기, Event, Command를 수정해도 실행 중인 Runner에는 부분적으로만 변경되는 일이 없습니다. 그래프 콘텐츠를 수정하면 Debug 패널에 미적용 상태가 표시됩니다. `Apply graph changes to Runner`를 누르면 모든 실행 흐름에 **Pause를 요청**하고 이전 View 콜백 종료를 기다린 다음 새 스냅샷을 만들고 Choice 캐시를 비웁니다. 기존 흐름은 **일시정지된 상태로 남으며 자동 재시작하지 않습니다.** `Play / Jump selected`로 이동하거나 `StartDialogue(key)`로 직접 재개하세요. 편집 과정에서 지워진 노드를 진행 중이었다면 시작 노드로 복귀하고 Console에 경고가 표시됩니다. 다른 Runner의 스냅샷에는 영향을 주지 않습니다.
+### 실행 및 저장
 
 ```csharp
-// 게임 로직에서 수동으로 재적용할 경우
-bool applied = await runner.ApplyGraphChangesAsync();
-// applied == true: 모든 기존 흐름이 Paused 상태이며 데이터 캐시가 교체됨
-runner.StartDialogue("main"); // 현재 노드 시작점부터 재실행
+using Yang.Dialogue;
+
+// 연결된 DialogueRunner에서 실행
+runner.StartDialogue("main");
+runner.PauseDialogue("main");
+runner.StartDialogue("main"); // 현재 위치에서 재개
+
+DialogueSaveData saved = runner.Save();
+runner.Load(saved);
+runner.StartDialogue("main");
+
+runner.StopDialogue("main");
 ```
 
-- 재적용은 **현재 메모리의 DialogueSO**를 읽으며 에셋 저장과는 별개입니다.
-- 노드 위치/확대만 변경한 것은 실행 데이터 변경으로 취급하지 않습니다.
-- 별도 Localization String Table의 문자열 갱신은 실행 스냅샷 복사 대상이 아니며 Localization 시스템의 갱신 정책을 따릅니다.
-- View의 비동기 작업은 기존 `IRunnerToken` 취소 계약에 따라 취소 후 반환해야 재적용이 완료됩니다.
-- 재적용 후 재시작하는 노드의 Event/Trigger/Command는 다시 실행될 수 있으므로, 재시작 지점을 직접 선택할 수 있게 했습니다.
+저장된 흐름의 노드가 그래프에서 삭제된 경우 시작 노드로 복구하며 경고를 출력합니다. 저장 데이터에는 흐름 위치, Trigger 값, View의 저장 정보가 포함됩니다. 실제 파일 저장과 불러오기는 게임 측에서 처리해야 합니다.
 
-**빈 그래프:** DialogueSO를 선택하지 않은 상태에서는 노드 생성·삭제·붙여넣기를 사용할 수 없고, 에셋을 선택하라는 안내가 표시됩니다.
+### View 구현
 
-**대규모 그래프 편집:** 팬·줌·창 크기 변경으로 발생하는 여러 가시성 검사를 한 번의 UI 갱신으로 병합하고, 화면 주변 노드만 생성하는 기존 가상화는 유지합니다. 노드 GUID 검색은 인덱스를 사용하고, 포트의 연결 상태는 링크를 한 번 순회하여 계산합니다. 노드 이동만으로 포트 연결 색상을 다시 계산하지 않으며, 다중 노드 삭제·붙여넣기는 일괄 처리합니다. 노드 추가·삭제·GUID 변경·Undo/Redo·CSV 가져오기 후에는 인덱스를 갱신합니다.
+`DialogueViewBase`를 상속해 필요한 콜백을 구현합니다. 같은 Runner에 여러 View를 연결할 수 있습니다.
 
-### 3-2. Event와 Variable 스키마
+- `OnDialogue`: 대사 표시
+- `OnChoice`: 선택 UI를 표시하고 선택된 항목의 **인덱스** 반환
+- `OnCommand`: 명령 전달
+- `OnMessage`: 외부 입력 또는 신호 대기
+- `OnPaused`, `OnStopped`, `OnEnded`: 흐름 종료 및 화면 정리
+- `CaptureView`: 저장할 View 상태 반환
 
-Event는 게임 코드에 공개 필드만 선언하면 됩니다. 필드별 ID와 `ReadFrom()`은 필요하지 않습니다.
+**여러 View의 선택지:** `OnChoice`는 모든 View에 동시에 요청됩니다. **가장 먼저 유효한 선택 인덱스를 반환한 View의 결과가 확정**됩니다. 나머지 선택 대기는 취소되므로, View는 `IRunnerToken.CancellationToken` 또는 `token.WaitFor(...)`를 사용해 취소 신호에 반응해야 합니다. 유효하지 않은 인덱스나 조건을 만족하지 않는 선택은 채택되지 않습니다.
 
 ```csharp
-[DialogueEvent("door.open", Menu = "Door/Open")]
-public class OpenDoorEvent
-{
-    [DialogueArgument("Door ID")]
-    public string doorId;
+AwaitableCompletionSource<int> selection = new();
+RunnerWaitResult<int> result = await token.WaitFor(selection);
 
-    public bool animated = true;
-}
+if (result.IsCompleted) return result.Value;
+
+return -1;
 ```
 
-Trigger, Condition, Choice가 공유하는 변수는 하나의 스키마에 선언합니다.
-현재 지원 변수 타입은 `float`, `bool`입니다.
-각 변수의 양수 `FieldId`는 저장 식별자와 표시 순서를 겸하며 전체 Variable 스키마에서 고유해야 합니다.
+View는 UI에서 항목을 클릭했을 때 `selection.TrySetResult(선택인덱스);`를 호출하고, 취소 시 선택 UI를 정리해야 합니다.
+
+**오류 확인:** `StartDialogue()`로 실행한 View의 비동기 콜백에서 예외가 발생하면 Unity Console에 흐름 키·노드 GUID·View ID·콜백 이름과 원래 예외가 표시됩니다. `StartDialogueAsync()`는 호출자에게 예외를 전달하므로 호출하는 쪽에서 `await`와 예외 처리를 해야 합니다. 정상적인 중지·일시정지에 따른 취소는 오류로 취급하지 않습니다. View 내부에서 시작한 다른 비동기 작업도 `await`해야 예외가 Runner로 전달됩니다.
+
+### 변수 및 명령
+
+Condition, Choice, Trigger에서 사용할 변수를 스키마로 선언합니다. 지원 타입은 `float`, `bool`이며, 필드 ID는 양수이면서 스키마 전체에서 고유해야 합니다.
 
 ```csharp
+using Yang.Dialogue;
+
 [DialogueVariableSchema]
 public class GameDialogueVariables
 {
-    public const int AffectionField = 10;
-    public const int HasKeyField = 20;
-
-    [DialogueVariable(AffectionField, "Affection")]
+    [DialogueVariable(10, "Affection")]
     public float affection;
 
-    [DialogueVariable(HasKeyField, "Has Key")]
+    [DialogueVariable(20, "Has Key")]
     public bool hasKey;
 }
-```
 
-### 3-3. Command / Event 정적 바인딩
-
-### Source Generator 빌드 확인
-
-Windows에서는 **명령 프롬프트(CMD)**에서 `Generator~\build.cmd`를 실행하거나 **PowerShell**에서 `& ".\Generator~\build.ps1"`를 실행하세요. `build.cmd`는 PowerShell 실행 정책으로 인해 `.ps1` 파일을 직접 실행할 수 없는 경우에도 빌드를 시작할 수 있습니다. macOS/Linux에서는 `bash Generator~/build.sh`를 실행하세요.
-
-빌드 전 `dotnet --list-sdks`에 SDK 버전이 나와야 합니다. `dotnet --list-runtimes`만 나온다면 SDK를 설치해야 합니다. 패키지는 Roslyn 3.8.0을 NuGet에서 복원하므로 NuGet 접근 또는 사전에 복원된 패키지 캐시가 필요합니다.
-
-빌드가 성공하면 `Analyzers/Dialogue.SourceGenerator.dll`이 생성됩니다. **DLL이 생성되는 것과 Unity가 DLL을 인식해 코드를 생성하는 것은 별개**입니다. Unity 공식 설정에서는 `RoslynAnalyzer` 레이블과 모든 플랫폼 비활성화를 요구하고, Unity 버전·패키지 설치 방식에 따라 패키지 내부 DLL이 인식되지 않을 수 있습니다. 이 경우 프로젝트 `Assets` 아래에 DLL과 `.meta`를 함께 배치해 확인하세요. 동일 DLL을 두 위치에 동시에 인식시키지 않도록 주의하세요.
-
-오류가 발생하면 `dotnet restore` 단계인지 `dotnet build` 컴파일 단계인지 확인하고, 출력된 오류 코드(`NU...`, `CS...`, `MSB...`)를 기준으로 원인을 확인하세요.
-
-소스 제너레이터 DLL을 먼저 준비해야 합니다. Unity가 설치된 머신에서 **.NET SDK**와 NuGet 복원 환경을 사용해 패키지 루트의 `Generator~/build.sh`(Windows는 `build.cmd`)를 실행하면 `Analyzers/Dialogue.SourceGenerator.dll`과 `RoslynAnalyzer` 라벨이 포함된 `.meta`가 생성됩니다. 생성되는 `.meta`가 적용되지 않으면 Unity Plugin Inspector에서 플랫폼을 모두 해제하고 `RoslynAnalyzer` 라벨을 확인하세요. 생성기 소스는 프로젝트 빌드에 포함되지 않습니다. Unity 2023.1 호환성을 고려해 Roslyn 3.8을 사용합니다. Unity 버전에 따라 패키지의 생성기 호환성을 확인하세요.
-
-일반 명령은 아래처럼 **클래스와 공개 필드만 작성**합니다. `partial`, 인터페이스, 필드 ID, 수동 변환 코드는 필요하지 않습니다.
-
-```csharp
 [DialogueCommand("character.move", Menu = "Character/Move")]
 public class MoveCharacterCommand
 {
-    [DialogueArgument("Target")]
-    [DialogueOptions(typeof(CharacterOptions), nameof(CharacterOptions.GetIDs))]
     public string target;
-
-    public float x;
-    public float y;
-    public float duration = 0.5f;
+    public float speed;
 }
 
-public static class CharacterOptions
+[DialogueEvent("door.open", Menu = "Door/Open")]
+public class OpenDoorEvent
 {
-    public static IReadOnlyList<string> GetIDs() => new[] { "alice", "bob", "shopkeeper" };
+    public string doorId;
 }
 ```
 
-**지원하는 필드:** 공개, 인스턴스, 변경 가능한 `string`, `int`, `float`, `long`, `bool`, `Color32`, `Guid`, `int` 기반 `enum`. 생성기는 지원하지 않는 공개 필드에서 컴파일 오류(`YDG001`)를 발생시킵니다. 기본 생성자가 필요하며, 제너레이터 대상 클래스는 중첩/제네릭/추상 클래스가 될 수 없습니다. `[NonSerialized]` 필드는 무시합니다.
+Command / Event의 공개 필드는 Source Generator가 인자를 변환하고 런타임 팩토리를 등록합니다. ID는 다른 어셈블리를 포함하여 각 Command 또는 Event 종류 안에서 중복되면 안 됩니다. 지원 필드는 `string`, `int`, `float`, `long`, `bool`, `Color32`, `Guid`, `int` 기반 `enum`입니다.
 
-필드 표시 순서는 **필드 이름의 Ordinal 정렬**을 사용합니다. 저장 ID는 **필드 이름으로부터 안정적인 FNV-1a 해시를 계산**해 자동 생성하며, 에디터와 생성기는 같은 알고리즘을 사용합니다. 따라서 기존 필드 이름을 유지한 채 필드를 추가하거나 재정렬해도 기존 인자 ID는 바뀌지 않습니다. **필드 이름을 변경하면 저장 ID도 변경됩니다.** 해시 충돌은 스키마 오류로 처리합니다. 이전 버전의 수동 FieldId 데이터에 대한 마이그레이션은 제공하지 않습니다.
+## CSV 내보내기 / 가져오기
 
-`[DialogueArgument("표시명")]`은 선택 사항입니다. 문자열 선택지는 `[DialogueOptions(typeof(공급자), nameof(메서드))]`, 조건부 표시는 필드명을 참조하는 `[DialogueShowIf(nameof(animated), true)]`를 사용합니다. 옵션 공급자와 커스텀 Drawer는 에디터에서만 Reflection으로 찾습니다.
+`DialogueSO`의 Inspector에서 **Export CSV** 또는 **Import CSV**를 사용합니다. CSV에는 노드·연결 정보와 로케일별 텍스트가 포함됩니다. 가져오기는 **기존 노드와 링크를 교체**하며, 연결된 String Table의 엔트리도 갱신할 수 있으므로 필요한 에셋을 먼저 백업하세요.
 
-생성기는 각 클래스의 값을 읽는 정적 팩토리와 런타임 등록 코드를 게임 어셈블리에 생성합니다. `RunnerNode.SetDatas()`가 그래프 데이터를 준비할 때 명령 객체를 **한 번 생성하고 캐싱**합니다. 실행 중에는 런타임 Reflection이나 필드별 탐색이 발생하지 않습니다. 캐시된 객체는 여러 View 및 반복 실행에서 공유되므로 **읽기 전용 설정값으로 사용**하세요. 게임 실행 상태를 명령 객체 필드에 기록하지 마세요.
+- 가져오기 전 노드·링크·텍스트 수를 미리 볼 수 있습니다.
+- 누락된 **노드 ID, Localization 테이블, 엔트리**는 생성을 묻습니다. 거절하면 해당 노드 또는 Localization 데이터만 건너뜁니다.
+- **잘못된 타입·ID·연결·조건식·명령 인자** 등이 있으면 CSV 행 번호와 노드 정보를 표시하고 정상 값을 입력받습니다. 해당 행이나 연결을 건너뛰거나 전체 가져오기를 취소할 수도 있습니다.
+- 가져오기 작업은 입력 검증과 생성 여부 선택을 마친 뒤 적용됩니다. 누락된 Localization 참조를 건너뛰면 그 참조는 빈 값으로 유지됩니다.
+- `Choice`의 Option, `Condition`의 Branch, `Command/Event`의 Instruction은 부모 노드 바로 아래의 행으로 표현됩니다.
 
-**세이브·로드:** DialogueSO의 설정 데이터는 세이브가 아니며, 기존의 노드 GUID/Trigger/View 상태 세이브 구조를 유지합니다. 게임의 저장 파일은 컴파일 시 생성되는 Command 객체 자체를 저장하지 않습니다. IL2CPP에서 정적 팩토리와 타입 생성 코드는 빌드에 직접 포함됩니다.
+## 플레이 모드 디버깅
 
-필드에 전용 Attribute가 있으면 기본 입력 필드보다 먼저 적용되는 커스텀 Drawer를 등록할 수 있습니다.
-Attribute는 런타임 코드에, Drawer는 Editor 어셈블리에 선언합니다.
-
-```csharp
-using System;
-
-[AttributeUsage(AttributeTargets.Field)]
-public sealed class DialogueRangeAttribute : Attribute
-{
-    public float Min { get; }
-    public float Max { get; }
-
-    public DialogueRangeAttribute(float min, float max)
-    {
-        Min = min;
-        Max = max;
-    }
-}
-```
-
-```csharp
-using System;
-using System.Reflection;
-using UnityEngine.UIElements;
-using Yang.Dialogue;
-using Yang.Dialogue.Editor;
-
-[DialogueArgumentDrawer(typeof(DialogueRangeAttribute))]
-public sealed class DialogueRangeDrawer : DialogueArgumentDrawer
-{
-    public override VisualElement CreateField(
-        FieldInfo field,
-        Attribute attribute,
-        string label,
-        GenericData value,
-        Action<GenericData> onChanged)
-    {
-        DialogueRangeAttribute range = (DialogueRangeAttribute)attribute;
-        Slider slider = new(label, range.Min, range.Max) { value = value.GetFloat() };
-
-        slider.RegisterValueChangedCallback(evt => onChanged(new GenericData(evt.newValue)));
-
-        return slider;
-    }
-}
-```
-
-```csharp
-[DialogueRange(0f, 10f)]
-public float duration = 0.5f;
-```
-
-### 3-4. View 구현
-
-`DialogueViewBase`(MonoBehaviour)를 상속해 필요한 콜백만 override 합니다. 각 콜백은 Unity `Awaitable`을 반환하므로, 타이핑 연출·버튼 입력 대기 등을 `await` 로 처리하면 그동안 러너가 다음 노드로 진행하지 않고 기다립니다.
-
-```csharp
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.Localization;
-using UnityEngine.Localization.Settings;
-using Yang.Dialogue;
-
-public class SampleDialogueView : DialogueViewBase
-{
-    public override async Awaitable OnDialogue(RunnerText speaker, RunnerText text, string message, IRunnerToken token)
-    {
-        // TableReference는 GUID, TableEntryReference는 long ID를 우선 사용
-        string speakerName = await Localize(speaker);
-        string body        = await Localize(text);
-
-        // UI 출력 + 클릭 대기 등...
-    }
-
-    public override async Awaitable<int> OnChoice(RunnerText speaker, RunnerChoiceCollection texts, string message, IRunnerToken token)
-    {
-        // texts[i].isValid 가 false 면 조건 미충족 선택지
-        // 사용자가 고른 인덱스를 반환 (선택 안 하면 -1)
-        return 0;
-    }
-
-    public override async Awaitable OnCommand(IReadOnlyList<RunnerCommand> commands, IRunnerToken token)
-    {
-        foreach (RunnerCommand command in commands)
-        {
-            if (command.TryConvert(out MoveCharacterCommand move))
-            {
-                // 게임 측 캐릭터 시스템에 명령 전달
-                MoveCharacter(move.target, move.x, move.y, move.duration);
-            }
-        }
-
-    }
-
-    public override async Awaitable OnMessage(string reason, IRunnerToken token) { }   // Wait 신호 등 알림
-
-    private async Awaitable<string> Localize(RunnerText t)
-    {
-        return await LocalizationSettings.StringDatabase.GetLocalizedStringAsync(t.TableReference, t.TableEntryReference).Task;
-    }
-}
-```
-
-**로컬라이제이션 이름 변경:** Dialogue/Choice 노드는 테이블명·GUID와 엔트리 키·long ID를 함께 저장합니다. GraphView 새로고침은 GUID와 ID가 유효하면 현재 이름·키로 저장 문자열을 동기화하고, 식별자가 유효하지 않으면 저장된 이름·키로 다시 조회해 GUID·ID를 복원합니다. 둘 다 찾을 수 없을 때는 저장된 참조값을 임의로 삭제하지 않습니다. CSV의 `SpeakerTableGuid`, `TextTableGuid`, `SpeakerEntryId`, `TextEntryId`에도 동일한 우선순위를 적용하며, 과거 CSV의 이름 기반 조회도 유지합니다. 기존 View에서 문자열 `table`/`entry`를 직접 사용하는 코드는 위 예제처럼 `TableReference`/`TableEntryReference`를 사용해야 이름 변경에 안전합니다. GraphView의 **Refresh** 버튼을 누르면 Console에 검사한 노드 수(`nodes`), 참조 수(`references`), 실제 보정 횟수(`updated`), 찾을 수 없는 참조 수(`unresolved`)가 출력되며, 미해결 참조는 노드 GUID와 저장된 키/ID를 함께 경고로 표시합니다.
-
-### 3-5. 러너 설정 & 실행
-
-1. 씬의 GameObject에 `DialogueRunner` 컴포넌트를 추가합니다.
-2. 인스펙터에서 `so`(DialogueSO)와 `viewBases`(위에서 만든 View들)를 할당합니다.
-3. 코드에서 `StartDialogue`로 대화를 시작합니다.
-
-```csharp
-[SerializeField] private DialogueRunner runner;
-
-void Begin()
-{
-    // key 는 동시에 흐를 수 있는 대화 흐름의 식별자
-    runner.StartDialogue("main");
-
-    // 특정 노드 이름에서 시작하려면:
-    // runner.StartDialogue("main", "SomeNodeGuid");
-}
-```
-
----
-
-## 4. DialogueRunner API
-
-### 흐름 제어
-
-```csharp
-void StartDialogue(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null);
-Awaitable StartDialogueAsync(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null);
-bool IsRunning(string key);
-void StopDialogue(string key);
-void PauseDialogue(string key);     // 특정 흐름 일시정지
-void StopAllDialogue();
-void PauseAllDialogue();
-void JumpNode(string key, string nodeName);   // 진행 중 흐름을 다른 노드로 점프
-Awaitable JumpNodeAsync(string key, string nodeName);
-Awaitable<bool> RequestJumpNodeAsync(string key, string nodeName); // 새 노드 실행이 시작되면 반환
-void SetDialogue(DialogueSO so);    // 다른 그래프로 교체 (진행 중이면 무시)
-```
-
-- `key`별로 독립적인 흐름이 유지됩니다. 같은 `key`가 이미 진행 중이면 중복 시작은 무시됩니다. 같은 흐름에 점프를 연속 요청하면 가장 나중의 요청만 유효합니다. `JumpNodeAsync()`는 점프 이후의 대화 종료까지 기다리고, `RequestJumpNodeAsync()`는 새 노드 실행을 시작하면 `true`를 반환하므로 에디터 테스트 버튼처럼 완료를 기다리지 않는 호출에 적합합니다.
-- `views`를 넘기면 그 대화 흐름의 View 목록으로 사용합니다. 미지정 시 기존 흐름의 View를 유지하며, 새 흐름은 인스펙터의 `viewBases`와 등록된 View를 사용합니다.
-
-### View 관리
-
-```csharp
-bool AddView(IDialogueView view);
-bool RemoveView(IDialogueView view);
-void ClearViews();
-IReadOnlyList<IDialogueView> Views { get; }
-```
-
-### Trigger (변수)
-
-조건 분기와 선택지 조건에 쓰이는 float/bool 값입니다.
-
-```csharp
-void  SetValue(int fieldId, float value);
-void  SetValue(int fieldId, bool value);
-float GetFloatValue(int fieldId);
-bool  GetBoolValue(int fieldId);
-bool  ContainsKey(int fieldId);
-bool  RemoveValue(int fieldId);
-void  ClearTriggerValues();
-
-// 값 변경 콜백
-void TriggerRegisterCallback(System.Action<int> callback);             // 모든 FieldId
-void TriggerRegisterCallback(int fieldId, System.Action callback);     // 특정 FieldId
-void TriggerUnregisterCallback(...);   // 위 두 형태의 해제
-void ClearTriggerCallbacks();
-```
-
-### Event
-
-Event 노드가 실행될 때 호출할 콜백을 ID로 등록합니다.
-
-```csharp
-void EventRegisterCallback(string id, System.Action<RunnerCommand> callback);
-void EventUnregisterCallback(string id, System.Action<RunnerCommand> callback);
-void ClearEventCallbacks();
-```
-
-```csharp
-runner.EventRegisterCallback(OpenDoorEvent.ID, data => door.Open(data.GetString(OpenDoorEvent.DoorIdField)));
-runner.SetValue(GameDialogueVariables.AffectionField, 100f);
-runner.SetValue(GameDialogueVariables.HasKeyField, true);
-```
-
-### 저장 / 불러오기
-
-진행 중인 흐름 위치(노드), 트리거 값, 대화별 View 데이터를 직렬화 가능한 `DialogueSaveData`로 저장/복원합니다. 저장된 대화는 `Load()` 이후 `StartDialogue()`로 재개하며, 실행 중인 노드의 처음부터 다시 시작합니다.
-
-```csharp
-DialogueSaveData data = runner.Save();
-string json = JsonUtility.ToJson(data);
-
-runner.Load(JsonUtility.FromJson<DialogueSaveData>(json));
-foreach (DialogueFlowData flow in data.dialogueFlows) runner.StartDialogue(flow.key);
-
-// 같은 View에서 대화별로 저장한 데이터를 구분할 때
-MyViewState state = runner.Get<MyViewState>("main", myView);
-```
-
-`Load()`는 기존 대화에 중지를 요청한 뒤 저장된 트리거와 대화 위치를 동기적으로 복원하지만 자동으로 재생하지는 않습니다. 이전 View가 아직 실행 중이면 해당 콜백이 끝난 후 `OnStopped`를 한 번 호출하며, 그때까지 새 대화 실행을 대기시켜 동일 View에서 이전 실행과 새 실행이 겹치지 않도록 합니다. `Load()` 자체는 비동기 콜백 종료까지 기다리지 않습니다. 사용자 지정 View 목록을 복원하려면 해당 View를 `AddView()`로 등록한 뒤 `Load()`를 호출해야 합니다. `Get<TData>(view)`는 첫 일치 항목을 반환하는 기존 API이며, 여러 대화에서 같은 View를 사용하면 `Get<TData>(key, view)`를 사용하세요.
-
----
-
-## 5. 데이터 타입 참고
-
-- **`RunnerText`** — `TableReference`(GUID 우선), `TableEntryReference`(long ID 우선)를 통해 안정적으로 로컬라이즈합니다. 기존 `table`/`entry` 문자열은 호환용으로 유지합니다.
-- **`RunnerChoiceText`** — 선택지. `portIndex`, `TableReference`, `TableEntryReference`, `isValid`, `Conditions`를 제공합니다. 문자열 키 필드는 호환용입니다.
-- **`RunnerCondition`** — 선택지 조건 한 건. `fieldId`, `isValid`, `type`(Float/Bool), `checkType`, `GetFloatValue()`/`GetBoolValue()`.
-- **`IRunnerToken`** — 진행 중 흐름 핸들. `State`, `Views`, `CancellationToken`, `Delay(seconds)`를 제공합니다. View 콜백에서 상태를 확인하고 흐름 중단과 연동되는 대기를 만들 때 사용합니다.
-
-외부 UI 입력이나 이벤트를 기다릴 때는 `WaitFor`를 사용하면 Pause/Stop/End 시 자동으로 취소됩니다.
-
-```csharp
-AwaitableCompletionSource<string> scanSource = new();
-
-RunnerWaitResult<string> waitResult = await token.WaitFor(scanSource);
-
-switch (waitResult.Status)
-{
-    case RunnerWaitStatus.Completed:
-        string result = waitResult.Value;
-        break;
-
-    case RunnerWaitStatus.TokenCanceled:
-        // 대화가 Pause/Stop/End됨
-        break;
-
-    case RunnerWaitStatus.SourceCanceled:
-        // scanSource 자체가 취소됨
-        break;
-}
-
-// 외부 입력 완료 시
-scanSource.TrySetResult("result");
-```
-
----
-
-## 6. CSV 내보내기 / 가져오기 (Localization)
-
-`DialogueSO`의 텍스트를 번역용 CSV로 주고받을 수 있습니다 (`Yang.Dialogue.Editor`의 `DialogueCsvExporter` / `DialogueCsvImporter`).
-
-- 컬럼: `ID, Type, Next, Message, Data` + 로케일별 `Speaker[code]` / `Text[code]` 및 `SpeakerPresent[code]` / `TextPresent[code]` (번역 엔트리 존재 여부). 빈 문자열 값과 엔트리가 없는 상태를 구분해 CSV 내보내기/가져오기를 진행합니다.
-- Choice 옵션, Condition 분기, Command/Event 명령은 소유 노드 아래 하위 행으로 표현됩니다.
-- Command/Event 인자는 `자동필드ID:type=value` 형식으로 왕복합니다. 지원 타입은 `string`, `int`, `float`, `long`, `bool`, `color`, `guid`, `enum`이며, 색상은 `#RRGGBBAA` 형식으로 저장됩니다.
-- 가져올 때 노드 ID가 **비어 있거나 중복**되면 노드마다 확인창이 떠서 *새 ID 생성 / 건너뛰기 / 모두 생성* 을 고를 수 있습니다.
-- 가리키는 노드가 없거나 건너뛴 링크는 가져오기 후 경고 메시지로 모아 알려줍니다.
-
----
+**Tools → Dialogue**의 Runner 디버그 영역에서 실행 중인 Flow를 확인하거나 선택한 노드로 이동할 수 있습니다. 그래프를 플레이 중 수정한 경우 **Apply graph changes to Runner**로 다시 적용할 수 있습니다. 기존 실행은 일시정지되며 자동으로 재시작하지 않습니다.
 
 ## 라이선스
 
-`LICENSE.txt` 참고. Author: Yang Jaewan.
-
-### 에디터 상태 저장
-
-그래프의 화면 중심/배율은 에셋 GUID에 따라 `EditorPrefs`에 별도로 저장합니다. `DialogueSO`의 노드 및 링크 직렬화 형식은 변경하지 않았으며, 마이그레이션 기능은 제공하지 않습니다.
-
-### 작업 검증 참고
-
-UI와 런타임 디버거 코드는 Unity Editor 컴파일 및 Play Mode에서 최종 확인해야 합니다. 주요 확인 항목은 빈 그래프 우클릭, 우클릭 삭제의 Undo/Edge 갱신, 1,000노드에서 에디터 포커스 전환, Localization이 일부 없는 CSV 왕복, 서로 다른 키의 동시 대화 추적, 선택 노드 점프입니다.
+`LICENSE.txt`를 참고하세요.

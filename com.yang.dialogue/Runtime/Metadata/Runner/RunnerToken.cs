@@ -140,6 +140,78 @@ namespace Yang.Dialogue
         }
     }
 
+    // Choice callbacks run concurrently. This lease cancels any losing View wait
+    // without canceling the dialogue flow itself.
+    internal sealed class RunnerChoiceToken : IRunnerToken, IDisposable
+    {
+        private readonly RunnerToken parent;
+        private readonly CancellationTokenSource source;
+        private readonly CancellationToken choiceCancellation;
+
+        public CancellationToken CancellationToken => choiceCancellation;
+        public TokenState State => choiceCancellation.IsCancellationRequested && parent.State == TokenState.Running ? TokenState.Paused : parent.State;
+        public IReadOnlyList<IDialogueView> Views => parent.Views;
+
+        public RunnerChoiceToken(RunnerToken parent)
+        {
+            this.parent = parent;
+            source = CancellationTokenSource.CreateLinkedTokenSource(parent.CancellationToken);
+            choiceCancellation = source.Token;
+        }
+
+        public void Cancel()
+        {
+            if (!choiceCancellation.IsCancellationRequested) source.Cancel();
+        }
+
+        public void Dispose() => source.Dispose();
+
+        public async Awaitable Delay(float second)
+        {
+            try
+            {
+                await Awaitable.WaitForSecondsAsync(second, CancellationToken);
+            }
+            catch (OperationCanceledException) when (CancellationToken.IsCancellationRequested)
+            {
+            }
+        }
+
+        public async Awaitable<RunnerWaitResult> WaitFor(AwaitableCompletionSource completion)
+        {
+            CancellationToken cancellation = CancellationToken;
+            using CancellationTokenRegistration registration = cancellation.Register(static state => ((AwaitableCompletionSource)state).TrySetCanceled(), completion);
+
+            try
+            {
+                await completion.Awaitable;
+
+                return new RunnerWaitResult(RunnerWaitStatus.Completed);
+            }
+            catch (OperationCanceledException)
+            {
+                return new RunnerWaitResult(cancellation.IsCancellationRequested ? RunnerWaitStatus.TokenCanceled : RunnerWaitStatus.SourceCanceled);
+            }
+        }
+
+        public async Awaitable<RunnerWaitResult<T>> WaitFor<T>(AwaitableCompletionSource<T> completion)
+        {
+            CancellationToken cancellation = CancellationToken;
+            using CancellationTokenRegistration registration = cancellation.Register(static state => ((AwaitableCompletionSource<T>)state).TrySetCanceled(), completion);
+
+            try
+            {
+                T value = await completion.Awaitable;
+
+                return new RunnerWaitResult<T>(RunnerWaitStatus.Completed, value);
+            }
+            catch (OperationCanceledException)
+            {
+                return new RunnerWaitResult<T>(cancellation.IsCancellationRequested ? RunnerWaitStatus.TokenCanceled : RunnerWaitStatus.SourceCanceled, default);
+            }
+        }
+    }
+
     public interface IRunnerToken
     {
         public CancellationToken CancellationToken { get; }

@@ -66,11 +66,9 @@ namespace Yang.Dialogue
 
             if (isRunning) return;
 
-            StopAllDialogue();
-
-            this.so = so;
-
             runnerNode.SetDatas(so);
+            StopAllDialogue();
+            this.so = so;
             runtimeContentHash = so.GetRuntimeContentHash();
             graphGeneration++;
         }
@@ -131,13 +129,18 @@ namespace Yang.Dialogue
 
                 return true;
             }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+                return false;
+            }
             finally
             {
                 applyingGraphChanges = false;
             }
         }
 
-        public void StartDialogue(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null) => _ = StartDialogueAsync(key, nodeName, views);
+        public void StartDialogue(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null) => StartDialogueObserved(key, nodeName, views);
 
         public async Awaitable StartDialogueAsync(string key, string nodeName = "", IReadOnlyList<IDialogueView> views = null)
         {
@@ -185,16 +188,27 @@ namespace Yang.Dialogue
                 }
 
                 if (runnerNode.CheckNode(nodeName)) token.TargetNode = nodeName;
-                else if (string.IsNullOrEmpty(token.TargetNode)) token.TargetNode = so.StartGuid;
+                else if (!runnerNode.CheckNode(token.TargetNode))
+                {
+                    Debug.LogWarning($"Dialogue flow '{key}' references missing node '{token.TargetNode}'. Resetting to Start.", this);
+                    token.TargetNode = so.StartGuid;
+                }
 
                 token.NodeIndex = runnerNode.GetNodeIndex(token.TargetNode);
+
+                if (token.NodeIndex < 0) return;
                 token.SetView(views ?? (token.Views.Count > 0 ? token.Views : Views));
                 token.SetState(TokenState.Running);
             }
             else
             {
-                token = new RunnerToken(views ?? Views) { TargetNode = runnerNode.CheckNode(nodeName) ? nodeName : so.StartGuid };
+                string targetNode = runnerNode.CheckNode(nodeName) ? nodeName : so.StartGuid;
+
+                if (!runnerNode.CheckNode(targetNode)) return;
+
+                token = new RunnerToken(views ?? Views) { TargetNode = targetNode };
                 token.NodeIndex = runnerNode.GetNodeIndex(token.TargetNode);
+
                 tokens.Add(key, token);
             }
 
@@ -227,11 +241,11 @@ namespace Yang.Dialogue
             catch (OperationCanceledException) when (token.State != TokenState.Running)
             {
             }
-            catch
+            catch (Exception exception)
             {
                 token.SetState(TokenState.Stopped);
 
-                throw;
+                throw new InvalidOperationException($"Dialogue flow '{key}' failed at node '{token.TargetNode}'.", exception);
             }
             finally
             {
@@ -240,6 +254,10 @@ namespace Yang.Dialogue
                 try
                 {
                     CompleteDialogue(key, token);
+                }
+                catch (Exception exception)
+                {
+                    throw new InvalidOperationException($"Dialogue flow '{key}' failed while notifying Views at node '{token.TargetNode}'.", exception);
                 }
                 finally
                 {
@@ -279,7 +297,7 @@ namespace Yang.Dialogue
             foreach (string key in new List<string>(tokens.Keys)) PauseDialogue(key);
         }
 
-        public void JumpNode(string key, string nodeName) => _ = RequestJumpNodeAsync(key, nodeName);
+        public void JumpNode(string key, string nodeName) => JumpNodeObserved(key, nodeName);
 
         // Completes when the new flow is started, not when the dialogue itself ends.
         public async Awaitable<bool> RequestJumpNodeAsync(string key, string nodeName)
@@ -370,7 +388,15 @@ namespace Yang.Dialogue
                 {
                     if (string.IsNullOrWhiteSpace(flow.key) || tokens.ContainsKey(flow.key)) continue;
 
-                    RunnerToken token = new() { TargetNode = flow.nodeGuid };
+                    string nodeGuid = flow.nodeGuid;
+
+                    if (so != null && !runnerNode.CheckNode(nodeGuid))
+                    {
+                        Debug.LogWarning($"Saved dialogue flow '{flow.key}' refers to missing node '{nodeGuid}'. Resetting to Start.", this);
+                        nodeGuid = so.StartGuid;
+                    }
+
+                    RunnerToken token = new() { TargetNode = nodeGuid };
 
                     if (flow.viewIDs != null && flow.viewIDs.Count > 0)
                     {
@@ -455,6 +481,31 @@ namespace Yang.Dialogue
 
         public void TriggerUnregisterCallback(int fieldId, System.Action callback) => runnerTrigger.UnregisterCallback(fieldId, callback);
         #endregion
+
+        // A void entry point must await and report failures rather than discard its Awaitable.
+        private async void StartDialogueObserved(string key, string nodeName, IReadOnlyList<IDialogueView> views)
+        {
+            try
+            {
+                await StartDialogueAsync(key, nodeName, views);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+            }
+        }
+
+        private async void JumpNodeObserved(string key, string nodeName)
+        {
+            try
+            {
+                await RequestJumpNodeAsync(key, nodeName);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException($"Dialogue flow '{key}' failed to jump to node '{nodeName}'.", exception), this);
+            }
+        }
 
         private async Awaitable<RunnerToken> BeginJumpAsync(string key, string nodeName)
         {

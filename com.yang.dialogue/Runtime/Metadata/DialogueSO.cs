@@ -70,16 +70,22 @@ namespace Yang.Dialogue
         {
             nodes.Clear();
             links.Clear();
+            if (string.IsNullOrWhiteSpace(startNode.guid)) throw new System.InvalidOperationException("Dialogue Start node has no GUID.");
+
             nodes.Add(startNode.guid, startNode.CreateRuntimeCopy());
 
-            foreach (NodeData node in this.nodes) nodes.Add(node.guid, node.CreateRuntimeCopy());
+            foreach (NodeData node in this.nodes)
+            {
+                if (string.IsNullOrWhiteSpace(node.guid) || !nodes.TryAdd(node.guid, node.CreateRuntimeCopy()))
+                    throw new System.InvalidOperationException($"Dialogue graph has an empty or duplicate node GUID '{node.guid}'.");
+            }
 
             foreach (LinkData link in this.links)
             {
                 RunnerPort output = new(link.nodeGuid, link.outPortIndex);
                 RunnerPort input = new(link.targetGuid, -1);
 
-                links.TryAdd(output, input);
+                if (!links.TryAdd(output, input)) throw new System.InvalidOperationException($"Dialogue node '{link.nodeGuid}' has duplicate links on output port {link.outPortIndex}.");
             }
         }
     }
