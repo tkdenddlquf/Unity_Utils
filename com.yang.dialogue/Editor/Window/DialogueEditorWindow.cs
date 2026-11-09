@@ -101,6 +101,7 @@ namespace Yang.Dialogue.Editor
         private bool rebuildingGraph;
         private (int nodes, int references, int updated, int unresolved) lastLocalizationSync;
         private Button refreshButton;
+        private Button resolveLocalizationButton;
         private DialogueSO so;
 
         private const long LOCALIZATION_REFRESH_DEBOUNCE_MS = 200;
@@ -152,11 +153,17 @@ namespace Yang.Dialogue.Editor
 
                 if (value != null)
                 {
-                    SynchronizeLocalizationReferences();
+                    lastLocalizationSync = SynchronizeLocalizationReferences();
                     ViewState state = ReadViewState(value);
                     graph.UpdateViewTransform(state.position, state.scale);
                 }
+                else
+                {
+                    lastLocalizationSync = default;
+                    localizationIssues.Clear();
+                }
 
+                UpdateMissingLocalizationButton();
                 ResetView();
             }
         }
@@ -256,6 +263,7 @@ namespace Yang.Dialogue.Editor
                 assetField = null;
                 collapseButton = null;
                 repairBar = null;
+                resolveLocalizationButton = null;
                 debugBar = null;
                 debugRunnerField = null;
                 debugFlowField = null;
@@ -299,6 +307,7 @@ namespace Yang.Dialogue.Editor
             collections = LocalizationEditorSettings.GetStringTableCollections();
             collections.SetTables(Tables);
             lastLocalizationSync = SynchronizeLocalizationReferences();
+            UpdateMissingLocalizationButton();
             RequestRebuild();
         }
 
@@ -349,12 +358,17 @@ namespace Yang.Dialogue.Editor
             System.Guid storedGuid = table[1].GetGuid();
             LocalizationTableCollection collection = collections.ResolveCollection(storedName, storedGuid);
 
+            bool hasEntryReference = false;
+
             if (collection == null)
             {
                 for (int i = start; i < start + count; i++)
                 {
                     List<GenericData> entry = entriesData[i].data;
-                    collection = collections.ResolveCollection(null, System.Guid.Empty, entry[1].GetLong(), entry[0].ToString());
+                    long id = entry[1].GetLong();
+                    string key = entry[0].ToString();
+                    hasEntryReference |= id != 0 || !string.IsNullOrEmpty(key);
+                    collection = collections.ResolveCollection(null, System.Guid.Empty, id, key);
 
                     if (collection != null) break;
                 }
@@ -364,7 +378,7 @@ namespace Yang.Dialogue.Editor
 
             if (collection == null)
             {
-                if (storedGuid != System.Guid.Empty || !string.IsNullOrEmpty(storedName))
+                if (storedGuid != System.Guid.Empty || !string.IsNullOrEmpty(storedName) || hasEntryReference)
                 {
                     unresolved++;
                     localizationIssues.Add($"Table not found: node={nodeGuid}, guid={storedGuid}, name={storedName}");
@@ -654,7 +668,15 @@ namespace Yang.Dialogue.Editor
             repairButton.style.marginTop = 0;
             repairButton.style.marginBottom = 0;
             repairBar.Add(refreshButton);
+            resolveLocalizationButton = new Button(() => DialogueLocalizationMissingWindow.Open(this))
+            {
+                text = "Resolve Missing",
+                tooltip = "Review unresolved localization tables and entries, and map them to existing references.",
+            };
+            resolveLocalizationButton.style.marginRight = 4;
+            repairBar.Add(resolveLocalizationButton);
             repairBar.Add(repairButton);
+            UpdateMissingLocalizationButton();
             topRightBar.Add(repairBar);
 
             BuildDebugBar();
@@ -1079,6 +1101,14 @@ namespace Yang.Dialogue.Editor
         {
             bar.style.flexDirection = FlexDirection.Row;
             bar.style.alignItems = Align.Center;
+        }
+
+        private void UpdateMissingLocalizationButton()
+        {
+            if (resolveLocalizationButton == null) return;
+
+            resolveLocalizationButton.style.display = SO != null && lastLocalizationSync.unresolved > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            resolveLocalizationButton.text = $"Resolve Missing ({lastLocalizationSync.unresolved})";
         }
 
         private void RefreshEditor()
@@ -1757,6 +1787,8 @@ namespace Yang.Dialogue.Editor
         }
 
         internal void RefreshAfterArgumentMapping() => RequestRebuild();
+
+        internal void RefreshAfterLocalizationMapping() => RefreshLocalization();
 
         private void RequestRebuild()
         {
