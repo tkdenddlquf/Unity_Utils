@@ -222,6 +222,7 @@ namespace Yang.Dialogue.Editor
 
             graph.graphViewChanged -= OnGraphViewChanged;
             graph.viewTransformChanged -= OnViewTransformChanged;
+            graph.Dispose();
 
             LocalizationEditorSettings.EditorEvents.CollectionAdded -= OnLocalizationCollectionChanged;
             LocalizationEditorSettings.EditorEvents.CollectionRemoved -= OnLocalizationCollectionChanged;
@@ -1700,6 +1701,29 @@ namespace Yang.Dialogue.Editor
         }
 
         #region View
+        public Port CreateOutputPort() => graph.CreateOutputPort();
+
+        public string GetConnectionSearchName(NodeData node)
+        {
+            EnsureSearchIndex();
+
+            for (int i = 0; i < searchIndex.Count; i++)
+            {
+                NodeSearchDocument document = searchIndex[i];
+
+                if (document.Node.guid != node.guid) continue;
+
+                string summary = document.LocalizedValues.Count > 0 ? document.LocalizedValues[document.LocalizedValues.Count - 1]
+                    : document.Values.Count > 0 ? document.Values[0] : "";
+                string shortGuid = node.guid.Length > 8 ? node.guid.Substring(0, 8) : node.guid;
+
+                return string.IsNullOrEmpty(summary) ? $"{node.type} · {node.guid}"
+                    : $"{node.type} · {shortGuid} · {Shorten(summary)} · {node.guid}";
+            }
+
+            return $"{node.type} · {node.guid}";
+        }
+
         public void RefreshPortColors() => graph?.RefreshPortColors();
 
         public void FocusNode(string guid, bool select = false)

@@ -65,99 +65,52 @@ namespace Yang.Dialogue.Editor
         private class Ctx
         {
             public IReadOnlyList<StringTableCollection> collections;
+            public DialogueCsvImportOptions options;
             public readonly Dictionary<string, StringTableCollection> resolvedTables = new();
             public readonly List<string> warnings = new();
-            public readonly HashSet<string> skippedTables = new();
             public readonly List<(string name, string folder)> plannedTables = new();
-            public readonly Dictionary<string, bool> entryDecisions = new();
             public readonly Dictionary<string, string> reservedIds = new();
             public readonly Dictionary<string, long> reservedKeys = new();
+            public readonly Dictionary<(string table, long id), (string key, int line)> requestedIds = new();
+            public readonly Dictionary<(string table, string key), (long id, int line)> requestedKeys = new();
+            public readonly Dictionary<(string table, long id), string> plannedRenames = new();
             public readonly List<string> createdAssets = new();
             public bool reuseStart;
         }
 
-        public static bool Preview(DialogueSO so, string csv, out string message)
+        public static bool Validate(DialogueSO so, string csv, DialogueCsvImportOptions options, out string message)
         {
-            List<List<string>> rows = CsvUtility.FromCsv(csv);
-
-            if (rows.Count < 1)
-            {
-                message = "CSV is empty.";
-                return false;
-            }
-
-            if (!ValidateHeader(rows[0], out message)) return false;
-
-            List<LocaleColumn> languages = ParseHeader(rows[0]);
-            List<Row> nodes;
-
             try
             {
-                nodes = ParseRows(rows, languages, rows[0], false);
+                Prepare(so, csv, options, out _, out _);
+                message = "";
+                return true;
             }
-            catch (System.FormatException exception)
+            catch (FormatException exception)
             {
                 message = exception.Message;
                 return false;
             }
-
-            int childRows = 0;
-            int textCells = 0;
-            int speakerCells = 0;
-
-            for (int i = 0; i < nodes.Count; i++)
-            {
-                Row node = nodes[i];
-                childRows += node.children.Count;
-                textCells += node.text.Count;
-                speakerCells += node.speaker.Count;
-
-                for (int j = 0; j < node.children.Count; j++)
-                {
-                    textCells += node.children[j].text.Count;
-                    speakerCells += node.children[j].speaker.Count;
-                }
-            }
-
-            message = $"Current asset: {so.EditorNodes.Count + 1} nodes, {so.EditorLinks.Count} links.\n"
-                + $"CSV: {nodes.Count} nodes, {childRows} detail rows, {languages.Count} locale columns/groups.\n"
-                + $"Localized cells present: speaker {speakerCells}, text {textCells}.\n\n"
-                + "Import replaces this asset's nodes and links, and may update the referenced String Tables. "
-                + "Counts represent CSV contents, not an exact difference preview.";
-            return true;
         }
 
-        public static bool Import(DialogueSO so, string csv, out string message)
+        public static bool Import(DialogueSO so, string csv, DialogueCsvImportOptions options, out string message)
         {
             message = "";
-            List<List<string>> rows = CsvUtility.FromCsv(csv);
-
-            if (rows.Count < 1)
-            {
-                message = "CSV is empty.";
-                return false;
-            }
-
-            if (!ValidateHeader(rows[0], out message)) return false;
-
-            List<LocaleColumn> localeColumns = ParseHeader(rows[0]);
-            Ctx ctx = new() { collections = LocalizationEditorSettings.GetStringTableCollections() };
+            Ctx ctx;
+            List<Row> nodes;
 
             try
             {
-                List<Row> nodes = ParseRows(rows, localeColumns, rows[0], true);
-                ResolveIds(nodes, ctx);
-                ValidateRows(so, nodes, ctx);
-                ResolveTables(so, nodes, ctx);
+                Prepare(so, csv, options, out nodes, out ctx);
 
-                // No graph or localization assets are changed until every correction and
-                // missing-data decision has been collected.
                 Undo.IncrementCurrentGroup();
                 int undoGroup = Undo.GetCurrentGroup();
                 Undo.SetCurrentGroupName("Import Dialogue CSV");
+
                 try
                 {
                     CreatePlannedTables(ctx);
+                    ApplyPlannedRenames(ctx);
                     Build(so, nodes, ctx);
                     Undo.CollapseUndoOperations(undoGroup);
                 }
@@ -167,11 +120,6 @@ namespace Yang.Dialogue.Editor
                     DeleteCreatedTables(ctx);
                     throw;
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                message = "CSV import canceled. No dialogue graph changes were applied.";
-                return false;
             }
             catch (FormatException exception)
             {
@@ -188,6 +136,23 @@ namespace Yang.Dialogue.Editor
             if (ctx.warnings.Count > 0) message = "Imported with warnings:\n- " + string.Join("\n- ", ctx.warnings);
 
             return true;
+        }
+
+        private static void Prepare(DialogueSO so, string csv, DialogueCsvImportOptions options, out List<Row> nodes, out Ctx ctx)
+        {
+            ctx = new Ctx { collections = LocalizationEditorSettings.GetStringTableCollections(), options = options };
+            List<List<string>> rows = CsvUtility.FromCsv(csv, out List<int> lines);
+
+            if (rows.Count == 0) throw new FormatException("CSV is empty.");
+
+            if (!ValidateHeader(rows[0], out string error)) throw new FormatException(error);
+
+            List<LocaleColumn> columns = ParseHeader(rows[0]);
+            nodes = ParseRows(rows, columns, rows[0], lines);
+            ResolveIds(nodes, ctx);
+            ValidateRows(so, nodes, ctx);
+            ResolveTables(so, nodes, ctx);
+            ValidateLocalizedValues(nodes);
         }
 
         private static bool ValidateHeader(List<string> header, out string error)
@@ -209,6 +174,19 @@ namespace Yang.Dialogue.Editor
                 if (seen.Add(header[i])) continue;
 
                 error = $"CSV header '{header[i]}' is duplicated.";
+                return false;
+            }
+
+            for (int i = FIXED_COLUMNS; i < header.Count; i++)
+            {
+                string name = header[i];
+
+                if (name == "SpeakerTableGuid" || name == "TextTableGuid" || name == "SpeakerEntryId" || name == "TextEntryId") continue;
+
+                if (TryParseLocaleHeader(name, "Speaker", out _) || TryParseLocaleHeader(name, "Text", out _) ||
+                    TryParseLocaleHeader(name, "SpeakerPresent", out _) || TryParseLocaleHeader(name, "TextPresent", out _)) continue;
+
+                error = $"Unknown CSV header '{name}' in column {i + 1}.";
                 return false;
             }
 
@@ -260,10 +238,10 @@ namespace Yang.Dialogue.Editor
 
             int start = prefix.Length + 1;
             code = name.Substring(start, name.Length - start - 1);
-            return true;
+            return !string.IsNullOrWhiteSpace(code);
         }
 
-        private static List<Row> ParseRows(List<List<string>> rows, List<LocaleColumn> localeColumns, List<string> header, bool interactive)
+        private static List<Row> ParseRows(List<List<string>> rows, List<LocaleColumn> localeColumns, List<string> header, List<int> lines)
         {
             List<Row> nodes = new();
             int speakerGuidColumn = header.IndexOf("SpeakerTableGuid");
@@ -278,12 +256,11 @@ namespace Yang.Dialogue.Editor
 
                 if (IsEmptyRow(cells)) continue;
 
-                if (interactive) ValidatePresence(cells, localeColumns, r + 1);
+                ValidatePresence(cells, localeColumns, lines[r]);
 
                 Row row = ReadRow(cells, localeColumns, speakerGuidColumn, textGuidColumn, speakerIdColumn, textIdColumn);
-                row.line = r + 1;
+                row.line = lines[r];
 
-                if (interactive)
                 {
                     string expected = current?.type switch
                     {
@@ -294,19 +271,8 @@ namespace Yang.Dialogue.Editor
                         _ => "",
                     };
 
-                    while (!IsNodeType(row.type) && (row.type != expected || string.IsNullOrEmpty(expected)))
-                    {
-                        string reason = IsDetailType(row.type) ? "This detail row has no matching parent node, or its type is not supported by that parent." : "Unsupported node type. Enter Start, Dialogue, Choice, Trigger, Event, Wait, Condition, or Command.";
-
-                        if (!RepairValue(row, "Type", ref row.type, reason, value => IsNodeType(value) || value == expected && !string.IsNullOrEmpty(expected)))
-                        {
-                            // A skipped parent must not absorb subsequent detail rows.
-                            current = null;
-                            break;
-                        }
-                    }
-
-                    if (string.IsNullOrEmpty(row.type)) continue;
+                    if (!IsNodeType(row.type) && (row.type != expected || string.IsNullOrEmpty(expected)))
+                        throw new FormatException($"CSV row {row.line}, Type: unsupported node or detail type '{row.type}' for the current parent.");
                 }
 
                 if (IsDetailType(row.type))
@@ -317,7 +283,7 @@ namespace Yang.Dialogue.Editor
                         row.detailIndex = current.children.Count;
                         current.children.Add(row);
                     }
-                    else if (interactive) throw new FormatException($"CSV row {row.line}: detail has no parent node.");
+                    else throw new FormatException($"CSV row {row.line}: detail has no parent node.");
                 }
                 else
                 {
@@ -343,88 +309,28 @@ namespace Yang.Dialogue.Editor
         {
             if (column < 0) return;
 
-            while (cells.Count <= column) cells.Add("");
-
-            string value = cells[column].Trim();
+            string value = Cell(cells, column);
 
             if (value == "0" || value == "1") return;
 
-            Row row = new() { line = line, id = Cell(cells, COL_ID), type = Cell(cells, COL_TYPE) };
-
-            if (!RepairValue(row, name, ref value, "Localization presence must be 0 (missing) or 1 (entry exists).", corrected => corrected == "0" || corrected == "1")) value = "0";
-
-            cells[column] = value;
+            throw new FormatException($"CSV row {line}, {name}: expected 0 or 1, received '{value}'.");
         }
 
-        private static bool IsDetailType(string type) => type == "Option" || type == "Branch" || type == "Instruction" || type == "Asset";
+        internal static bool IsDetailType(string type) => type == "Option" || type == "Branch" || type == "Instruction" || type == "Asset";
 
-        private static bool IsNodeType(string type) => type == "Start" || type == "Dialogue" || type == "Choice" || type == "Trigger" || type == "Event" || type == "Wait" || type == "Condition" || type == "Command";
+        internal static bool IsNodeType(string type) => type == "Start" || type == "Dialogue" || type == "Choice" || type == "Trigger" || type == "Event" || type == "Wait" || type == "Condition" || type == "Command";
 
         private static void ResolveIds(List<Row> nodes, Ctx ctx)
         {
             HashSet<string> seen = new();
 
-            for (int i = 0; i < nodes.Count; i++)
+            foreach (Row row in nodes)
             {
-                Row row = nodes[i];
-                bool missing = string.IsNullOrWhiteSpace(row.id);
+                if (!Guid.TryParse(row.id, out _)) throw new FormatException($"CSV row {row.line}, ID: enter a valid GUID.");
 
-                if (missing)
-                {
-                    bool generate = EditorUtility.DisplayDialog("Missing Node ID", $"CSV row {row.line}: {row.type} node has no ID.\n\nGenerate a unique ID? (No skips this node and its details.)", "Generate", "Skip Node");
-
-                    if (!generate)
-                    {
-                        ctx.warnings.Add($"CSV row {row.line}: skipped {row.type} node without ID.");
-                        nodes.RemoveAt(i--);
-                        continue;
-                    }
-
-                    row.id = Guid.NewGuid().ToString();
-                }
-
-                if (!Guid.TryParse(row.id, out _) || seen.Contains(row.id))
-                {
-                    string issue = seen.Contains(row.id) ? "Duplicate node ID. Enter a different GUID." : "Invalid node ID. Enter a valid GUID.";
-
-                    if (!RepairValue(row, "ID", ref row.id, issue, value => Guid.TryParse(value, out _) && !seen.Contains(value)))
-                    {
-                        ctx.warnings.Add($"CSV row {row.line}: skipped {row.type} node with invalid ID.");
-                        nodes.RemoveAt(i--);
-                        continue;
-                    }
-                }
-
-                seen.Add(row.id);
+                if (!seen.Add(row.id)) throw new FormatException($"CSV row {row.line}, ID: duplicate node ID '{row.id}'.");
 
                 foreach (Row child in row.children) child.parentId = row.id;
-            }
-        }
-
-        private static bool RepairValue(Row row, string field, ref string value, string description, Func<string, bool> valid)
-        {
-            while (true)
-            {
-                DialogueCsvRepairWindow.Decision decision = DialogueCsvRepairWindow.Request(row.line, string.IsNullOrEmpty(row.id) ? row.parentId : row.id, row.type, field, value, description, out string correction);
-
-                if (decision == DialogueCsvRepairWindow.Decision.Cancel) throw new OperationCanceledException();
-
-                if (decision == DialogueCsvRepairWindow.Decision.Skip)
-                {
-                    value = "";
-                    return false;
-                }
-
-                correction = correction.Trim();
-
-                if (valid(correction))
-                {
-                    value = correction;
-                    return true;
-                }
-
-                value = correction;
-                description = $"'{correction}' is not valid for {field}. Please enter a valid replacement.";
             }
         }
 
@@ -487,60 +393,34 @@ namespace Yang.Dialogue.Editor
         {
             bool foundStart = false;
 
-            for (int i = 0; i < rows.Count; i++)
+            foreach (Row row in rows)
             {
-                Row row = rows[i];
-
                 if (row.type != "Start") continue;
 
-                if (!foundStart)
-                {
-                    foundStart = true;
-                    continue;
-                }
+                if (foundStart) throw new FormatException($"CSV row {row.line}, Type: more than one Start node.");
 
-                string type = row.type;
-
-                if (!RepairValue(row, "Type", ref type, "Multiple Start nodes. Change the extra node to a supported non-Start type, or skip it.", value => IsNodeType(value) && value != "Start"))
-                {
-                    ctx.warnings.Add($"CSV row {row.line}: skipped duplicate Start node.");
-                    rows.RemoveAt(i--);
-                    continue;
-                }
-
-                row.type = type;
+                foundStart = true;
             }
 
-            if (!foundStart)
-            {
-                ctx.reuseStart = !EditorUtility.DisplayDialog("Missing Start Node", "The CSV has no Start node. Create a new one?\n\nChoosing 'Keep Existing' preserves the asset's current Start node and connects it to the first imported node.", "Create Start", "Keep Existing");
-                ctx.warnings.Add(ctx.reuseStart ? "Kept the existing Start node because the CSV had none." : "Created a Start node because the CSV had none.");
-            }
+            ctx.reuseStart = !foundStart && ctx.options.keepStart;
 
-            if (ctx.reuseStart)
-            {
-                for (int i = 0; i < rows.Count; i++)
-                {
-                    if (rows[i].id != so.EditorStartNode.guid) continue;
-
-                    if (!EditorUtility.DisplayDialog("Start ID Conflict", $"CSV row {rows[i].line} uses the existing Start node's ID. A new Start node is required to avoid duplicate IDs. Create one?", "Create Start", "Cancel Import")) throw new OperationCanceledException();
-
-                    ctx.reuseStart = false;
-                    break;
-                }
-            }
+            if (ctx.reuseStart && string.IsNullOrEmpty(so.EditorStartNode.guid))
+                throw new FormatException("Cannot keep the existing Start node because it has no ID.");
 
             HashSet<string> validIds = new();
 
             foreach (Row row in rows) validIds.Add(row.id);
 
-            if (ctx.reuseStart) validIds.Add(so.EditorStartNode.guid);
-
-            for (int i = 0; i < rows.Count; i++)
+            if (ctx.reuseStart)
             {
-                Row row = rows[i];
-                ValidateNodeFields(row, ctx);
-                ValidateTarget(row, validIds, ctx);
+                if (!validIds.Add(so.EditorStartNode.guid))
+                    throw new FormatException("The existing Start node ID is used by an imported node. Select Create Start instead.");
+            }
+
+            foreach (Row row in rows)
+            {
+                ValidateNodeFields(row);
+                ValidateTarget(row, validIds);
                 string childType = row.type switch
                 {
                     "Choice" => "Option",
@@ -553,35 +433,25 @@ namespace Yang.Dialogue.Editor
                 for (int j = 0; j < row.children.Count; j++)
                 {
                     Row child = row.children[j];
-                    string type = child.type;
 
                     if (child.type != childType)
-                    {
-                        if (string.IsNullOrEmpty(childType) || !RepairValue(child, "Type", ref type, $"Detail row does not belong under {row.type} node {row.id}. Expected {childType}.", value => value == childType))
-                        {
-                            ctx.warnings.Add($"CSV row {child.line}: skipped incompatible detail row of node '{row.id}'.");
-                            row.children.RemoveAt(j--);
-                            continue;
-                        }
-
-                        child.type = type;
-                    }
+                        throw new FormatException($"CSV row {child.line}, Type: expected {childType} under {row.type}.");
 
                     child.detailIndex = j;
-                    ValidateNodeFields(child, ctx);
-                    ValidateTarget(child, validIds, ctx);
+                    ValidateNodeFields(child);
+                    ValidateTarget(child, validIds);
                 }
             }
         }
 
-        private static void ValidateNodeFields(Row row, Ctx ctx)
+        private static void ValidateNodeFields(Row row)
         {
-            ValidateEntryId(row, "SpeakerEntryId", ref row.speakerIdRaw, out row.speakerId, ctx);
-            ValidateEntryId(row, "TextEntryId", ref row.textIdRaw, out row.textId, ctx);
-            ValidateTableGuid(row, "SpeakerTableGuid", ref row.speakerGuid, ctx);
-            ValidateTableGuid(row, "TextTableGuid", ref row.textGuid, ctx);
-            ValidatePosition(row, "X", ref row.posX, ctx);
-            ValidatePosition(row, "Y", ref row.posY, ctx);
+            row.speakerId = ValidateEntryId(row, "SpeakerEntryId", row.speakerIdRaw);
+            row.textId = ValidateEntryId(row, "TextEntryId", row.textIdRaw);
+            ValidateTableGuid(row, "SpeakerTableGuid", row.speakerGuid);
+            ValidateTableGuid(row, "TextTableGuid", row.textGuid);
+            ValidatePosition(row, "X", row.posX);
+            ValidatePosition(row, "Y", row.posY);
 
             Func<string, bool> validData = row.type switch
             {
@@ -592,56 +462,43 @@ namespace Yang.Dialogue.Editor
                 _ => null,
             };
 
-            if (validData == null || validData(row.data)) return;
-
-            if (!RepairValue(row, "Data", ref row.data, "Malformed data expression. Check field IDs, operators, value types and argument format.", validData))
-                ctx.warnings.Add($"CSV row {row.line}: skipped invalid Data for node '{row.id}'.");
+            if (validData != null && !validData(row.data))
+                throw new FormatException($"CSV row {row.line}, Data: malformed expression for {row.type}.");
         }
 
-        private static void ValidateEntryId(Row row, string field, ref string value, out long id, Ctx ctx)
+        private static long ValidateEntryId(Row row, string field, string value)
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                id = 0;
-                return;
-            }
+            if (string.IsNullOrEmpty(value)) return 0;
 
-            if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out id) || id <= 0)
-            {
-                if (!RepairValue(row, field, ref value, "Entry ID must be a positive integer, or empty when not assigned.", input => string.IsNullOrEmpty(input) || long.TryParse(input, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsed) && parsed > 0))
-                    ctx.warnings.Add($"CSV row {row.line}: skipped invalid {field}.");
-            }
+            if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long id) || id <= 0)
+                throw new FormatException($"CSV row {row.line}, {field}: expected a positive integer or an empty value.");
 
-            id = string.IsNullOrEmpty(value) ? 0 : long.Parse(value, CultureInfo.InvariantCulture);
+            return id;
         }
 
-        private static void ValidateTableGuid(Row row, string field, ref string value, Ctx ctx)
+        private static void ValidateTableGuid(Row row, string field, string value)
         {
-            if (string.IsNullOrEmpty(value) || Guid.TryParse(value, out _)) return;
-
-            if (!RepairValue(row, field, ref value, "Table GUID is invalid. Enter an existing GUID or leave it blank to resolve by table name.", input => string.IsNullOrEmpty(input) || Guid.TryParse(input, out _)))
-                ctx.warnings.Add($"CSV row {row.line}: ignored invalid {field}.");
+            if (!string.IsNullOrEmpty(value) && !Guid.TryParse(value, out _))
+                throw new FormatException($"CSV row {row.line}, {field}: invalid table GUID.");
         }
 
-        private static void ValidatePosition(Row row, string field, ref string value, Ctx ctx)
+        private static void ValidatePosition(Row row, string field, string value)
         {
-            if (string.IsNullOrEmpty(value) || float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float number) && IsFinite(number)) return;
+            if (string.IsNullOrEmpty(value)) return;
 
-            if (!RepairValue(row, field, ref value, "Position must be a finite number, or blank for automatic layout.", input => string.IsNullOrEmpty(input) || float.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out float candidate) && IsFinite(candidate)))
-                ctx.warnings.Add($"CSV row {row.line}: using automatic position for invalid {field}.");
+            if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float position) || !IsFinite(position))
+                throw new FormatException($"CSV row {row.line}, {field}: enter a finite number or leave blank for automatic layout.");
         }
 
-        private static void ValidateTarget(Row row, HashSet<string> ids, Ctx ctx)
+        private static void ValidateTarget(Row row, HashSet<string> ids)
         {
-            if (string.IsNullOrEmpty(row.next) || ids.Contains(row.next)) return;
-
-            if (!RepairValue(row, "Next", ref row.next, $"Linked target '{row.next}' does not exist among imported nodes. Enter an existing node GUID or skip this link.", ids.Contains))
-                ctx.warnings.Add($"CSV row {row.line}: skipped link to a missing node.");
+            if (!string.IsNullOrEmpty(row.next) && !ids.Contains(row.next))
+                throw new FormatException($"CSV row {row.line}, Next: target '{row.next}' does not exist in the import.");
         }
 
         private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
-        private static bool IsValidConditions(string data, bool allowHide)
+        internal static bool IsValidConditions(string data, bool allowHide)
         {
             foreach (string part in SplitData(data))
             {
@@ -661,7 +518,7 @@ namespace Yang.Dialogue.Editor
             return true;
         }
 
-        private static bool IsValidTrigger(string data)
+        internal static bool IsValidTrigger(string data)
         {
             foreach (string part in SplitData(data))
             {
@@ -679,7 +536,7 @@ namespace Yang.Dialogue.Editor
             return true;
         }
 
-        private static bool IsValidArguments(string data)
+        internal static bool IsValidArguments(string data)
         {
             HashSet<int> fields = new();
 
@@ -1016,71 +873,26 @@ namespace Yang.Dialogue.Editor
             string kind = speaker ? "Speaker" : "Text";
             string name = speaker ? owner.speakerTable : owner.textTable;
 
-            while (string.IsNullOrEmpty(name) || (!ctx.resolvedTables.ContainsKey(name) && !ctx.skippedTables.Contains(name) && !HasTablePlan(ctx, name) && FindCollection(ctx.collections, name) == null))
+            if (string.IsNullOrWhiteSpace(name))
+                throw new FormatException($"CSV row {entry.line}, {kind}Table: table name is required.");
+
+            if (ctx.resolvedTables.ContainsKey(name) || HasTablePlan(ctx, name)) return;
+
+            StringTableCollection existing = FindCollection(ctx.collections, name);
+
+            if (existing != null)
             {
-                if (string.IsNullOrEmpty(name))
-                {
-                    if (!RepairValue(owner, kind + "Table", ref name, $"Node '{owner.id}' contains {kind} references but no table name. Enter an existing or new table name, or skip this localization data.", value => !string.IsNullOrWhiteSpace(value)))
-                    {
-                        ClearEntry(entry, speaker);
-                        ctx.warnings.Add($"CSV row {entry.line}: skipped {kind} data without a table.");
-                        return;
-                    }
-
-                    if (speaker) owner.speakerTable = name;
-                    else owner.textTable = name;
-                }
-
-                StringTableCollection existing = FindCollection(ctx.collections, name);
-
-                if (existing != null)
-                {
-                    ctx.resolvedTables[name] = existing;
-                    break;
-                }
-
-                int decision = EditorUtility.DisplayDialogComplex("Missing Localization Table", $"CSV row {entry.line}, node '{owner.id}' ({owner.type}):\n{kind} table '{name}' does not exist.\n\nCreate the table, correct its name, or skip this localization data?", "Create", "Skip Data", "Correct Name");
-
-                if (decision == 1)
-                {
-                    ctx.skippedTables.Add(name);
-                    break;
-                }
-
-                if (decision == 2)
-                {
-                    if (!RepairValue(owner, kind + "Table", ref name, "Enter the correct String Table name.", value => !string.IsNullOrWhiteSpace(value)))
-                    {
-                        ClearEntry(entry, speaker);
-                        return;
-                    }
-
-                    if (speaker) owner.speakerTable = name;
-                    else owner.textTable = name;
-
-                    continue;
-                }
-
-                string absolute = EditorUtility.SaveFolderPanel($"Folder for table '{name}'", Application.dataPath, "");
-                string folder = string.IsNullOrEmpty(absolute) ? null : ToProjectRelative(absolute);
-
-                if (folder == null)
-                {
-                    ctx.skippedTables.Add(name);
-                    ctx.warnings.Add($"CSV row {entry.line}: skipped {kind} table '{name}' (folder selection canceled or outside Assets).");
-                }
-                else ctx.plannedTables.Add((name, folder));
-            }
-
-            if (ctx.skippedTables.Contains(name))
-            {
-                ClearEntry(entry, speaker);
-                ctx.warnings.Add($"CSV row {entry.line}: skipped {kind} data for table '{name}'.");
+                ctx.resolvedTables[name] = existing;
                 return;
             }
 
-            if (!ctx.resolvedTables.ContainsKey(name) && !HasTablePlan(ctx, name))
-                ctx.resolvedTables[name] = FindCollection(ctx.collections, name);
+            if (!ctx.options.createTables)
+                throw new FormatException($"CSV row {entry.line}: localization table '{name}' is missing. Enable Create missing tables in the review window.");
+
+            if (!AssetDatabase.IsValidFolder(ctx.options.tableFolder))
+                throw new FormatException($"Table folder '{ctx.options.tableFolder}' does not exist in Assets.");
+
+            ctx.plannedTables.Add((name, ctx.options.tableFolder));
         }
 
         private static bool HasTablePlan(Ctx ctx, string name)
@@ -1108,25 +920,12 @@ namespace Yang.Dialogue.Editor
                 SharedTableData.SharedTableEntry byId = collection.SharedData.GetEntry(id);
                 SharedTableData.SharedTableEntry byKey = collection.SharedData.GetEntry(key);
 
-                if (byId != null && byId.Key != key)
-                {
-                    if (!RepairValue(row, kind + "Key", ref key, $"Entry ID {id} belongs to '{byId.Key}', not '{key}' in table '{tableName}'. Correct the entry key or skip its localization data.", value => value == byId.Key))
-                    {
-                        ClearEntry(row, speaker);
-                        return;
-                    }
-                }
-                else if (byId == null && byKey != null && byKey.Id != id)
-                {
-                    string correctedId = id.ToString(CultureInfo.InvariantCulture);
+                if (byId != null && byId.Key != key && byKey != null && byKey.Id != id)
+                    throw new FormatException($"CSV row {row.line}: cannot rename entry ID {id} to '{key}' in '{tableName}' because that key belongs to ID {byKey.Id}.");
 
-                    if (!RepairValue(row, kind + "EntryId", ref correctedId, $"Entry key '{key}' has ID {byKey.Id}, not {id}, in table '{tableName}'. Correct the entry ID or skip its localization data.", value => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsed) && parsed == byKey.Id))
-                    {
-                        ClearEntry(row, speaker);
-                        return;
-                    }
-
-                    id = byKey.Id;
+                if (byId == null && byKey != null && byKey.Id != id)
+                {
+                    throw new FormatException($"CSV row {row.line}, {kind}EntryId: key '{key}' belongs to ID {byKey.Id}, not {id} in '{tableName}'.");
                 }
             }
 
@@ -1134,15 +933,21 @@ namespace Yang.Dialogue.Editor
 
             if (existing != null)
             {
+                if (string.IsNullOrEmpty(key)) key = existing.Key;
+
+                RegisterEntryIdentity(ctx, tableName, existing.Id, key, row.line);
+
+                if (id != 0 && existing.Id == id && existing.Key != key) ctx.plannedRenames[(tableName, id)] = key;
+
                 if (speaker)
                 {
                     row.speakerId = existing.Id;
-                    row.speakerKey = existing.Key;
+                    row.speakerKey = key;
                 }
                 else
                 {
                     row.textId = existing.Id;
-                    row.textKey = existing.Key;
+                    row.textKey = key;
                 }
 
                 return;
@@ -1152,49 +957,20 @@ namespace Yang.Dialogue.Editor
             {
                 string ownerId = string.IsNullOrEmpty(row.id) ? row.parentId : row.id;
                 string suffix = row.type == "Option" ? $"opt{row.detailIndex}" : speaker ? "speaker" : "text";
-                string proposed = ResolveKey(key, ownerId, suffix);
-
-                if (!RepairValue(row, kind + "Key", ref proposed, $"Missing {kind} entry key in table '{tableName}'. Enter a new key, or skip the localization data.", value => !string.IsNullOrWhiteSpace(value)))
-                {
-                    ClearEntry(row, speaker);
-                    return;
-                }
-
-                key = proposed;
+                key = ResolveKey(key, ownerId, suffix);
             }
 
             string requestedIdKey = $"{tableName}\u001f{id}";
             string requestedNameKey = $"{tableName}\u001f{key}";
 
-            while (id != 0 && ctx.reservedIds.TryGetValue(requestedIdKey, out string usedKey) && usedKey != key ||
-                   ctx.reservedKeys.TryGetValue(requestedNameKey, out long usedId) && id != usedId && usedId != 0)
-            {
-                string rawId = id.ToString(CultureInfo.InvariantCulture);
+            if (id != 0 && ctx.reservedIds.TryGetValue(requestedIdKey, out string usedKey) && usedKey != key ||
+                ctx.reservedKeys.TryGetValue(requestedNameKey, out long usedId) && id != usedId && usedId != 0)
+                throw new FormatException($"CSV row {row.line}: entry '{key}' conflicts with another planned entry in '{tableName}'.");
 
-                if (!RepairValue(row, kind + "EntryId", ref rawId, $"Localization entry '{key}' conflicts with an entry already planned in '{tableName}'. Use a free positive ID or leave it blank for a generated ID.", input => string.IsNullOrEmpty(input) || long.TryParse(input, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsed) && parsed > 0 && !ctx.reservedIds.ContainsKey($"{tableName}\u001f{parsed}")))
-                {
-                    ClearEntry(row, speaker);
-                    return;
-                }
+            if (!ctx.options.createEntries)
+                throw new FormatException($"CSV row {row.line}: localization entry '{key}' is missing in '{tableName}'. Enable Create missing entries in the review window.");
 
-                id = string.IsNullOrEmpty(rawId) ? 0 : long.Parse(rawId, CultureInfo.InvariantCulture);
-                requestedIdKey = $"{tableName}\u001f{id}";
-            }
-
-            string decisionKey = $"{tableName}\u001f{id}\u001f{key}";
-
-            if (!ctx.entryDecisions.TryGetValue(decisionKey, out bool create))
-            {
-                create = EditorUtility.DisplayDialog("Missing Localization Entry", $"CSV row {row.line}, {row.type} node '{(string.IsNullOrEmpty(row.id) ? row.parentId : row.id)}':\n{kind} entry '{key}' (ID {id}) does not exist in '{tableName}'.\n\nCreate it? Selecting Skip leaves the node but removes this missing localization reference.", "Create", "Skip Data");
-                ctx.entryDecisions.Add(decisionKey, create);
-            }
-
-            if (!create)
-            {
-                ClearEntry(row, speaker);
-                ctx.warnings.Add($"CSV row {row.line}: skipped missing {kind} entry '{key}' in '{tableName}'.");
-                return;
-            }
+            RegisterEntryIdentity(ctx, tableName, id, key, row.line);
 
             if (id != 0) ctx.reservedIds[$"{tableName}\u001f{id}"] = key;
 
@@ -1214,21 +990,81 @@ namespace Yang.Dialogue.Editor
             }
         }
 
-        private static void ClearEntry(Row row, bool speaker)
+        private static void RegisterEntryIdentity(Ctx ctx, string tableName, long id, string key, int line)
         {
-            if (speaker)
+            if (id != 0)
             {
-                row.speakerId = 0;
-                row.speakerKey = "";
-                row.speaker.Clear();
-                row.createSpeaker = false;
+                (string table, long id) idIdentity = (tableName, id);
+
+                if (ctx.requestedIds.TryGetValue(idIdentity, out (string key, int line) previous) && previous.key != key)
+                    throw new FormatException($"CSV rows {previous.line} and {line}: entry ID {id} in '{tableName}' has conflicting keys '{previous.key}' and '{key}'.");
+
+                ctx.requestedIds[idIdentity] = (key, line);
             }
-            else
+
+            (string table, string key) keyIdentity = (tableName, key);
+
+            if (ctx.requestedKeys.TryGetValue(keyIdentity, out (long id, int line) previousKey) && previousKey.id != id)
+                throw new FormatException($"CSV rows {previousKey.line} and {line}: localization key '{key}' in '{tableName}' has conflicting entry IDs {previousKey.id} and {id}.");
+
+            ctx.requestedKeys[keyIdentity] = (id, line);
+        }
+
+        private static void ValidateLocalizedValues(List<Row> nodes)
+        {
+            Dictionary<(string table, string entry, string locale), (string value, int line)> values = new();
+
+            foreach (Row row in nodes)
             {
-                row.textId = 0;
-                row.textKey = "";
-                row.text.Clear();
-                row.createText = false;
+                if (row.type == "Dialogue")
+                {
+                    ValidateLocalizedEntry(row, row.speakerTable, row.speakerKey, row.speakerId, row.speaker, values);
+                    ValidateLocalizedEntry(row, row.textTable, row.textKey, row.textId, row.text, values);
+                }
+                else if (row.type == "Choice")
+                {
+                    ValidateLocalizedEntry(row, row.speakerTable, row.speakerKey, row.speakerId, row.speaker, values);
+
+                    foreach (Row option in row.children)
+                        ValidateLocalizedEntry(option, row.textTable, option.textKey, option.textId, option.text, values);
+                }
+            }
+        }
+
+        private static void ValidateLocalizedEntry(Row row, string tableName, string key, long id, Dictionary<string, string> translations, Dictionary<(string table, string entry, string locale), (string value, int line)> values)
+        {
+            if (string.IsNullOrEmpty(tableName) || id == 0 && string.IsNullOrEmpty(key)) return;
+
+            string entryIdentity = id != 0 ? $"id:{id}" : $"key:{key}";
+
+            foreach (KeyValuePair<string, string> translation in translations)
+            {
+                (string table, string entry, string locale) identity = (tableName, entryIdentity, translation.Key);
+
+                if (values.TryGetValue(identity, out (string value, int line) previous) && previous.value != translation.Value)
+                    throw new FormatException($"CSV rows {previous.line} and {row.line}: localization entry '{key}' in '{tableName}' has conflicting '{translation.Key}' translations.");
+
+                values[identity] = (translation.Value, row.line);
+            }
+        }
+
+        private static void ApplyPlannedRenames(Ctx ctx)
+        {
+            foreach (KeyValuePair<(string table, long id), string> rename in ctx.plannedRenames)
+            {
+                StringTableCollection collection = ResolveTable(ctx, rename.Key.table);
+                SharedTableData shared = collection.SharedData;
+                string currentKey = shared.GetKey(rename.Key.id);
+
+                if (currentKey == rename.Value) continue;
+
+                Undo.RecordObject(shared, "Import Dialogue CSV Localization");
+                shared.RenameKey(rename.Key.id, rename.Value);
+
+                if (shared.GetKey(rename.Key.id) != rename.Value)
+                    throw new FormatException($"Could not rename localization entry ID {rename.Key.id} in '{rename.Key.table}' from '{currentKey}' to '{rename.Value}'.");
+
+                EditorUtility.SetDirty(shared);
             }
         }
 
@@ -1265,54 +1101,33 @@ namespace Yang.Dialogue.Editor
 
         private static void ApplyDefaultTables(DialogueSO so, List<Row> nodes, Ctx ctx)
         {
+            if (!ctx.options.useDefaultTables) return;
+
             string speakerDefault = GetDefaultTableName(so.SpeakerTable, ctx);
             string textDefault = GetDefaultTableName(so.TextTable, ctx);
 
-            if (string.IsNullOrEmpty(speakerDefault) && string.IsNullOrEmpty(textDefault)) return;
-
-            Dictionary<string, bool> decisions = new();
-
             foreach (Row row in nodes)
             {
-                if (string.IsNullOrEmpty(row.id)) continue;
+                if (row.type != "Dialogue" && row.type != "Choice") continue;
 
-                NodeType type = ParseType(row.type);
+                bool hasSpeaker = row.speaker.Count > 0 || row.speakerId != 0 || !string.IsNullOrEmpty(row.speakerKey);
+                bool hasText = row.text.Count > 0 || row.textId != 0 || !string.IsNullOrEmpty(row.textKey);
 
-                if (type == NodeType.Dialogue)
+                if (row.type == "Choice")
                 {
-                    row.speakerTable = ResolveDefault(row.speaker.Count > 0 || row.speakerId != 0 || !string.IsNullOrEmpty(row.speakerKey), row.speakerTable, speakerDefault, "Speaker", row.id, decisions);
-                    row.textTable = ResolveDefault(row.text.Count > 0 || row.textId != 0 || !string.IsNullOrEmpty(row.textKey), row.textTable, textDefault, "Text", row.id, decisions);
-                }
-                else if (type == NodeType.Choice)
-                {
-                    row.speakerTable = ResolveDefault(row.speaker.Count > 0 || row.speakerId != 0 || !string.IsNullOrEmpty(row.speakerKey), row.speakerTable, speakerDefault, "Speaker", row.id, decisions);
-                    bool hasOptionText = false;
-
                     foreach (Row option in row.children)
                     {
-                        if (option.text.Count > 0 || option.textId != 0 || !string.IsNullOrEmpty(option.textKey))
-                        {
-                            hasOptionText = true;
-                            break;
-                        }
+                        if (option.text.Count == 0 && option.textId == 0 && string.IsNullOrEmpty(option.textKey)) continue;
+
+                        hasText = true;
+                        break;
                     }
-
-                    row.textTable = ResolveDefault(hasOptionText, row.textTable, textDefault, "Text", row.id, decisions);
                 }
+
+                if (hasSpeaker && string.IsNullOrEmpty(row.speakerTable)) row.speakerTable = speakerDefault;
+
+                if (hasText && string.IsNullOrEmpty(row.textTable)) row.textTable = textDefault;
             }
-        }
-
-        private static string ResolveDefault(bool hasText, string tableName, string defaultName, string kind, string nodeId, Dictionary<string, bool> decisions)
-        {
-            if (!hasText || !string.IsNullOrEmpty(tableName) || string.IsNullOrEmpty(defaultName)) return tableName;
-
-            if (!decisions.TryGetValue(defaultName, out bool use))
-            {
-                use = EditorUtility.DisplayDialog($"Use Default {kind} Table?", $"Node '{nodeId}' has {kind} text but no {kind} table name in the CSV.\n\nUse the dialogue's default {kind} table '{defaultName}'?", "Use Default", "Skip");
-                decisions[defaultName] = use;
-            }
-
-            return use ? defaultName : tableName;
         }
 
         private static string GetDefaultTableName(LocalizedStringTable table, Ctx ctx)

@@ -85,7 +85,7 @@ namespace Yang.Dialogue.Editor
 
         protected Port CreateOutputPort(bool accent = true)
         {
-            Port port = InstantiatePort(Orientation.Horizontal, Direction.Output, Port.Capacity.Single, typeof(bool));
+            Port port = window.CreateOutputPort();
             port.portName = "Output";
 
             if (accent) AddPortAccent(port);

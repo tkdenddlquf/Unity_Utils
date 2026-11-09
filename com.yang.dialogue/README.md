@@ -12,7 +12,7 @@ Unity에서 대화 흐름을 노드로 작성하고 실행하는 패키지입니
 
 1. **Project → Create → Dialogue/Node**에서 `DialogueSO`를 생성합니다.
 2. **Tools → Dialogue**를 열고 에셋을 선택합니다.
-3. 노드를 추가하고 출력 포트를 다음 노드에 연결합니다.
+3. 노드를 추가하고 출력 포트를 다음 노드에 연결합니다. 출력 포트에서 엣지를 빈 공간으로 끌어 놓으면 검색창에서 새 노드를 생성하거나 기존 노드를 찾아 연결할 수 있습니다. 기존 노드 목록에는 타입·GUID·대표 노드 내용이 표시되며 화면 밖에 있는 노드도 표시합니다.
 4. 필요하면 `DialogueSO`의 **Speaker Table / Text Table**을 지정하고, 노드에서 Localization 키를 선택합니다.
 5. 게임 오브젝트에 `DialogueRunner`를 붙이고 `DialogueSO`와 View 컴포넌트를 연결합니다.
 
@@ -26,6 +26,8 @@ Unity에서 대화 흐름을 노드로 작성하고 실행하는 패키지입니
 | Event | 등록된 게임 이벤트 호출 |
 | Wait | 시간 또는 View 신호 대기 |
 | Command | View에 명령과 인자 전달 |
+
+그래프의 Ctrl+C/V와 우클릭 Copy/Paste는 같은 시스템 클립보드를 사용합니다. Dialogue 노드 데이터가 아닌 텍스트나 JSON은 붙여넣을 수 없습니다.
 
 ### 실행 및 저장
 
@@ -72,6 +74,8 @@ View는 UI에서 항목을 클릭했을 때 `selection.TrySetResult(선택인덱
 
 **오류 확인:** `StartDialogue()`로 실행한 View의 비동기 콜백에서 예외가 발생하면 Unity Console에 흐름 키·노드 GUID·View ID·콜백 이름과 원래 예외가 표시됩니다. `StartDialogueAsync()`는 호출자에게 예외를 전달하므로 호출하는 쪽에서 `await`와 예외 처리를 해야 합니다. 정상적인 중지·일시정지에 따른 취소는 오류로 취급하지 않습니다. View 내부에서 시작한 다른 비동기 작업도 `await`해야 예외가 Runner로 전달됩니다.
 
+`OnChoice`는 선택 확정 전에 하나의 View라도 예외를 발생시키면 선택 대기를 취소하고 대화 실행을 실패시킵니다. 이미 다른 View의 선택이 확정된 뒤 발생한 예외는 해당 선택 결과를 되돌리지 않고 Unity Console에 기록합니다.
+
 ### 변수 및 명령
 
 Condition, Choice, Trigger에서 사용할 변수를 스키마로 선언합니다. 지원 타입은 `float`, `bool`이며, 필드 ID는 양수이면서 스키마 전체에서 고유해야 합니다.
@@ -107,13 +111,21 @@ Command / Event의 공개 필드는 Source Generator가 인자를 변환하고 �
 
 ## CSV 내보내기 / 가져오기
 
-`DialogueSO`의 Inspector에서 **Export CSV** 또는 **Import CSV**를 사용합니다. CSV에는 노드·연결 정보와 로케일별 텍스트가 포함됩니다. 가져오기는 **기존 노드와 링크를 교체**하며, 연결된 String Table의 엔트리도 갱신할 수 있으므로 필요한 에셋을 먼저 백업하세요.
+`DialogueSO`의 Inspector에서 **Export CSV** 또는 **Import CSV**를 사용합니다. CSV에는 노드·연결 정보와 로케일별 텍스트가 포함됩니다. Import는 **기존 노드와 링크를 교체**하고 참조 중인 String Table을 갱신할 수 있습니다.
 
-- 가져오기 전 노드·링크·텍스트 수를 미리 볼 수 있습니다.
-- 누락된 **노드 ID, Localization 테이블, 엔트리**는 생성을 묻습니다. 거절하면 해당 노드 또는 Localization 데이터만 건너뜁니다.
-- **잘못된 타입·ID·연결·조건식·명령 인자** 등이 있으면 CSV 행 번호와 노드 정보를 표시하고 정상 값을 입력받습니다. 해당 행이나 연결을 건너뛰거나 전체 가져오기를 취소할 수도 있습니다.
-- 가져오기 작업은 입력 검증과 생성 여부 선택을 마친 뒤 적용됩니다. 누락된 Localization 참조를 건너뛰면 그 참조는 빈 값으로 유지됩니다.
-- `Choice`의 Option, `Condition`의 Branch, `Command/Event`의 Instruction은 부모 노드 바로 아래의 행으로 표현됩니다.
+Import를 선택하면 **Dialogue CSV Import** 검토 창이 열립니다.
+
+1. CSV 전체를 분석한 뒤 문제 개수, 실제 파일 줄 번호, 컬럼, 원인과 수정 방법을 표시합니다. 여러 줄로 된 텍스트가 있어도 파일의 실제 줄 번호를 사용합니다.
+2. 문제를 선택해 값을 수정합니다. 잘못된 노드 ID는 새 GUID를 만들 수 있고, 없는 연결 대상은 노드 검색으로 선택하거나 연결을 해제할 수 있습니다. 잘못된 타입은 선택 목록에서, 테이블 이름은 기존 String Table 목록에서 수정할 수 있습니다. 번역 충돌은 다른 행의 값으로 맞추거나 직접 수정합니다.
+3. 수정 후 검증이 다시 실행됩니다. 누락된 테이블과 엔트리는 **Create missing tables / Create missing entries** 옵션으로 명시적으로 생성할 수 있습니다. 새 테이블을 만들 때는 프로젝트의 `Assets` 하위 폴더를 지정합니다. `Use asset default tables`와 `Keep existing Start if missing`도 선택할 수 있습니다.
+4. 변경 요약에서 노드 수, 생성될 테이블·엔트리, 키 이름 변경과 번역 갱신 예상 건수를 확인합니다. 오류가 모두 해결된 경우에만 **Replace graph and import**가 활성화됩니다.
+5. **Save corrected CSV...**로 수정된 데이터를 CSV 파일에 저장할 수 있습니다. 저장하지 않아도 검토 창의 수정 내용은 이번 Import에 적용됩니다. 원본 CSV 파일을 자동 덮어쓰지 않습니다.
+
+검토 중에는 그래프와 Localization 에셋을 수정하지 않습니다. 적용 단계에서 다시 검증한 뒤 변경을 하나의 Undo 그룹으로 기록하고, 실패 시 변경을 되돌립니다. 잘못된 데이터나 누락된 참조를 조용히 건너뛰지 않습니다.
+
+`SpeakerEntryId` / `TextEntryId`가 기존 엔트리와 일치하면 키 이름을 변경해도 ID와 번역 연결을 유지합니다. 다른 ID의 키 이름을 가로채거나 같은 엔트리에 충돌하는 번역을 설정하면 오류로 표시합니다. Entry ID가 없는 키의 이름 변경 여부는 추측하지 않습니다.
+
+`Choice`의 Option, `Condition`의 Branch, `Command/Event`의 Instruction은 부모 노드 바로 아래의 CSV 행으로 표현됩니다.
 
 ## 플레이 모드 디버깅
 

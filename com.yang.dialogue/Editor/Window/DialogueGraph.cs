@@ -8,14 +8,20 @@ namespace Yang.Dialogue.Editor
 {
     public class DialogueGraph : GraphView
     {
-        private string jsonCopyData = "";
+        private string pendingSourceGuid;
+        private int pendingOutputIndex;
+        private Vector2 pendingDropPosition;
+        private DialogueSO pendingAsset;
         private bool syncScheduled;
         private bool suppressSelectionTracking;
         private string debugNodeGuid;
 
         private const float NODE_MARGIN = 1500f;
+        private const string COPY_FORMAT = "Yang.Dialogue.NodeClipboard";
 
         private readonly DialogueEditorWindow window;
+        private readonly DialogueEdgeConnectorListener edgeListener;
+        private readonly DialogueEdgeSearchProvider edgeSearch;
         private static readonly Color PortLinkedColor = new(0.36f, 0.82f, 0.47f);
         private static readonly Color PortEmptyColor = new(0.55f, 0.55f, 0.55f);
         private static readonly Color PortCapColor = new(0.48f, 0.48f, 0.48f);
@@ -28,6 +34,9 @@ namespace Yang.Dialogue.Editor
         public DialogueGraph(DialogueEditorWindow window)
         {
             this.window = window;
+            edgeListener = new DialogueEdgeConnectorListener(this);
+            edgeSearch = ScriptableObject.CreateInstance<DialogueEdgeSearchProvider>();
+            edgeSearch.Initialize(this, window);
             LoadStyleSheet();
             Insert(0, new GridBackground());
             SetupZoom(ContentZoomer.DefaultMinScale, ContentZoomer.DefaultMaxScale);
@@ -42,6 +51,10 @@ namespace Yang.Dialogue.Editor
             RegisterCallback<ValidateCommandEvent>(OnValidateCommand);
             RegisterCallback<ExecuteCommandEvent>(OnExecuteCommand);
         }
+
+        public void Dispose() => Object.DestroyImmediate(edgeSearch);
+
+        public Port CreateOutputPort() => new DialogueOutputPort(edgeListener);
 
         private void LoadStyleSheet()
         {
@@ -454,7 +467,7 @@ namespace Yang.Dialogue.Editor
 
                     window.CanDebugJump ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
             menu.AppendAction("Copy", MenuActionCopy, selectedGuids.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
-            menu.AppendAction("Paste", MenuActionPaste, jsonCopyData == "" ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+            menu.AppendAction("Paste", MenuActionPaste, CheckSerialize(EditorGUIUtility.systemCopyBuffer) ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
             menu.AppendAction("Remove", MenuActionRemove, selection.Count == 0 ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
 
             if (clickedNode != null) return;
@@ -568,7 +581,7 @@ namespace Yang.Dialogue.Editor
             if (window.SO == null) return "";
 
             DialogueSO so = window.SO;
-            CopyData data = new();
+            CopyData data = new() { format = COPY_FORMAT };
             HashSet<string> guids = new();
 
             foreach (string guid in selectedGuids)
@@ -583,12 +596,7 @@ namespace Yang.Dialogue.Editor
                 guids.Add(guid);
             }
 
-            if (data.nodes.Count == 0)
-            {
-                jsonCopyData = "";
-
-                return jsonCopyData;
-            }
+            if (data.nodes.Count == 0) return "";
 
             List<LinkData> links = window.Links;
 
@@ -599,18 +607,12 @@ namespace Yang.Dialogue.Editor
                 if (guids.Contains(link.nodeGuid) && guids.Contains(link.targetGuid)) data.links.Add(link);
             }
 
-            jsonCopyData = JsonUtility.ToJson(data);
-
-            return jsonCopyData;
+            return JsonUtility.ToJson(data);
         }
 
         private void UnserializeNode(string operationName, string data)
         {
-            if (window.SO == null || string.IsNullOrEmpty(data)) return;
-
-            CopyData copyData = JsonUtility.FromJson<CopyData>(data);
-
-            if (copyData == null || copyData.nodes == null || copyData.nodes.Count == 0) return;
+            if (!TryReadCopyData(data, out CopyData copyData)) return;
 
             ClearSelection();
             Vector2 nodeCenterPos = Vector2.zero;
@@ -663,20 +665,68 @@ namespace Yang.Dialogue.Editor
             window.SetUnsaved();
         }
 
-        private bool CheckSerialize(string data) => window.SO != null && !string.IsNullOrEmpty(data);
+        private bool CheckSerialize(string data) => TryReadCopyData(data, out _);
+
+        private bool TryReadCopyData(string data, out CopyData copyData)
+        {
+            copyData = null;
+
+            if (window.SO == null || string.IsNullOrWhiteSpace(data) || data.IndexOf(COPY_FORMAT, System.StringComparison.Ordinal) < 0) return false;
+
+            try
+            {
+                CopyData parsed = JsonUtility.FromJson<CopyData>(data);
+
+                if (parsed == null || parsed.format != COPY_FORMAT || parsed.nodes == null || parsed.nodes.Count == 0) return false;
+
+                HashSet<string> guids = new();
+
+                for (int i = 0; i < parsed.nodes.Count; i++)
+                {
+                    NodeData node = parsed.nodes[i];
+
+                    if (string.IsNullOrEmpty(node.guid) || node.type == NodeType.Start || !System.Enum.IsDefined(typeof(NodeType), node.type) || !guids.Add(node.guid)) return false;
+
+                    if (node.PortDatas == null || node.OptionDatas == null) return false;
+
+                    for (int j = 0; j < node.PortDatas.Count; j++)
+                    {
+                        if (node.PortDatas[j].data == null) return false;
+                    }
+
+                    for (int j = 0; j < node.OptionDatas.Count; j++)
+                    {
+                        if (node.OptionDatas[j].data == null) return false;
+                    }
+                }
+
+                if (parsed.links != null)
+                {
+                    for (int i = 0; i < parsed.links.Count; i++)
+                    {
+                        LinkData link = parsed.links[i];
+
+                        if (!guids.Contains(link.nodeGuid) || !guids.Contains(link.targetGuid) || link.outPortIndex < 0) return false;
+                    }
+                }
+
+                copyData = parsed;
+                return true;
+            }
+            catch (System.ArgumentException)
+            {
+                return false;
+            }
+        }
 
         private void MenuActionCopy(DropdownMenuAction menuAction)
         {
-            if (selectedGuids.Count == 0)
-            {
-                jsonCopyData = "";
-                return;
-            }
+            string data = BuildCopy();
 
-            BuildCopy();
+            if (!string.IsNullOrEmpty(data)) EditorGUIUtility.systemCopyBuffer = data;
         }
 
-        private void MenuActionPaste(DropdownMenuAction menuAction) => UnserializeNode("", jsonCopyData);
+        private void MenuActionPaste(DropdownMenuAction menuAction) => UnserializeNode("Paste", EditorGUIUtility.systemCopyBuffer);
 
         private void MenuActionRemove(DropdownMenuAction menuAction)
         {
@@ -692,9 +742,139 @@ namespace Yang.Dialogue.Editor
             if (elements.Count > 0) DeleteElements(elements);
         }
 
+        #region Edge Search
+        private void OpenEdgeSearch(Port output, Vector2 position)
+        {
+            if (window.SO == null || output.node is not BaseNode source) return;
+
+            int index = output.parent.IndexOf(output);
+
+            if (index < 0) return;
+
+            pendingSourceGuid = source.GUID;
+            pendingOutputIndex = index;
+            pendingDropPosition = contentViewContainer.WorldToLocal(position);
+            pendingAsset = window.SO;
+            SearchWindow.Open(new SearchWindowContext(GUIUtility.GUIToScreenPoint(position)), edgeSearch);
+        }
+
+        public void CompleteEdgeSearch(object result)
+        {
+            if (window.SO == null || window.SO != pendingAsset) return;
+
+            NodeData source = window.GetNode(pendingSourceGuid);
+
+            if (string.IsNullOrEmpty(source.guid)) return;
+
+            if (result is NodeType type)
+            {
+                if (type == NodeType.Start) return;
+
+                DialogueSO so = window.SO;
+                Undo.RecordObject(so, "Create Connected Node");
+                NodeData data = new(type) { position = pendingDropPosition };
+                window.Nodes.Add(data);
+                window.InvalidateNodeIndices();
+                CreateNode(data);
+                ConnectOutput(data.guid, false);
+            }
+            else if (result is string targetGuid)
+            {
+                ConnectOutput(targetGuid, true);
+            }
+        }
+
+        private void ConnectOutput(string targetGuid, bool recordUndo)
+        {
+            if (targetGuid == pendingSourceGuid || targetGuid == window.SO.StartGuid) return;
+
+            NodeData target = window.GetNode(targetGuid);
+
+            if (string.IsNullOrEmpty(target.guid)) return;
+
+            if (recordUndo) Undo.RecordObject(window.SO, "Connect Nodes");
+
+            List<LinkData> links = window.Links;
+
+            for (int i = links.Count - 1; i >= 0; i--)
+            {
+                if (links[i].nodeGuid == pendingSourceGuid && links[i].outPortIndex == pendingOutputIndex) links.RemoveAt(i);
+            }
+
+            links.Add(new LinkData { nodeGuid = pendingSourceGuid, targetGuid = targetGuid, outPortIndex = pendingOutputIndex });
+            RebuildEdges();
+            EditorUtility.SetDirty(window.SO);
+            window.SetUnsaved();
+        }
+
+        private sealed class DialogueOutputPort : Port
+        {
+            public DialogueOutputPort(IEdgeConnectorListener listener) : base(Orientation.Horizontal, Direction.Output, Capacity.Single, typeof(bool))
+            {
+                m_EdgeConnector = new EdgeConnector<Edge>(listener);
+                this.AddManipulator(m_EdgeConnector);
+            }
+        }
+
+        private sealed class DialogueEdgeConnectorListener : IEdgeConnectorListener
+        {
+            private readonly DialogueGraph graph;
+            private readonly List<Edge> edgesToCreate = new(1);
+            private readonly List<GraphElement> edgesToDelete = new();
+
+            public DialogueEdgeConnectorListener(DialogueGraph graph) => this.graph = graph;
+
+            public void OnDropOutsidePort(Edge edge, Vector2 position)
+            {
+                if (edge.output != null && edge.input == null) graph.OpenEdgeSearch(edge.output, position);
+            }
+
+            public void OnDrop(GraphView graphView, Edge edge)
+            {
+                if (edge.input == null || edge.output == null) return;
+
+                edgesToDelete.Clear();
+
+                if (edge.input.capacity == Port.Capacity.Single)
+                {
+                    foreach (Edge old in edge.input.connections)
+                    {
+                        if (old != edge) edgesToDelete.Add(old);
+                    }
+                }
+
+                if (edge.output.capacity == Port.Capacity.Single)
+                {
+                    foreach (Edge old in edge.output.connections)
+                    {
+                        if (old != edge && !edgesToDelete.Contains(old)) edgesToDelete.Add(old);
+                    }
+                }
+
+                if (edgesToDelete.Count > 0) graphView.DeleteElements(edgesToDelete);
+
+                edgesToCreate.Clear();
+                edgesToCreate.Add(edge);
+                GraphViewChange change = new() { edgesToCreate = edgesToCreate };
+                List<Edge> created = graphView.graphViewChanged != null ? graphView.graphViewChanged(change).edgesToCreate : edgesToCreate;
+
+                if (created == null) return;
+
+                for (int i = 0; i < created.Count; i++)
+                {
+                    Edge connection = created[i];
+                    graphView.AddElement(connection);
+                    connection.input.Connect(connection);
+                    connection.output.Connect(connection);
+                }
+            }
+        }
+        #endregion
+
         [System.Serializable]
         private class CopyData
         {
+            public string format;
             public List<NodeData> nodes = new();
             public List<LinkData> links = new();
         }

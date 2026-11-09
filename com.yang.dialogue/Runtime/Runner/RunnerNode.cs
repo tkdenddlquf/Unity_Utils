@@ -410,7 +410,10 @@ namespace Yang.Dialogue
             }
             catch (Exception exception)
             {
-                Debug.LogException(new InvalidOperationException($"Dialogue View '{view.ViewID}' failed in OnChoice at node '{token.TargetNode}'.", exception));
+                InvalidOperationException error = new($"Dialogue View '{view.ViewID}' failed in OnChoice at node '{token.TargetNode}'.", exception);
+
+                if (firstChoice.TrySetException(error)) choiceToken.Cancel();
+                else Debug.LogException(error);
             }
             finally
             {
