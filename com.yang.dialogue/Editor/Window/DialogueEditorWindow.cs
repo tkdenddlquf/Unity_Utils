@@ -1756,6 +1756,8 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        internal void RefreshAfterArgumentMapping() => RequestRebuild();
+
         private void RequestRebuild()
         {
             nextGraphDiffCheck = 0;

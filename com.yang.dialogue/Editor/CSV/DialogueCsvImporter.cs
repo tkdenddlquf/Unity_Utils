@@ -297,24 +297,30 @@ namespace Yang.Dialogue.Editor
 
         private static void ValidatePresence(List<string> cells, List<LocaleColumn> columns, int line)
         {
+            string type = Cell(cells, COL_TYPE).Trim();
+
             for (int i = 0; i < columns.Count; i++)
             {
                 LocaleColumn column = columns[i];
-                ValidatePresenceCell(cells, column.speakerPresentColumn, line, $"SpeakerPresent[{column.code}]");
-                ValidatePresenceCell(cells, column.textPresentColumn, line, $"TextPresent[{column.code}]");
+                ValidatePresenceCell(cells, column.speakerPresentColumn, line, $"SpeakerPresent[{column.code}]", RequiresPresence(type, true));
+                ValidatePresenceCell(cells, column.textPresentColumn, line, $"TextPresent[{column.code}]", RequiresPresence(type, false));
             }
         }
 
-        private static void ValidatePresenceCell(List<string> cells, int column, int line, string name)
+        private static void ValidatePresenceCell(List<string> cells, int column, int line, string name, bool required)
         {
             if (column < 0) return;
 
-            string value = Cell(cells, column);
+            string value = Cell(cells, column).Trim();
 
+            if (!required && string.IsNullOrEmpty(value)) return;
             if (value == "0" || value == "1") return;
 
             throw new FormatException($"CSV row {line}, {name}: expected 0 or 1, received '{value}'.");
         }
+
+        internal static bool RequiresPresence(string type, bool speaker)
+            => speaker ? type == "Dialogue" || type == "Choice" : type == "Dialogue" || type == "Option";
 
         internal static bool IsDetailType(string type) => type == "Option" || type == "Branch" || type == "Instruction" || type == "Asset";
 

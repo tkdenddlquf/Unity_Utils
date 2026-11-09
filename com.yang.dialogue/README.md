@@ -109,6 +109,8 @@ public class OpenDoorEvent
 
 Command / Event의 공개 필드는 Source Generator가 인자를 변환하고 런타임 팩토리를 등록합니다. ID는 다른 어셈블리를 포함하여 각 Command 또는 Event 종류 안에서 중복되면 안 됩니다. 지원 필드는 `string`, `int`, `float`, `long`, `bool`, `Color32`, `Guid`, `int` 기반 `enum`입니다.
 
+**필드 이름 변경:** Command/Event 필드의 저장 ID는 필드 이름으로 계산합니다. 이름이 변경되어 현재 스키마와 연결되지 않는 기존 인자 ID는 삭제하지 않고 노드에 경고와 **Resolve Unmatched IDs...** 버튼을 표시합니다. 버튼에서 저장된 ID·타입·값을 확인하고 같은 타입의 현재 필드로 옮기거나, 그대로 보류하거나, 명시적으로 삭제할 수 있습니다. 필요하면 동일 Command/Event ID의 다른 노드에도 선택한 매핑을 적용할 수 있습니다. 기존 필드에 기본값이 아닌 값이 있으면 매핑을 중단합니다. 적용한 변경은 Undo가 가능합니다.
+
 ## CSV 내보내기 / 가져오기
 
 `DialogueSO`의 Inspector에서 **Export CSV** 또는 **Import CSV**를 사용합니다. CSV에는 노드·연결 정보와 로케일별 텍스트가 포함됩니다. Import는 **기존 노드와 링크를 교체**하고 참조 중인 String Table을 갱신할 수 있습니다.
@@ -121,7 +123,7 @@ Import를 선택하면 **Dialogue CSV Import** 검토 창이 열립니다.
 4. 변경 요약에서 노드 수, 생성될 테이블·엔트리, 키 이름 변경과 번역 갱신 예상 건수를 확인합니다. 오류가 모두 해결된 경우에만 **Replace graph and import**가 활성화됩니다.
 5. **Save corrected CSV...**로 수정된 데이터를 CSV 파일에 저장할 수 있습니다. 저장하지 않아도 검토 창의 수정 내용은 이번 Import에 적용됩니다. 원본 CSV 파일을 자동 덮어쓰지 않습니다.
 
-검토 중에는 그래프와 Localization 에셋을 수정하지 않습니다. 적용 단계에서 다시 검증한 뒤 변경을 하나의 Undo 그룹으로 기록하고, 실패 시 변경을 되돌립니다. 잘못된 데이터나 누락된 참조를 조용히 건너뛰지 않습니다.
+검토 중에는 그래프와 Localization 에셋을 수정하지 않습니다. 적용 단계에서 다시 검증한 뒤 변경을 하나의 Undo 그룹으로 기록하고, 실패 시 변경을 되돌립니다. 잘못된 데이터나 누락된 참조를 조용히 건너뛰지 않습니다. **Instruction에 현재 Command/Event 스키마에서 사용하지 않는 필드 ID가 포함되어 있으면 경고를 표시하지만 Import는 허용하며, 값과 ID를 유지합니다.** Import 후 해당 노드에서 직접 ID를 매핑할 수 있습니다.
 
 `SpeakerEntryId` / `TextEntryId`가 기존 엔트리와 일치하면 키 이름을 변경해도 ID와 번역 연결을 유지합니다. 다른 ID의 키 이름을 가로채거나 같은 엔트리에 충돌하는 번역을 설정하면 오류로 표시합니다. Entry ID가 없는 키의 이름 변경 여부는 추측하지 않습니다.
 

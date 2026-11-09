@@ -280,6 +280,23 @@ namespace Yang.Dialogue.Editor
                 GenericData value = FindArgument(data, field.id, out GenericData found) ? found : DefaultValue(schema, field.info);
 
                 commandElement.Add(new ArgumentElement(field, CreateArgumentField(commandElement, field, value)));
+
+                if (FindArgument(data, field.id, out GenericData stored) && !MatchesType(stored, field.info.FieldType))
+                {
+                    Label typeWarning = new($"'{field.info.Name}' contains a stored {stored.Type} value. The value is preserved; editing the field replaces it.");
+                    typeWarning.AddToClassList("dlg-warning");
+                    commandElement.Add(typeWarning);
+                }
+            }
+
+            List<DialogueCommandFieldMapper.MissingField> missing = FindUnmatchedFields(data, schema);
+
+            if (missing.Count > 0)
+            {
+                Label warning = new($"{missing.Count} unmatched argument ID(s) are preserved. Resolve them before using this command.");
+                warning.AddToClassList("dlg-warning");
+                commandElement.Add(warning);
+                commandElement.Add(new Button(() => OpenFieldMapper(commandElement, schema)) { text = "Resolve Unmatched IDs..." });
             }
 
             RefreshArgumentVisibility(commandElement, data);
@@ -551,19 +568,95 @@ namespace Yang.Dialogue.Editor
             }
         }
 
+        private List<DialogueCommandFieldMapper.MissingField> FindUnmatchedFields(IReadOnlyList<GenericData> data, Schema schema)
+        {
+            HashSet<int> ids = new();
+
+            foreach (SchemaField field in schema.fields) ids.Add(field.id);
+
+            List<DialogueCommandFieldMapper.MissingField> missing = new();
+
+            for (int i = 1; i + 1 < data.Count; i += 2)
+            {
+                if (!data[i].TryGetInt(out int fieldId) || ids.Contains(fieldId)) continue;
+
+                missing.Add(new DialogueCommandFieldMapper.MissingField { id = fieldId, value = data[i + 1] });
+            }
+
+            return missing;
+        }
+
+        private void OpenFieldMapper(VisualElement commandElement, Schema schema)
+        {
+            List<DialogueCommandFieldMapper.FieldOption> fields = new();
+
+            foreach (SchemaField field in schema.fields)
+            {
+                fields.Add(new DialogueCommandFieldMapper.FieldOption
+                {
+                    id = field.id,
+                    name = field.info.Name,
+                    type = field.info.FieldType.IsEnum ? GenericData.DataType.Enum : DefaultValue(schema, field.info).Type,
+                    defaultValue = DefaultValue(schema, field.info)
+                });
+            }
+
+            NodeType nodeType = SchemaAttributeType == typeof(DialogueEventAttribute) ? NodeType.Event : NodeType.Command;
+            DialogueCommandFieldMapper.Open(window, GUID, extensionContainer.IndexOf(commandElement), schema.id, nodeType, fields);
+        }
+
+        internal static bool TryGetSchemaFieldIds(string schemaId, bool isEvent, out HashSet<int> fieldIds)
+        {
+            IEnumerable<Type> types = isEvent
+                ? TypeCache.GetTypesWithAttribute<DialogueEventAttribute>()
+                : TypeCache.GetTypesWithAttribute<DialogueCommandAttribute>();
+            Type attributeType = isEvent ? typeof(DialogueEventAttribute) : typeof(DialogueCommandAttribute);
+
+            foreach (Type type in types)
+            {
+                DialogueSchemaAttribute attribute = type.GetCustomAttribute(attributeType) as DialogueSchemaAttribute;
+
+                if (attribute == null || attribute.ID != schemaId || !type.IsClass || type.IsAbstract) continue;
+
+                fieldIds = new HashSet<int>();
+
+                foreach (FieldInfo field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+                {
+                    if (!field.IsStatic && !field.IsNotSerialized && !field.IsInitOnly && IsSupported(field.FieldType)) fieldIds.Add(GetFieldId(field.Name));
+                }
+
+                return true;
+            }
+
+            fieldIds = null;
+            return false;
+        }
+
         private static DataWrapper CreateSchemaData(Schema schema, IReadOnlyList<GenericData> previous)
         {
             List<GenericData> data = new() { new GenericData(schema.id) };
+            HashSet<int> schemaIds = new();
 
             for (int i = 0; i < schema.fields.Length; i++)
             {
                 SchemaField field = schema.fields[i];
-                GenericData value = previous != null &&
-                    FindArgument(previous, field.id, out GenericData found) &&
-                    MatchesType(found, field.info.FieldType)
+                schemaIds.Add(field.id);
+                GenericData value = previous != null && FindArgument(previous, field.id, out GenericData found)
                     ? found : DefaultValue(schema, field.info);
                 data.Add(new GenericData(field.id));
                 data.Add(value);
+            }
+
+            // Unknown IDs may belong to renamed fields. Keep them until the user resolves them.
+            if (previous != null)
+            {
+                for (int i = 1; i + 1 < previous.Count; i += 2)
+                {
+                    if (previous[i].TryGetInt(out int fieldId) && schemaIds.Contains(fieldId)) continue;
+
+                    data.Add(previous[i]);
+                    data.Add(previous[i + 1]);
+                }
             }
 
             return new DataWrapper(data);

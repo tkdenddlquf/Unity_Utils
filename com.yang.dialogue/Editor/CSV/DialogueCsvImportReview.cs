@@ -43,6 +43,7 @@ namespace Yang.Dialogue.Editor
         private readonly Dictionary<string, StringTableCollection> tables = new();
         private readonly Dictionary<string, int> columns = new();
         private readonly Dictionary<string, int> ids = new();
+        private readonly Dictionary<(bool isEvent, string schemaId), HashSet<int>> instructionFields = new();
         private readonly List<int> lines = new();
 
         public readonly DialogueCsvImportOptions options = new();
@@ -136,6 +137,7 @@ namespace Yang.Dialogue.Editor
             tables.Clear();
             columns.Clear();
             ids.Clear();
+            instructionFields.Clear();
             nodeLabels.Clear();
             tableNames.Clear();
             entryIds.Clear();
@@ -284,6 +286,9 @@ namespace Yang.Dialogue.Editor
                 CheckGuid(r, "TextTableGuid");
                 CheckPresence(r);
                 CheckData(r, type);
+
+                if (type == "Instruction" && parent >= 0 && (GetCell(parent, 1) == "Command" || GetCell(parent, 1) == "Event"))
+                    CheckUnmatchedArguments(r, GetCell(parent, 1) == "Event");
             }
 
             if (startCount == 0)
@@ -537,13 +542,18 @@ namespace Yang.Dialogue.Editor
 
         private void CheckPresence(int row)
         {
+            string type = GetCell(row, 1).Trim();
+
             foreach (KeyValuePair<string, int> column in columns)
             {
                 string name = column.Key;
+                bool speaker = name.StartsWith("SpeakerPresent[", StringComparison.Ordinal);
 
-                if (!name.StartsWith("TextPresent[", StringComparison.Ordinal) && !name.StartsWith("SpeakerPresent[", StringComparison.Ordinal)) continue;
+                if (!speaker && !name.StartsWith("TextPresent[", StringComparison.Ordinal)) continue;
 
                 string value = GetCell(row, column.Value).Trim();
+
+                if (string.IsNullOrEmpty(value) && !DialogueCsvImporter.RequiresPresence(type, speaker)) continue;
 
                 if (value != "0" && value != "1")
                 {
@@ -572,6 +582,37 @@ namespace Yang.Dialogue.Editor
             };
 
             if (!valid) Add(row, 4, "Invalid Data", $"{type} data has an invalid field, operator, type, or value.");
+        }
+
+        private void CheckUnmatchedArguments(int row, bool isEvent)
+        {
+            string data = GetCell(row, 4);
+
+            if (!DialogueCsvImporter.IsValidArguments(data)) return;
+
+            (bool isEvent, string schemaId) key = (isEvent, GetCell(row, 3));
+
+            if (!instructionFields.TryGetValue(key, out HashSet<int> fields))
+            {
+                CommandNode.TryGetSchemaFieldIds(key.schemaId, isEvent, out fields);
+                instructionFields.Add(key, fields);
+            }
+
+            if (fields == null) return;
+
+            foreach (string raw in data.Split(';'))
+            {
+                string part = raw.Trim();
+                int separator = part.IndexOf(':');
+
+                if (separator <= 0) continue;
+
+                string idText = Uri.UnescapeDataString(part.Substring(0, separator).Trim());
+
+                if (!int.TryParse(idText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int id) || fields.Contains(id)) continue;
+
+                Add(row, 4, "Unmatched instruction ID", $"Field ID {id} is not in the current schema. Its value will be preserved. After import, use Resolve Unmatched IDs on the node.", true);
+            }
         }
 
         private string DefaultTableName(bool speaker)
