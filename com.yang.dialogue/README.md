@@ -113,20 +113,22 @@ Command / Event의 공개 필드는 Source Generator가 인자를 변환하고 �
 
 **필드 이름 변경:** Command/Event 필드의 저장 ID는 필드 이름으로 계산합니다. 이름이 변경되거나 저장된 값의 타입이 스키마와 맞지 않으면 기존 값을 보존하고 노드에 **Resolve fields...** 버튼을 표시합니다. 매핑 창에서는 이전 ID·타입·저장값과 현재 필드·ID·값을 비교하여 연결 대상을 선택합니다. 같은 타입의 안전한 대상이 하나뿐이면 추천 선택되지만 승인 전에는 데이터를 수정하지 않습니다. 매핑하지 않는 값을 유지하거나 명시적으로 삭제할 수 있으며, 타입이 다른 기존 필드는 기본값으로 초기화할 수 있습니다. 동일 Command/Event ID의 다른 노드에도 적용하려면 해당 옵션을 켭니다. 적용 대상 노드별 변경 전후와 충돌 위치를 미리 확인하고 문제 노드로 이동할 수 있으며, 충돌한 노드만 제외하고 나머지를 적용하려면 별도 옵션을 직접 선택해야 합니다. 중복 대상 선택은 차단하고, 최종 승인 후 Undo 가능한 변경으로 기록합니다. Command/Event 종류 변경으로 인자가 초기화될 때도 사전 확인을 요구합니다.
 
-## CSV 내보내기 / 가져오기
+## Excel / CSV 내보내기 및 가져오기
 
-`DialogueSO`의 Inspector에서 **Export CSV** 또는 **Import CSV**를 사용합니다. CSV에는 노드, 연결, 로케일별 번역 및 Localization 식별자가 포함됩니다. CSV는 `SpeakerTableGuid`, `TextTableGuid`, `SpeakerEntryId`, `TextEntryId` 열을 반드시 포함해야 하며, `SpeakerPresent[...]` / `TextPresent[...]` 열은 지원하지 않습니다. **빈 번역 칸은 빈 문자열로 덮어씁니다.**
+Excel에서 편집할 때는 `DialogueSO` Inspector의 **Export Excel (.xlsx)** → Excel 편집·저장 → **Import Excel (.xlsx)**를 사용합니다. 모든 셀을 **텍스트 형식**으로 내보내므로 긴 Entry ID, 숫자로 보이는 Key, 날짜처럼 보이는 문자열의 자동 변환을 방지합니다. Excel에서 셀을 수식이나 숫자 형식으로 변경한 경우에는 잘못된 값을 조용히 적용하지 않도록 가져오기를 중단하고 셀 위치를 알립니다. 여러 시트가 있다면 첫 시트가 Dialogue 데이터여야 합니다. Excel에서 검토 중 수정한 내용을 저장할 때도 `.xlsx` 형식을 유지합니다.
 
-**CSV가 최종 기준**입니다. `SpeakerTableGuid` / `TextTableGuid`로 String Table 컬렉션을, `SpeakerEntryId` / `TextEntryId`로 엔트리를 식별합니다. 같은 GUID·Entry ID라면 기존 Key, 테이블 이름, 번역이 CSV와 달라도 오류가 아닙니다. CSV의 이름 및 번역으로 갱신하되 식별자는 유지합니다. 하나의 엔트리를 여러 노드에서 참조하면 같은 변경을 한 번 적용합니다.
+외부 파이프라인용 **Export CSV** / **Import CSV**도 그대로 사용할 수 있습니다. CSV는 Excel에서 더블클릭해 열면 값이 자동 변환될 수 있으므로, Excel 편집에는 `.xlsx`를 권장합니다. CSV에는 노드, 연결, 로케일별 번역 및 Localization 식별자가 포함됩니다. CSV는 `SpeakerTableGuid`, `TextTableGuid`, `SpeakerEntryId`, `TextEntryId` 열을 반드시 포함해야 하며, `SpeakerPresent[...]` / `TextPresent[...]` 열은 지원하지 않습니다. **빈 번역 칸은 빈 문자열로 덮어씁니다.**
 
-**Dialogue CSV Import** 검토 창에서는 다음처럼 처리합니다.
+**가져온 파일(CSV 또는 XLSX)이 최종 기준**입니다. `SpeakerTableGuid` / `TextTableGuid`로 String Table 컬렉션을, `SpeakerEntryId` / `TextEntryId`로 엔트리를 식별합니다. 같은 GUID·Entry ID라면 기존 Key, 테이블 이름, 번역이 CSV와 달라도 오류가 아닙니다. CSV의 이름 및 번역으로 갱신하되 식별자는 유지합니다. 하나의 엔트리를 여러 노드에서 참조하면 같은 변경을 한 번 적용합니다.
+
+**Dialogue Import** 검토 창에서는 다음처럼 처리합니다.
 
 1. 유효한 변경은 자동 적용 대상으로 분류합니다. 기존 노드 ID에 대한 `Type`, 연결, 메시지, 데이터 변경과 기존 Localization 식별자에 대한 이름·Key·번역 변경은 별도 승인 없이 적용합니다. 같은 테이블 GUID 또는 엔트리 ID에 관한 문제는 한 번만 표시하고, Speaker와 Text 양쪽에서 참조하더라도 동일한 실체라면 관련 CSV 행을 함께 수정합니다. 여러 행이 동일한 존재하지 않는 `Next` ID를 참조하면 하나의 결정 항목으로 묶어 대상 연결이나 연결 해제를 일괄 적용합니다.
 2. **사용자 선택이 필요한 경우**에만 미해결 항목이 나타납니다. 새 노드 ID는 생성하거나 아직 사용하지 않은 기존 ID로 재연결하고, 존재하지 않는 테이블 GUID·Entry ID는 새 항목을 생성하거나 기존 항목을 선택해 연결할 수 있습니다. `Next`의 대상 ID가 없으면 다른 노드를 선택하거나 비웁니다. 새 타입에 필요한 값이 없거나 사용하지 않는 필드 값이 남아 있다면 해당 값을 보완·정리합니다. Choice에 Option이 없을 때는 Option 행을 추가할 수 있습니다.
 3. 명시적인 `SpeakerTableGuid` / `TextTableGuid` 또는 `SpeakerEntryId` / `TextEntryId`가 없거나 대상이 존재하지 않는 경우에는 이름·Key가 같다는 이유만으로 다른 기존 항목에 자동 연결하지 않습니다. 구형 CSV 형식은 지원하지 않습니다. 새 테이블을 생성하면 Unity가 GUID를 발급하므로 다음 CSV Export에 새 식별자가 기록됩니다. 필요한 로케일 테이블도 선택하여 생성할 수 있습니다.
 4. **실제 CSV 충돌이나 형식 오류**는 별도 검증합니다. 중복 노드 ID, 없는 연결 대상, 같은 엔트리 ID에 서로 다른 Key·번역 지정, 서로 다른 엔트리의 Key 충돌, 같은 테이블 GUID에 서로 다른 이름 지정, 필수 데이터 누락, 잘못된 데이터 형식 등이 해당합니다. 이미 존재하는 Key의 정상적인 이름 변경 또는 서로 맞바뀐 Key는 충돌로 취급하지 않습니다.
 5. 검토 창 왼쪽에서 **문제 제목, Localization 참조, CSV 줄·필드**를 검색하거나 알림 항목을 숨길 수 있습니다. 같은 참조를 공유하는 문제는 한 항목으로 표시하고 영향받는 행을 접어서 확인합니다. 동일 엔트리의 Key·Entry ID·번역 또는 동일 테이블의 이름이 충돌하면 모든 관련 CSV 행에서 후보를 모아 **값별 사용 건수와 기존 Localization 값**을 보여줍니다. 후보 버튼을 한 번 누르면 해당 참조의 모든 CSV 행을 즉시 통일하고 재검증합니다. 다른 값을 직접 입력할 수도 있으며, **이전/다음 문제**로 이동할 수 있습니다. 기존 노드·String Table·Localization 엔트리 선택은 검색 목록을 사용합니다. 테이블 이름이 CSV에서 변경되었더라도 GUID로 기존 테이블의 엔트리를 찾습니다.
-6. 변경 요약을 확인한 뒤 **Replace graph and import**를 실행합니다. 유효하지 않은 데이터가 남아 있는 경우 **Ignore invalid data and import**로 제외 대상을 확인하고 가능한 내용만 가져올 수 있습니다. 원본 CSV는 자동으로 수정되지 않으며, **Save CSV corrections...**로 현재 검토한 결과를 별도로 저장할 수 있습니다. 검토 중 CSV의 값을 바꾸면 저장 전까지 미저장 상태를 안내합니다.
+6. 변경 요약을 확인한 뒤 **Replace graph and import**를 실행합니다. 유효하지 않은 데이터가 남아 있는 경우 **Ignore invalid data and import**로 제외 대상을 확인하고 가능한 내용만 가져올 수 있습니다. 원본 CSV는 자동으로 수정되지 않으며, **Save corrections...**로 현재 검토한 결과를 별도로 저장할 수 있습니다. 검토 중 CSV의 값을 바꾸면 저장 전까지 미저장 상태를 안내합니다.
 
 새 테이블을 만들 때는 프로젝트 `Assets` 아래 저장 폴더를 선택합니다. 기존 Dialogue의 기본 테이블을 쓰는 **Use asset default tables**, CSV에 Start가 없을 때 유지하는 **Keep existing Start if missing** 옵션도 제공됩니다. 테이블 생성, 엔트리 생성, 로케일 테이블 생성 및 새 노드 ID 생성은 검토 창에서 명시적으로 선택합니다.
 

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine.UIElements;
@@ -14,13 +16,17 @@ namespace Yang.Dialogue.Editor
             Button button = new(Open) { text = "Edit" };
             Button exportButton = new(ExportCsv) { text = "Export CSV" };
             Button importButton = new(ImportCsv) { text = "Import CSV" };
+            Button exportExcelButton = new(ExportExcel) { text = "Export Excel (.xlsx)" };
+            Button importExcelButton = new(ImportExcel) { text = "Import Excel (.xlsx)" };
 
             root.Bind(serializedObject);
             root.Add(GetHeader("Override Settings"));
             root.Add(GetField("speakerTable"));
             root.Add(GetField("textTable"));
             root.Add(button);
-            root.Add(GetHeader("CSV"));
+            root.Add(GetHeader("Dialogue Data"));
+            root.Add(exportExcelButton);
+            root.Add(importExcelButton);
             root.Add(exportButton);
             root.Add(importButton);
             serializedObject.ApplyModifiedProperties();
@@ -55,6 +61,49 @@ namespace Yang.Dialogue.Editor
 
             string csv = System.IO.File.ReadAllText(path);
             DialogueCsvImportWindow.Open(so, path, csv);
+        }
+
+        private void ExportExcel()
+        {
+            DialogueSO so = target as DialogueSO;
+
+            if (so == null) return;
+
+            string path = EditorUtility.SaveFilePanel("Export Dialogue Excel", "", so.name + ".xlsx", "xlsx");
+
+            if (string.IsNullOrEmpty(path)) return;
+
+            try
+            {
+                List<List<string>> rows = CsvUtility.FromCsv(DialogueCsvExporter.Export(so));
+                DialogueExcelUtility.Save(path, rows);
+                EditorUtility.RevealInFinder(path);
+            }
+            catch (Exception exception)
+            {
+                EditorUtility.DisplayDialog("Excel export failed", exception.Message, "OK");
+            }
+        }
+
+        private void ImportExcel()
+        {
+            DialogueSO so = target as DialogueSO;
+
+            if (so == null) return;
+
+            string path = EditorUtility.OpenFilePanel("Import Dialogue Excel", "", "xlsx");
+
+            if (string.IsNullOrEmpty(path)) return;
+
+            try
+            {
+                string csv = DialogueExcelUtility.Load(path);
+                DialogueCsvImportWindow.Open(so, path, csv);
+            }
+            catch (Exception exception)
+            {
+                EditorUtility.DisplayDialog("Excel import failed", exception.Message, "OK");
+            }
         }
 
         private void Open()

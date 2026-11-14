@@ -79,7 +79,7 @@ namespace Yang.Dialogue.Editor
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
             root.Add(title);
             root.Add(new Label($"{asset.name}  ·  {Path.GetFileName(sourcePath)}"));
-            Label introduction = new("The CSV is authoritative. Valid changes are applied automatically; only unresolved decisions are shown below.");
+            Label introduction = new("The imported file is authoritative. Valid changes are applied automatically; only unresolved decisions are shown below.");
             introduction.style.whiteSpace = WhiteSpace.Normal;
             root.Add(introduction);
             root.Add(Spacer(8));
@@ -218,7 +218,7 @@ namespace Yang.Dialogue.Editor
             VisualElement actions = new();
             actions.style.flexDirection = FlexDirection.Row;
             actions.style.marginTop = 8;
-            actions.Add(new Button(SaveCsv) { text = "Save CSV corrections..." });
+            actions.Add(new Button(SaveCorrections) { text = "Save corrections..." });
             actions.Add(new Button(CancelReview) { text = "Cancel" });
             VisualElement push = new();
             push.style.flexGrow = 1;
@@ -856,18 +856,30 @@ namespace Yang.Dialogue.Editor
             Close();
         }
 
-        private void SaveCsv()
+        private void SaveCorrections()
         {
+            bool excel = Path.GetExtension(sourcePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
+            string extension = excel ? "xlsx" : "csv";
             string folder = Path.GetDirectoryName(sourcePath);
-            string filename = Path.GetFileNameWithoutExtension(sourcePath) + ".csv";
-            string path = EditorUtility.SaveFilePanel("Save corrected Dialogue CSV", folder, filename, "csv");
+            string filename = Path.GetFileNameWithoutExtension(sourcePath) + "." + extension;
+            string path = EditorUtility.SaveFilePanel("Save corrected Dialogue " + extension.ToUpperInvariant(), folder, filename, extension);
 
             if (string.IsNullOrEmpty(path)) return;
 
-            File.WriteAllText(path, review.csv, new UTF8Encoding(true));
+            try
+            {
+                if (excel) DialogueExcelUtility.Save(path, CsvUtility.FromCsv(review.csv));
+                else File.WriteAllText(path, review.csv, new UTF8Encoding(true));
+            }
+            catch (Exception exception)
+            {
+                EditorUtility.DisplayDialog("Save corrections failed", exception.Message, "OK");
+                return;
+            }
+
             sourcePath = path;
             savedCsv = review.csv;
-            resultMessage = "Saved corrected CSV: " + path;
+            resultMessage = "Saved corrections: " + path;
             BuildWindow();
         }
 
