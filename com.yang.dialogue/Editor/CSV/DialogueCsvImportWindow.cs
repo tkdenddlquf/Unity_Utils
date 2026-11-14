@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using UnityEditor;
 using UnityEditor.Localization;
 using UnityEngine.Localization.Tables;
@@ -21,7 +20,7 @@ namespace Yang.Dialogue.Editor
         private int selectedIssue;
         private string searchQuery = "";
         private string preferredGroupKey;
-        private string savedCsv;
+        private string originalCsv;
         private bool showNotices = true;
         private bool optionsExpanded;
         private VisualElement detailPanel;
@@ -35,7 +34,7 @@ namespace Yang.Dialogue.Editor
             DialogueCsvImportWindow window = CreateInstance<DialogueCsvImportWindow>();
             window.asset = so;
             window.sourcePath = path;
-            window.savedCsv = csv;
+            window.originalCsv = csv;
             window.review = new DialogueCsvImportReview(so, csv);
             window.titleContent = new GUIContent("Dialogue CSV Import");
             window.minSize = new Vector2(920, 660);
@@ -237,36 +236,21 @@ namespace Yang.Dialogue.Editor
             (int missingTableGuids, int missingEntryIds) = review.GetCompletableLocalizationCounts();
             int unapprovedNodeIds = review.GetUnapprovedNodeIdCount();
 
-            if ((missingNodeIds + missingTableGuids + missingEntryIds > 0 && HasPreviewStructure()) || unapprovedNodeIds > 0)
+            if (HasPreviewStructure() && missingNodeIds + missingTableGuids + missingEntryIds + unapprovedNodeIds > 0)
             {
-                VisualElement bulkActions = new();
-                bulkActions.style.flexDirection = FlexDirection.Row;
-                bulkActions.style.flexWrap = Wrap.Wrap;
-                bulkActions.style.marginBottom = 7;
-
-                if (missingNodeIds + missingTableGuids + missingEntryIds > 0 && HasPreviewStructure())
+                Button complete = new(CompleteIdentifiersAndApproveNodes)
                 {
-                    Button generateIds = new(GenerateAndSaveIds) { text = $"Fill IDs and save... ({missingNodeIds} nodes, {missingTableGuids} table GUIDs, {missingEntryIds} entries)" };
-                    generateIds.tooltip = "Reuse existing node IDs when uniquely identified by their values, generate IDs only for new nodes, and fill existing Localization table GUIDs, keys, and entry IDs. Explicit IDs are preserved. Save without changing Unity assets.";
-                    generateIds.style.unityFontStyleAndWeight = FontStyle.Bold;
-                    generateIds.style.marginRight = 8;
-                    bulkActions.Add(generateIds);
-                }
-
-                if (unapprovedNodeIds > 0)
-                {
-                    Button approveIds = new(ApproveAllNewNodeIds) { text = $"Allow creation of all {unapprovedNodeIds} new nodes" };
-                    approveIds.tooltip = "Resolve all New node ID decisions at once. The nodes are created only after you review and confirm the final import.";
-                    bulkActions.Add(approveIds);
-                }
-
-                bottomBar.Add(bulkActions);
+                    text = $"Complete IDs + approve nodes ({missingNodeIds} missing IDs, {unapprovedNodeIds} new nodes)"
+                };
+                complete.tooltip = "Reuse matching IDs, complete missing identifiers and approve creation of unmatched nodes in one action. The source file is unchanged; the graph is updated only after Import.";
+                complete.style.unityFontStyleAndWeight = FontStyle.Bold;
+                complete.style.marginBottom = 7;
+                bottomBar.Add(complete);
             }
 
             VisualElement actions = new();
             actions.style.flexDirection = FlexDirection.Row;
             actions.style.flexWrap = Wrap.Wrap;
-            actions.Add(new Button(SaveCorrections) { text = "Save corrections..." });
             actions.Add(new Button(CancelReview) { text = "Cancel" });
             VisualElement push = new();
             push.style.flexGrow = 1;
@@ -284,7 +268,7 @@ namespace Yang.Dialogue.Editor
             actions.Add(importButton);
             bottomBar.Add(actions);
 
-            string editStatus = review.csv == savedCsv ? "" : "CSV edits are not saved to disk.  ";
+            string editStatus = review.csv == originalCsv ? "" : "Pending changes are held in this review only. The source file is unchanged.  ";
             statusLabel = new Label(editStatus + (resultMessage ?? (review.errorCount == 0 ? "Ready to import. Review the changes above." : "Resolve the outstanding decisions, or explicitly ignore invalid data.")));
             statusLabel.style.marginTop = 5;
             statusLabel.style.whiteSpace = WhiteSpace.Normal;
@@ -903,100 +887,30 @@ namespace Yang.Dialogue.Editor
 
         private void CancelReview()
         {
-            if (review.csv != savedCsv && !EditorUtility.DisplayDialog("Discard CSV corrections?", "The corrections made in this review have not been saved to disk. Discard them?", "Discard", "Continue editing")) return;
+            if (review.csv != originalCsv && !EditorUtility.DisplayDialog("Discard pending import changes?", "The changes in this review have not been applied to the Dialogue asset. Discard them?", "Discard", "Continue editing")) return;
 
             Close();
         }
 
-        private void ApproveAllNewNodeIds()
-        {
-            if (review.GetUnapprovedNodeIdCount() == 0) return;
-
-            review.options.createNodes = true;
-            review.Scan();
-            resultMessage = "All new node IDs approved for creation. No assets are changed until the final import is confirmed.";
-            BuildWindow();
-        }
-
-        private void GenerateAndSaveIds()
+        private void CompleteIdentifiersAndApproveNodes()
         {
             (int tableGuids, int entryIds) = review.GetCompletableLocalizationCounts();
+            int pending = review.GetMissingNodeIdCount() + tableGuids + entryIds + review.GetUnapprovedNodeIdCount();
 
-            if (!HasPreviewStructure() || review.GetMissingNodeIdCount() + tableGuids + entryIds == 0) return;
-
-            bool excel = Path.GetExtension(sourcePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
-            string extension = excel ? "xlsx" : "csv";
-            string folder = Path.GetDirectoryName(sourcePath);
-            string name = Path.GetFileNameWithoutExtension(sourcePath);
-            string filename = (name.EndsWith("_ids", StringComparison.OrdinalIgnoreCase) ? name : name + "_ids") + "." + extension;
-            string path = EditorUtility.SaveFilePanel("Save Dialogue with completed IDs", folder, filename, extension);
-
-            if (string.IsNullOrEmpty(path)) return;
-
-            string previousCsv = review.csv;
-            int reused;
-            int generated;
-            int filledTables;
-            int filledEntries;
+            if (!HasPreviewStructure() || pending == 0) return;
 
             try
             {
-                (filledTables, filledEntries) = review.FillExistingLocalizationReferences();
-                (reused, generated) = review.CompleteMissingNodeIds();
+                (int reused, int generated, int filledTables, int filledEntries, int approvedNodes) = review.CompleteIdentifiersAndApproveNodes();
+                resultMessage = $"Pending import: {reused} existing node IDs reused, {generated} new IDs assigned, {filledTables} table GUIDs and {filledEntries} entry IDs filled, {approvedNodes} new nodes approved. No source file or Unity asset has changed. Review settings, then confirm Import.";
             }
             catch (Exception exception)
             {
-                review.csv = previousCsv;
-                review.Scan();
                 EditorUtility.DisplayDialog("Complete IDs failed", exception.Message, "OK");
-                BuildWindow();
-                return;
+                resultMessage = "ID completion was cancelled and the previous review state restored.";
             }
 
-            if (!TrySaveCorrections(path, true))
-            {
-                review.csv = previousCsv;
-                review.Scan();
-                BuildWindow();
-                return;
-            }
-
-            sourcePath = path;
-            savedCsv = review.csv;
-            resultMessage = $"Saved {reused} reused node IDs, {generated} new node IDs, {filledTables} existing table GUIDs, and {filledEntries} existing entry IDs to {path}. No Unity assets were changed.";
             BuildWindow();
-        }
-
-        private void SaveCorrections()
-        {
-            bool excel = Path.GetExtension(sourcePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
-            string extension = excel ? "xlsx" : "csv";
-            string folder = Path.GetDirectoryName(sourcePath);
-            string filename = Path.GetFileNameWithoutExtension(sourcePath) + "." + extension;
-            string path = EditorUtility.SaveFilePanel("Save corrected Dialogue " + extension.ToUpperInvariant(), folder, filename, extension);
-
-            if (string.IsNullOrEmpty(path) || !TrySaveCorrections(path)) return;
-
-            sourcePath = path;
-            savedCsv = review.csv;
-            resultMessage = "Saved corrections: " + path;
-            BuildWindow();
-        }
-
-        private bool TrySaveCorrections(string path, bool idsOnly = false)
-        {
-            try
-            {
-                if (Path.GetExtension(path).Equals(".xlsx", StringComparison.OrdinalIgnoreCase)) DialogueExcelUtility.SaveEditedCells(sourcePath, path, review.csv, idsOnly);
-                else File.WriteAllText(path, review.csv, new UTF8Encoding(true));
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                EditorUtility.DisplayDialog("Save corrections failed", exception.Message, "OK");
-                return false;
-            }
         }
 
         private bool HasPreviewStructure()

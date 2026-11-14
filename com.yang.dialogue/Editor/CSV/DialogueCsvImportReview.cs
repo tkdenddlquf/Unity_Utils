@@ -339,6 +339,76 @@ namespace Yang.Dialogue.Editor
             return (tableGuids.Count, entryIds.Count);
         }
 
+        public (int reused, int generated, int tableGuids, int entryIds, int approvedNodes) CompleteIdentifiersAndApproveNodes()
+        {
+            string originalCsv = csv;
+            List<List<string>> originalRows = CsvUtility.FromCsv(originalCsv);
+            HashSet<string> previousApprovals = new(options.approvedNewNodeIds, StringComparer.Ordinal);
+
+            try
+            {
+                (int tableGuids, int entryIds) localization = FillExistingLocalizationReferences();
+                (int reused, int generated) nodes = CompleteMissingNodeIds();
+                VerifyIdentifierChanges(originalRows);
+
+                HashSet<string> existingIds = new(StringComparer.Ordinal) { asset.EditorStartNode.guid };
+
+                foreach (NodeData node in asset.EditorNodes) existingIds.Add(node.guid);
+
+                int approvedNodes = 0;
+
+                for (int row = 1; row < rows.Count; row++)
+                {
+                    if (!DialogueCsvImporter.IsNodeType(GetCell(row, 1).Trim())) continue;
+
+                    string id = GetCell(row, 0).Trim();
+
+                    if (string.IsNullOrEmpty(id) || existingIds.Contains(id)) continue;
+
+                    if (options.approvedNewNodeIds.Add(id)) approvedNodes++;
+                }
+
+                Scan();
+
+                return (nodes.reused, nodes.generated, localization.tableGuids, localization.entryIds, approvedNodes);
+            }
+            catch
+            {
+                csv = originalCsv;
+                options.approvedNewNodeIds.Clear();
+
+                foreach (string id in previousApprovals) options.approvedNewNodeIds.Add(id);
+
+                Scan();
+                throw;
+            }
+        }
+
+        private void VerifyIdentifierChanges(List<List<string>> originalRows)
+        {
+            if (rows.Count != originalRows.Count) throw new InvalidOperationException("ID completion changed the number of data rows.");
+
+            for (int row = 0; row < rows.Count; row++)
+            {
+                if (rows[row].Count != originalRows[row].Count) throw new InvalidOperationException($"ID completion changed the columns on line {GetLine(row)}.");
+
+                for (int column = 0; column < rows[row].Count; column++)
+                {
+                    string before = originalRows[row][column];
+                    string after = rows[row][column];
+
+                    if (before == after) continue;
+
+                    string name = GetColumnName(column);
+                    bool identifier = name == "ID" || name == "SpeakerTableGuid" || name == "TextTableGuid" ||
+                                      name == "SpeakerEntryId" || name == "TextEntryId" || name == "SpeakerKey" || name == "TextKey";
+
+                    if (!identifier || !string.IsNullOrWhiteSpace(before) || string.IsNullOrWhiteSpace(after))
+                        throw new InvalidOperationException($"ID completion attempted to change existing data at row {row + 1}, column {name}.");
+                }
+            }
+        }
+
         private void CollectExistingLocalizationReferences(List<(int row, int column, string value)> tableGuids, List<(int row, int column, string value)> entryIds, List<(int row, int column, string value)> keys)
         {
             if (!parsed || Column("SpeakerTableGuid") < 0 || Column("TextTableGuid") < 0 || Column("SpeakerEntryId") < 0 || Column("TextEntryId") < 0) return;
