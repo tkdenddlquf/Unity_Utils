@@ -247,7 +247,7 @@ namespace Yang.Dialogue.Editor
                 if (missingNodeIds + missingTableGuids + missingEntryIds > 0 && HasPreviewStructure())
                 {
                     Button generateIds = new(GenerateAndSaveIds) { text = $"Fill IDs and save... ({missingNodeIds} nodes, {missingTableGuids} table GUIDs, {missingEntryIds} entries)" };
-                    generateIds.tooltip = "Generate missing node IDs and fill exact matches for existing Localization table GUIDs and entry IDs. Explicit IDs are preserved. Save without changing Unity assets.";
+                    generateIds.tooltip = "Reuse existing node IDs when uniquely identified by their values, generate IDs only for new nodes, and fill existing Localization table GUIDs, keys, and entry IDs. Explicit IDs are preserved. Save without changing Unity assets.";
                     generateIds.style.unityFontStyleAndWeight = FontStyle.Bold;
                     generateIds.style.marginRight = 8;
                     bulkActions.Add(generateIds);
@@ -934,10 +934,26 @@ namespace Yang.Dialogue.Editor
             if (string.IsNullOrEmpty(path)) return;
 
             string previousCsv = review.csv;
-            int generated = review.GenerateMissingNodeIds();
-            (int filledTables, int filledEntries) = review.FillExistingLocalizationReferences();
+            int reused;
+            int generated;
+            int filledTables;
+            int filledEntries;
 
-            if (!TrySaveCorrections(path))
+            try
+            {
+                (filledTables, filledEntries) = review.FillExistingLocalizationReferences();
+                (reused, generated) = review.CompleteMissingNodeIds();
+            }
+            catch (Exception exception)
+            {
+                review.csv = previousCsv;
+                review.Scan();
+                EditorUtility.DisplayDialog("Complete IDs failed", exception.Message, "OK");
+                BuildWindow();
+                return;
+            }
+
+            if (!TrySaveCorrections(path, true))
             {
                 review.csv = previousCsv;
                 review.Scan();
@@ -947,7 +963,7 @@ namespace Yang.Dialogue.Editor
 
             sourcePath = path;
             savedCsv = review.csv;
-            resultMessage = $"Saved {generated} node IDs, {filledTables} table GUIDs, and {filledEntries} existing entry IDs to {path}. No Unity assets were changed.";
+            resultMessage = $"Saved {reused} reused node IDs, {generated} new node IDs, {filledTables} existing table GUIDs, and {filledEntries} existing entry IDs to {path}. No Unity assets were changed.";
             BuildWindow();
         }
 
@@ -967,11 +983,11 @@ namespace Yang.Dialogue.Editor
             BuildWindow();
         }
 
-        private bool TrySaveCorrections(string path)
+        private bool TrySaveCorrections(string path, bool idsOnly = false)
         {
             try
             {
-                if (Path.GetExtension(path).Equals(".xlsx", StringComparison.OrdinalIgnoreCase)) DialogueExcelUtility.Save(path, CsvUtility.FromCsv(review.csv));
+                if (Path.GetExtension(path).Equals(".xlsx", StringComparison.OrdinalIgnoreCase)) DialogueExcelUtility.SaveEditedCells(sourcePath, path, review.csv, idsOnly);
                 else File.WriteAllText(path, review.csv, new UTF8Encoding(true));
 
                 return true;

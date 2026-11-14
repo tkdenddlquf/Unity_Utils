@@ -359,18 +359,16 @@ namespace Yang.Dialogue.Editor
 
             bool speakerUsed = row.type == "Dialogue" || row.type == "Choice";
             bool textUsed = row.type == "Dialogue" || row.type == "Option";
-            bool speakerHasEntry = !string.IsNullOrEmpty(row.speakerIdRaw) || !string.IsNullOrEmpty(row.speakerKey);
-            bool textHasEntry = !string.IsNullOrEmpty(row.textIdRaw) || !string.IsNullOrEmpty(row.textKey);
 
             foreach (LocaleColumn column in localeColumns)
             {
                 string speaker = Cell(cells, column.speakerColumn, false);
                 string text = Cell(cells, column.textColumn, false);
 
-                if (speakerUsed && column.speakerColumn >= 0 && (speakerHasEntry || !string.IsNullOrEmpty(speaker))) row.speaker[column.code] = speaker;
+                if (speakerUsed && column.speakerColumn >= 0 && !string.IsNullOrEmpty(speaker)) row.speaker[column.code] = speaker;
                 else if (!speakerUsed && !string.IsNullOrEmpty(speaker)) row.unusedSpeakerLocale = true;
 
-                if (textUsed && column.textColumn >= 0 && (textHasEntry || !string.IsNullOrEmpty(text))) row.text[column.code] = text;
+                if (textUsed && column.textColumn >= 0 && !string.IsNullOrEmpty(text)) row.text[column.code] = text;
                 else if (!textUsed && !string.IsNullOrEmpty(text)) row.unusedTextLocale = true;
             }
 
@@ -1506,11 +1504,9 @@ namespace Yang.Dialogue.Editor
             {
                 if (reference.asset is not StringTable table) continue;
 
-                if (!values.TryGetValue(table.LocaleIdentifier.Code, out string value)) continue;
+                if (!values.TryGetValue(table.LocaleIdentifier.Code, out string value) || string.IsNullOrEmpty(value)) continue;
 
                 StringTableEntry existing = table.GetEntry(id);
-
-                if (existing == null && string.IsNullOrEmpty(value)) continue;
 
                 if (existing != null && (existing.Value ?? "") == value) continue;
 

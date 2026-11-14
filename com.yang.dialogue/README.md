@@ -117,9 +117,13 @@ Command / Event의 공개 필드는 Source Generator가 인자를 변환하고 �
 
 Excel에서 편집할 때는 `DialogueSO` Inspector의 **Export Excel (.xlsx)** → Excel 편집·저장 → **Import Excel (.xlsx)**를 사용합니다. 내보낼 때는 식별자 보존을 위해 모든 셀을 **텍스트 형식**으로 저장하지만, 가져올 때는 숫자형 셀도 허용합니다(`X`, `Y`, `EntryId` 포함). XLSX 내부의 숫자를 부동소수점으로 재계산하지 않고 읽으며, 정수인 숫자가 `1000.0` 또는 `1E+3`으로 저장된 경우에는 정확한 정수 문자열로 처리합니다. 수식 셀과 지원하지 않는 셀 형식은 거부합니다. **노드 ID, 테이블 GUID, Entry ID 등 식별자 열은 Google 스프레드시트에서 일반 텍스트로 유지하는 것이 안전합니다.** 스프레드시트가 이미 큰 숫자의 정밀도나 앞자리 0을 바꿨다면 Import에서 원본을 복구할 수 없으므로 Unity에서 다시 내보낸 원본을 사용해야 합니다. 첫 시트가 Dialogue 데이터여야 하며, 검토 창에서 저장한 XLSX도 텍스트 셀 형식을 유지합니다.
 
-**ID를 먼저 채우는 작업 흐름:** 일부 내용만 작성한 XLSX를 **Import Excel (.xlsx)**로 열고, 검토 창 하단의 **Fill IDs and save...** 버튼을 누릅니다. 빈 신규 노드 ID는 GUID로 생성하고, 비어 있는 Localization 테이블 GUID 및 Entry ID는 프로젝트의 기존 String Table 이름과 Key가 정확히 일치하는 경우에만 채웁니다. 입력된 식별자는 덮어쓰지 않습니다. `Start`와 `Option`·`Branch`·`Instruction`·`Asset` 하위 행은 신규 노드 ID 발급 대상이 아닙니다. 이 단계에서는 Unity 에셋을 수정하지 않습니다. 저장한 XLSX에서 나머지 데이터를 편집한 후 다시 가져와 **Allow creation of all N new nodes**로 신규 노드를 일괄 승인하고, 변경 내용을 확인한 뒤 Import합니다. 일치하지 않는 Localization 참조나 실제로 존재하지 않는 엔트리는 별도로 해결해야 합니다. 검토 내용은 스크롤하고 작업 버튼은 창 하단에 고정됩니다.
+**ID를 먼저 채우는 작업 흐름:** 일부 내용만 작성한 XLSX를 **Import Excel (.xlsx)**로 열고 검토 창 하단의 **Fill IDs and save...**를 누릅니다. 먼저 Localization에서 테이블 이름 또는 GUID와 Key가 일치하는 기존 항목을 찾아 GUID·Entry ID를 채웁니다. Key가 비어 있으면 작성된 로케일 번역값이 기존 항목 **단 하나**에 정확히 일치할 때만 기존 Key와 Entry ID를 함께 채웁니다. 이미 입력된 Key나 ID는 덮어쓰지 않으며, 중복 텍스트처럼 후보가 여러 개인 경우에는 자동 연결하지 않습니다.
 
-외부 파이프라인용 **Export CSV** / **Import CSV**도 그대로 사용할 수 있습니다. CSV는 Excel에서 더블클릭해 열면 값이 자동 변환될 수 있으므로, Excel 편집에는 `.xlsx`를 권장합니다. CSV에는 노드, 연결, 로케일별 번역 및 Localization 식별자가 포함됩니다. CSV는 `SpeakerTableGuid`, `TextTableGuid`, `SpeakerEntryId`, `TextEntryId` 열을 반드시 포함해야 하며, `SpeakerPresent[...]` / `TextPresent[...]` 열은 지원하지 않습니다. **빈 번역 칸은 기존 로케일 엔트리가 있으면 빈 문자열로 덮어쓰고, 엔트리가 없으면 새로 만들지 않습니다.** 새로 생성하지 않는 빈 번역은 최종 변경 내역에서도 제외합니다. `EntryId`는 모든 로케일이 공유하는 식별자이므로, ID가 있어도 특정 언어의 번역 엔트리는 없을 수 있습니다.
+노드 ID가 비어 있으면 기존 Dialogue 그래프에서 동일한 노드를 먼저 찾습니다. `Dialogue`는 Text Table·Key(또는 Entry ID), `Choice`는 Text Table·선택지 Key(또는 Entry ID) 조합으로 찾습니다. 다른 종류의 노드 또는 식별자가 부족한 노드는 내용과 좌표가 모두 일치할 때만 재사용합니다. 기존 노드 후보가 여러 개면 작업을 중단하고 직접 ID를 지정하도록 안내합니다. 확실한 기존 노드가 없는 경우에만 GUID를 새로 생성하며, 빈 Start ID에는 기존 Start 노드 ID를 사용합니다. `Option`·`Branch`·`Instruction`·`Asset` 하위 행에는 노드 GUID를 생성하지 않습니다.
+
+이 단계에서는 Unity 에셋을 수정하지 않습니다. XLSX의 **기존 내용을 다시 작성하지 않고 비어 있는 ID 및 기존 Key 셀만** 수정하며, 다른 셀을 변경하려 하면 저장을 중단합니다. 원본의 다른 시트·서식·메타데이터를 보존합니다. 저장한 파일에서 나머지 데이터를 편집한 뒤 다시 가져와 새 노드가 있을 때만 **Allow creation of all N new nodes**를 승인하고, 미리보기 후 Import합니다.
+
+외부 파이프라인용 **Export CSV** / **Import CSV**도 그대로 사용할 수 있습니다. CSV는 Excel에서 더블클릭해 열면 값이 자동 변환될 수 있으므로, Excel 편집에는 `.xlsx`를 권장합니다. CSV에는 노드, 연결, 로케일별 번역 및 Localization 식별자가 포함됩니다. CSV는 `SpeakerTableGuid`, `TextTableGuid`, `SpeakerEntryId`, `TextEntryId` 열을 반드시 포함해야 하며, `SpeakerPresent[...]` / `TextPresent[...]` 열은 지원하지 않습니다. **빈 번역 칸은 기존 번역을 덮어쓰지 않고 새 엔트리도 만들지 않습니다.** 새로 생성하지 않는 빈 번역은 최종 변경 내역에서도 제외합니다. `EntryId`는 모든 로케일이 공유하는 식별자이므로, ID가 있어도 특정 언어의 번역 엔트리는 없을 수 있습니다.
 
 **가져온 파일(CSV 또는 XLSX)이 최종 기준**입니다. `SpeakerTableGuid` / `TextTableGuid`로 String Table 컬렉션을, `SpeakerEntryId` / `TextEntryId`로 엔트리를 식별합니다. 같은 GUID·Entry ID라면 기존 Key, 테이블 이름, 번역이 CSV와 달라도 오류가 아닙니다. CSV의 이름 및 번역으로 갱신하되 식별자는 유지합니다. 하나의 엔트리를 여러 노드에서 참조하면 같은 변경을 한 번 적용합니다.
 
@@ -127,7 +131,7 @@ Excel에서 편집할 때는 `DialogueSO` Inspector의 **Export Excel (.xlsx)** 
 
 1. 유효한 변경은 자동 적용 대상으로 분류합니다. 기존 노드 ID에 대한 `Type`, 연결, 메시지, 데이터 변경과 기존 Localization 식별자에 대한 이름·Key·번역 변경은 별도 승인 없이 적용합니다. 같은 테이블 GUID 또는 엔트리 ID에 관한 문제는 한 번만 표시하고, Speaker와 Text 양쪽에서 참조하더라도 동일한 실체라면 관련 CSV 행을 함께 수정합니다. 여러 행이 동일한 존재하지 않는 `Next` ID를 참조하면 하나의 결정 항목으로 묶어 대상 연결이나 연결 해제를 일괄 적용합니다.
 2. **사용자 선택이 필요한 경우**에만 미해결 항목이 나타납니다. 새 노드 ID는 생성하거나 아직 사용하지 않은 기존 ID로 재연결하고, 존재하지 않는 테이블 GUID·Entry ID는 새 항목을 생성하거나 기존 항목을 선택해 연결할 수 있습니다. `Next`의 대상 ID가 없으면 다른 노드를 선택하거나 비웁니다. 새 타입에 필요한 값이 없거나 사용하지 않는 필드 값이 남아 있다면 해당 값을 보완·정리합니다. Choice에 Option이 없을 때는 Option 행을 추가할 수 있습니다.
-3. 비어 있는 `SpeakerEntryId` / `TextEntryId`는 지정된 String Table에서 Key가 정확히 일치하면 그 기존 ID를 사용합니다. 비어 있는 테이블 GUID는 **Fill IDs and save...**에서 기존 테이블 이름과 정확히 일치할 때만 채우며, 명시된 GUID·Entry ID는 Key나 이름을 근거로 바꾸지 않습니다. 기존 ID가 가리키는 대상이 없거나 서로 충돌하면 검토 창에서 직접 결정합니다. 새 테이블을 생성하면 Unity가 GUID를 발급하므로 다음 Export에 기록됩니다. 필요한 로케일 테이블도 선택하여 생성할 수 있습니다.
+3. 비어 있는 `SpeakerEntryId` / `TextEntryId`는 지정된 String Table에서 Key가 정확히 일치하면 그 기존 ID를 사용합니다. Key까지 비어 있으면 로케일 번역값이 단 하나의 엔트리와 모두 정확히 일치할 때만 Key와 ID를 채울 수 있습니다. 비어 있는 테이블 GUID는 **Fill IDs and save...**에서 기존 테이블 이름과 정확히 일치할 때만 채우며, 명시된 GUID·Entry ID는 Key나 이름을 근거로 바꾸지 않습니다. 기존 ID가 가리키는 대상이 없거나 서로 충돌하면 검토 창에서 직접 결정합니다. 새 테이블을 생성하면 Unity가 GUID를 발급하므로 다음 Export에 기록됩니다. 필요한 로케일 테이블도 선택하여 생성할 수 있습니다.
 4. **실제 CSV 충돌이나 형식 오류**는 별도 검증합니다. 중복 노드 ID, 없는 연결 대상, 같은 엔트리 ID에 서로 다른 Key·번역 지정, 서로 다른 엔트리의 Key 충돌, 같은 테이블 GUID에 서로 다른 이름 지정, 필수 데이터 누락, 잘못된 데이터 형식 등이 해당합니다. 이미 존재하는 Key의 정상적인 이름 변경 또는 서로 맞바뀐 Key는 충돌로 취급하지 않습니다.
 5. 검토 창 왼쪽에서 **문제 제목, Localization 참조, CSV 줄·필드**를 검색하거나 알림 항목을 숨길 수 있습니다. 같은 참조를 공유하는 문제는 한 항목으로 표시하고 영향받는 행을 접어서 확인합니다. 동일 엔트리의 Key·Entry ID·번역 또는 동일 테이블의 이름이 충돌하면 모든 관련 CSV 행에서 후보를 모아 **값별 사용 건수와 기존 Localization 값**을 보여줍니다. 후보 버튼을 한 번 누르면 해당 참조의 모든 CSV 행을 즉시 통일하고 재검증합니다. 다른 값을 직접 입력할 수도 있으며, **이전/다음 문제**로 이동할 수 있습니다. 기존 노드·String Table·Localization 엔트리 선택은 검색 목록을 사용합니다. 테이블 이름이 CSV에서 변경되었더라도 GUID로 기존 테이블의 엔트리를 찾습니다.
 6. 변경 요약을 확인한 뒤 **Replace graph and import**를 실행합니다. 유효하지 않은 데이터가 남아 있는 경우 **Ignore invalid data and import**로 제외 대상을 확인하고 가능한 내용만 가져올 수 있습니다. 원본 CSV는 자동으로 수정되지 않으며, **Save corrections...**로 현재 검토한 결과를 별도로 저장할 수 있습니다. 검토 중 CSV의 값을 바꾸면 저장 전까지 미저장 상태를 안내합니다.
@@ -147,3 +151,5 @@ Excel에서 편집할 때는 `DialogueSO` Inspector의 **Export Excel (.xlsx)** 
 ## 라이선스
 
 `LICENSE.txt`를 참고하세요.
+
+**부분 번역 Import:** `Speaker[언어]`, `Text[언어]` 셀이 비어 있으면 기존 Localization 값을 지우지 않고 유지합니다. 작성된 번역만 추가하거나 갱신합니다. 기존 번역을 삭제하려면 Localization 에디터에서 직접 삭제해야 합니다. XLSX의 `Save corrections...`도 행 구조가 같을 때 수정 셀만 반영하며, 행 추가·삭제가 필요한 저장은 원본 보호를 위해 차단합니다.

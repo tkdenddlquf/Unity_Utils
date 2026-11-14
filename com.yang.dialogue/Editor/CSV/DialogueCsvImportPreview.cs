@@ -353,6 +353,9 @@ namespace Yang.Dialogue.Editor
                 if (!configuredLocales.Contains(locale)) continue;
 
                 string after = Cell(values, field.Value);
+
+                if (string.IsNullOrEmpty(after)) continue;
+
                 string before = "(no entry)";
                 StringTable localeTable = null;
 
@@ -368,9 +371,6 @@ namespace Yang.Dialogue.Editor
                 }
 
                 StringTableEntry existing = currentEntry == null ? null : localeTable?.GetEntry(currentEntry.Id);
-
-                // An empty CSV cell clears an existing translation, but does not create a missing one.
-                if (existing == null && string.IsNullOrEmpty(after)) continue;
 
                 if (localeTable == null && collection != null)
                 {

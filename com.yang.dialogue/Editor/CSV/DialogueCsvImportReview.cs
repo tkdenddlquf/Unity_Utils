@@ -113,9 +113,7 @@ namespace Yang.Dialogue.Editor
 
             for (int row = 1; row < rows.Count; row++)
             {
-                string type = GetCell(row, 1).Trim();
-
-                if (type != "Start" && DialogueCsvImporter.IsNodeType(type) && string.IsNullOrWhiteSpace(GetCell(row, 0))) count++;
+                if (DialogueCsvImporter.IsNodeType(GetCell(row, 1).Trim()) && string.IsNullOrWhiteSpace(GetCell(row, 0))) count++;
             }
 
             return count;
@@ -133,48 +131,194 @@ namespace Yang.Dialogue.Editor
             return count;
         }
 
-        public int GenerateMissingNodeIds()
+        public (int reused, int generated) CompleteMissingNodeIds()
         {
-            int count = GetMissingNodeIdCount();
+            if (GetMissingNodeIdCount() == 0) return (0, 0);
 
-            if (count == 0) return 0;
-
-            HashSet<string> used = new(StringComparer.Ordinal);
-            used.Add(asset.EditorStartNode.guid);
+            List<List<string>> existingRows = CsvUtility.FromCsv(DialogueCsvExporter.Export(asset));
+            HashSet<string> used = new(StringComparer.Ordinal) { asset.EditorStartNode.guid };
+            List<(int row, string id)> changes = new();
+            int reused = 0;
+            int generated = 0;
 
             foreach (NodeData node in asset.EditorNodes) used.Add(node.guid);
+
+            HashSet<string> assigned = new(StringComparer.Ordinal);
 
             for (int row = 1; row < rows.Count; row++)
             {
                 string id = GetCell(row, 0).Trim();
 
-                if (!string.IsNullOrEmpty(id)) used.Add(id);
+                if (!string.IsNullOrEmpty(id)) assigned.Add(id);
             }
 
             for (int row = 1; row < rows.Count; row++)
             {
                 string type = GetCell(row, 1).Trim();
 
-                if (type == "Start" || !DialogueCsvImporter.IsNodeType(type) || !string.IsNullOrWhiteSpace(GetCell(row, 0))) continue;
+                if (!DialogueCsvImporter.IsNodeType(type) || !string.IsNullOrWhiteSpace(GetCell(row, 0))) continue;
 
-                string id;
+                if (type == "Start")
+                {
+                    if (!assigned.Add(asset.EditorStartNode.guid)) throw new InvalidOperationException("The existing Start node ID is already assigned to another row.");
 
-                do id = Guid.NewGuid().ToString();
-                while (!used.Add(id));
+                    changes.Add((row, asset.EditorStartNode.guid));
+                    reused++;
+                    continue;
+                }
 
-                SetCellValue(row, 0, id);
+                string match = null;
+                int matchCount = 0;
+
+                for (int candidate = 1; candidate < existingRows.Count; candidate++)
+                {
+                    if (!DialogueCsvImporter.IsNodeType(CellValue(existingRows[candidate], 1))) continue;
+                    if (!MatchesExistingNode(rows, row, existingRows, candidate)) continue;
+
+                    string candidateId = CellValue(existingRows[candidate], 0);
+
+                    if (assigned.Contains(candidateId)) continue;
+
+                    match = candidateId;
+                    matchCount++;
+                }
+
+                if (matchCount > 1)
+                    throw new InvalidOperationException($"Line {GetLine(row)} matches multiple existing {type} nodes. Set its ID explicitly before completing IDs.");
+
+                if (matchCount == 1)
+                {
+                    if (!assigned.Add(match)) throw new InvalidOperationException($"Line {GetLine(row)} shares an existing node identity with another row. Set the IDs explicitly.");
+
+                    changes.Add((row, match));
+                    reused++;
+                    continue;
+                }
+
+                string newId;
+
+                do newId = Guid.NewGuid().ToString();
+                while (!used.Add(newId) || !assigned.Add(newId));
+
+                changes.Add((row, newId));
+                generated++;
             }
 
-            SaveRows();
+            foreach ((int row, string id) change in changes) SetCellValue(change.row, 0, change.id);
 
-            return count;
+            if (changes.Count > 0) SaveRows();
+
+            return (reused, generated);
         }
+
+        private bool MatchesExistingNode(List<List<string>> source, int row, List<List<string>> existing, int candidate)
+        {
+            string type = CellValue(source[row], 1);
+
+            if (type != CellValue(existing[candidate], 1)) return false;
+
+            if (type == "Dialogue" && SameTextReference(source[row], existing[candidate], existing[0], true)) return true;
+
+            if (type == "Choice" && SameChoiceOptions(source, row, existing, candidate)) return true;
+
+            // For nodes without a stable localization reference, matching requires
+            // the same content and position, not merely the same node type.
+            if (string.IsNullOrWhiteSpace(CellValue(source[row], 9)) || string.IsNullOrWhiteSpace(CellValue(source[row], 10))) return false;
+            if (CellValue(source[row], 9) != CellValue(existing[candidate], 9) || CellValue(source[row], 10) != CellValue(existing[candidate], 10)) return false;
+
+            int[] fields = { 3, 4, 5, 6, 7, 8 };
+
+            foreach (int field in fields)
+            {
+                if (CellValue(source[row], field) != CellValue(existing[candidate], field)) return false;
+            }
+
+            int sourceChild = row + 1;
+            int existingChild = candidate + 1;
+
+            while (sourceChild < source.Count && !DialogueCsvImporter.IsNodeType(CellValue(source[sourceChild], 1)) &&
+                   existingChild < existing.Count && !DialogueCsvImporter.IsNodeType(CellValue(existing[existingChild], 1)))
+            {
+                int[] childFields = { 1, 3, 4, 7, 8 };
+
+                foreach (int field in childFields)
+                {
+                    if (CellValue(source[sourceChild], field) != CellValue(existing[existingChild], field)) return false;
+                }
+
+                sourceChild++;
+                existingChild++;
+            }
+
+            return (sourceChild == source.Count || DialogueCsvImporter.IsNodeType(CellValue(source[sourceChild], 1))) &&
+                   (existingChild == existing.Count || DialogueCsvImporter.IsNodeType(CellValue(existing[existingChild], 1)));
+        }
+
+        private bool SameChoiceOptions(List<List<string>> source, int row, List<List<string>> existing, int candidate)
+        {
+            if (!SameTableReference(source[row], existing[candidate], existing[0], false)) return false;
+
+            int sourceIndex = row + 1;
+            int existingIndex = candidate + 1;
+            int count = 0;
+
+            while (sourceIndex < source.Count && CellValue(source[sourceIndex], 1) == "Option" &&
+                   existingIndex < existing.Count && CellValue(existing[existingIndex], 1) == "Option")
+            {
+                if (!SameTextReference(source[sourceIndex], existing[existingIndex], existing[0], false)) return false;
+
+                count++;
+                sourceIndex++;
+                existingIndex++;
+            }
+
+            return count > 0 && (sourceIndex == source.Count || CellValue(source[sourceIndex], 1) != "Option") &&
+                   (existingIndex == existing.Count || CellValue(existing[existingIndex], 1) != "Option");
+        }
+
+        private bool SameTextReference(List<string> source, List<string> existing, List<string> existingHeader, bool requireTable)
+        {
+            if (requireTable && !SameTableReference(source, existing, existingHeader, false)) return false;
+
+            string sourceId = CellValue(source, Column("TextEntryId"));
+            string existingId = CellValue(existing, existingHeader.IndexOf("TextEntryId"));
+
+            if (long.TryParse(sourceId, NumberStyles.Integer, CultureInfo.InvariantCulture, out long id) && id > 0 &&
+                long.TryParse(existingId, NumberStyles.Integer, CultureInfo.InvariantCulture, out long existingEntryId) && existingEntryId > 0)
+                return id == existingEntryId;
+
+            string sourceKey = CellValue(source, 8);
+
+            return !string.IsNullOrEmpty(sourceKey) && sourceKey == CellValue(existing, 8);
+        }
+
+        private bool SameTableReference(List<string> source, List<string> existing, List<string> existingHeader, bool speaker)
+        {
+            string name = speaker ? "SpeakerTableGuid" : "TextTableGuid";
+            string sourceGuid = CellValue(source, Column(name));
+            string existingGuid = CellValue(existing, existingHeader.IndexOf(name));
+
+            if (!string.IsNullOrEmpty(sourceGuid) && !string.IsNullOrEmpty(existingGuid))
+                return Guid.TryParse(sourceGuid, out Guid first) && Guid.TryParse(existingGuid, out Guid second) && first == second;
+
+            int column = speaker ? 5 : 6;
+            string sourceName = CellValue(source, column);
+            string existingName = CellValue(existing, column);
+
+            if (string.IsNullOrEmpty(sourceName) && options.useDefaultTables) sourceName = DefaultTableName(speaker);
+
+            return !string.IsNullOrEmpty(sourceName) && sourceName == existingName;
+        }
+
+        private static string CellValue(List<string> cells, int column)
+            => column >= 0 && column < cells.Count ? cells[column].Trim() : "";
 
         public (int tableGuids, int entryIds) GetCompletableLocalizationCounts()
         {
             List<(int row, int column, string value)> tableGuids = new();
             List<(int row, int column, string value)> entryIds = new();
-            CollectExistingLocalizationReferences(tableGuids, entryIds);
+            List<(int row, int column, string value)> keys = new();
+            CollectExistingLocalizationReferences(tableGuids, entryIds, keys);
 
             return (tableGuids.Count, entryIds.Count);
         }
@@ -183,17 +327,19 @@ namespace Yang.Dialogue.Editor
         {
             List<(int row, int column, string value)> tableGuids = new();
             List<(int row, int column, string value)> entryIds = new();
-            CollectExistingLocalizationReferences(tableGuids, entryIds);
+            List<(int row, int column, string value)> keys = new();
+            CollectExistingLocalizationReferences(tableGuids, entryIds, keys);
 
             foreach ((int row, int column, string value) field in tableGuids) SetCellValue(field.row, field.column, field.value);
             foreach ((int row, int column, string value) field in entryIds) SetCellValue(field.row, field.column, field.value);
+            foreach ((int row, int column, string value) field in keys) SetCellValue(field.row, field.column, field.value);
 
             if (tableGuids.Count > 0 || entryIds.Count > 0) SaveRows();
 
             return (tableGuids.Count, entryIds.Count);
         }
 
-        private void CollectExistingLocalizationReferences(List<(int row, int column, string value)> tableGuids, List<(int row, int column, string value)> entryIds)
+        private void CollectExistingLocalizationReferences(List<(int row, int column, string value)> tableGuids, List<(int row, int column, string value)> entryIds, List<(int row, int column, string value)> keys)
         {
             if (!parsed || Column("SpeakerTableGuid") < 0 || Column("TextTableGuid") < 0 || Column("SpeakerEntryId") < 0 || Column("TextEntryId") < 0) return;
 
@@ -210,14 +356,14 @@ namespace Yang.Dialogue.Editor
                 {
                     CollectExistingTableGuid(collections, row, row, true, tableGuids);
                     CollectExistingTableGuid(collections, row, row, false, tableGuids);
-                    CollectExistingEntryId(collections, row, row, true, entryIds);
+                    CollectExistingEntryId(collections, row, row, true, entryIds, keys);
 
-                    if (type == "Dialogue") CollectExistingEntryId(collections, row, row, false, entryIds);
+                    if (type == "Dialogue") CollectExistingEntryId(collections, row, row, false, entryIds, keys);
                 }
                 else if (type == "Option" && owner > 0 && GetCell(owner, 1) == "Choice")
                 {
                     CollectExistingTableGuid(collections, owner, row, false, tableGuids);
-                    CollectExistingEntryId(collections, owner, row, false, entryIds);
+                    CollectExistingEntryId(collections, owner, row, false, entryIds, keys);
                 }
             }
         }
@@ -235,16 +381,14 @@ namespace Yang.Dialogue.Editor
             changes.Add((row, column, collection.TableCollectionNameReference.TableCollectionNameGuid.ToString("N")));
         }
 
-        private void CollectExistingEntryId(IReadOnlyList<StringTableCollection> collections, int owner, int row, bool speaker, List<(int row, int column, string value)> changes)
+        private void CollectExistingEntryId(IReadOnlyList<StringTableCollection> collections, int owner, int row, bool speaker, List<(int row, int column, string value)> changes, List<(int row, int column, string value)> keys)
         {
             int column = Column(speaker ? "SpeakerEntryId" : "TextEntryId");
 
             if (!string.IsNullOrWhiteSpace(GetCell(row, column))) return;
 
-            string key = GetCell(row, speaker ? 7 : 8).Trim();
-
-            if (string.IsNullOrEmpty(key)) return;
-
+            int keyColumn = speaker ? 7 : 8;
+            string key = GetCell(row, keyColumn).Trim();
             StringTableCollection collection = FindExistingLocalizationTable(collections, owner, speaker);
 
             if (collection == null) return;
@@ -259,9 +403,69 @@ namespace Yang.Dialogue.Editor
                 }
             }
 
-            SharedTableData.SharedTableEntry entry = collection.SharedData.GetEntry(key);
+            SharedTableData.SharedTableEntry entry = string.IsNullOrEmpty(key) ? FindUniqueEntryByText(collection, row, speaker) : collection.SharedData.GetEntry(key);
 
-            if (entry != null) changes.Add((row, column, entry.Id.ToString(CultureInfo.InvariantCulture)));
+            if (entry == null) return;
+
+            changes.Add((row, column, entry.Id.ToString(CultureInfo.InvariantCulture)));
+
+            if (string.IsNullOrEmpty(key)) keys.Add((row, keyColumn, entry.Key));
+        }
+
+        private SharedTableData.SharedTableEntry FindUniqueEntryByText(StringTableCollection collection, int row, bool speaker)
+        {
+            string prefix = speaker ? "Speaker[" : "Text[";
+            List<(StringTable table, string value)> values = new();
+
+            foreach (KeyValuePair<string, int> column in columns)
+            {
+                if (!column.Key.StartsWith(prefix, StringComparison.Ordinal) || !column.Key.EndsWith("]", StringComparison.Ordinal)) continue;
+
+                string value = GetCell(row, column.Value);
+
+                if (string.IsNullOrEmpty(value)) continue;
+
+                string localeCode = column.Key.Substring(prefix.Length, column.Key.Length - prefix.Length - 1);
+                StringTable localeTable = null;
+
+                foreach (LazyLoadReference<LocalizationTable> reference in collection.Tables)
+                {
+                    if (reference.asset is not StringTable candidate || candidate.LocaleIdentifier.Code != localeCode) continue;
+
+                    localeTable = candidate;
+                    break;
+                }
+
+                if (localeTable == null) return null;
+
+                values.Add((localeTable, value));
+            }
+
+            if (values.Count == 0) return null;
+
+            SharedTableData.SharedTableEntry match = null;
+
+            foreach (SharedTableData.SharedTableEntry entry in collection.SharedData.Entries)
+            {
+                bool equal = true;
+
+                foreach ((StringTable table, string value) field in values)
+                {
+                    StringTableEntry translated = field.table.GetEntry(entry.Id);
+
+                    if (translated != null && translated.Value == field.value) continue;
+
+                    equal = false;
+                    break;
+                }
+
+                if (!equal) continue;
+                if (match != null) return null;
+
+                match = entry;
+            }
+
+            return match;
         }
 
         private StringTableCollection FindExistingLocalizationTable(IReadOnlyList<StringTableCollection> collections, int owner, bool speaker)
@@ -1164,7 +1368,6 @@ namespace Yang.Dialogue.Editor
             int tableColumn = speaker ? 5 : 6;
 
             string guidText = GetCell(owner, Column(kind + "TableGuid")).Trim();
-            bool hasEntry = id > 0 || !string.IsNullOrEmpty(key);
             List<(string code, string value, int column)> values = new();
 
             foreach (KeyValuePair<string, int> column in columns)
@@ -1174,7 +1377,7 @@ namespace Yang.Dialogue.Editor
                 string code = column.Key.Substring(kind.Length + 1, column.Key.Length - kind.Length - 2);
                 string value = GetCell(row, column.Value);
 
-                if (localeCodes.Contains(code) && (hasEntry || !string.IsNullOrEmpty(value)))
+                if (localeCodes.Contains(code) && !string.IsNullOrEmpty(value))
                     values.Add((code, value, column.Value));
             }
 
@@ -1325,8 +1528,6 @@ namespace Yang.Dialogue.Editor
                 }
 
                 StringTableEntry entry = existing == null ? null : localeTable?.GetEntry(existing.Id);
-
-                if (entry == null && string.IsNullOrEmpty(value)) continue;
 
                 if (localeTable == null)
                 {
