@@ -406,7 +406,7 @@ namespace Yang.Dialogue.Editor
 
                     if (values.ContainsKey(column)) throw new FormatException($"Duplicate Excel cell {address}.");
 
-                    values[column] = ReadCell(cell, namespaces, sharedStrings, address);
+                    values[column] = ReadCell(cell, namespaces, sharedStrings, address, row > 1 && (column == 9 || column == 10));
                 }
 
                 if (values.Count > 0) cells[row] = values;
@@ -474,7 +474,7 @@ namespace Yang.Dialogue.Editor
             return column - 1;
         }
 
-        private static string ReadCell(XmlNode cell, XmlNamespaceManager namespaces, List<string> sharedStrings, string address)
+        private static string ReadCell(XmlNode cell, XmlNamespaceManager namespaces, List<string> sharedStrings, string address, bool coordinate)
         {
             if (cell.SelectSingleNode("./s:f", namespaces) != null)
                 throw new FormatException($"Excel cell {address} contains a formula. Change the cell format to Text and enter a literal value.");
@@ -500,7 +500,11 @@ namespace Yang.Dialogue.Editor
             if (type == "str") return value?.InnerText ?? "";
             if (value == null && (type == null || type == "" || type == "n")) return "";
 
-            throw new FormatException($"Excel cell {address} is not text. Set the cell format to Text before entering values, then save again. Numeric conversion can damage IDs.");
+            if (coordinate && (type == null || type == "" || type == "n") && value != null &&
+                float.TryParse(value.InnerText, NumberStyles.Float, CultureInfo.InvariantCulture, out float number) && !float.IsNaN(number) && !float.IsInfinity(number))
+                return value.InnerText;
+
+            throw new FormatException($"Excel cell {address} is not text. Set the cell format to Text before entering values, then save again. Numeric conversion can damage IDs. Only X and Y accept numeric cells.");
         }
     }
 }

@@ -115,7 +115,9 @@ Command / Event의 공개 필드는 Source Generator가 인자를 변환하고 �
 
 ## Excel / CSV 내보내기 및 가져오기
 
-Excel에서 편집할 때는 `DialogueSO` Inspector의 **Export Excel (.xlsx)** → Excel 편집·저장 → **Import Excel (.xlsx)**를 사용합니다. 모든 셀을 **텍스트 형식**으로 내보내므로 긴 Entry ID, 숫자로 보이는 Key, 날짜처럼 보이는 문자열의 자동 변환을 방지합니다. Excel에서 셀을 수식이나 숫자 형식으로 변경한 경우에는 잘못된 값을 조용히 적용하지 않도록 가져오기를 중단하고 셀 위치를 알립니다. 여러 시트가 있다면 첫 시트가 Dialogue 데이터여야 합니다. Excel에서 검토 중 수정한 내용을 저장할 때도 `.xlsx` 형식을 유지합니다.
+Excel에서 편집할 때는 `DialogueSO` Inspector의 **Export Excel (.xlsx)** → Excel 편집·저장 → **Import Excel (.xlsx)**를 사용합니다. 모든 셀을 **텍스트 형식**으로 내보내므로 긴 Entry ID, 숫자로 보이는 Key, 날짜처럼 보이는 문자열의 자동 변환을 방지합니다. 가져올 때 Google 스프레드시트가 숫자 셀로 저장한 `X`, `Y` 좌표는 유한한 숫자이면 허용하지만, ID·Entry ID·Key를 비롯한 다른 필드의 숫자 셀이나 수식은 오류로 처리하고 셀 위치를 알립니다. 여러 시트가 있다면 첫 시트가 Dialogue 데이터여야 합니다. 검토 창의 수정 내용을 저장할 때도 원본과 동일한 형식을 유지합니다.
+
+**신규 노드 ID를 먼저 발급하는 작업 흐름:** 일부 내용만 작성한 XLSX를 **Import Excel (.xlsx)**로 열고, 검토 창의 **Generate N missing node IDs and save...**를 눌러 별도 XLSX에 저장합니다. 이 단계에서는 실제 Dialogue 에셋이나 Localization을 변경하지 않습니다. 기존 ID는 보존하고, ID가 비어 있는 신규 노드 행에만 GUID를 발급합니다. `Start` 행은 기존 Start ID를 유지하도록 자동 생성 대상에서 제외하며, `Option`·`Branch`·`Instruction`·`Asset` 같은 하위 행에도 ID를 넣지 않습니다. 생성된 파일을 다시 Google 스프레드시트에서 수정한 뒤 Unity에 Import하고, 신규 노드를 실제로 생성할 때는 검토 창의 **Create nodes with unknown IDs** 옵션을 켭니다. Localization 테이블 GUID·Entry ID와 필수 데이터는 별도로 확인·해결해야 하며, ID를 저장했다고 자동으로 Import가 완료되지는 않습니다.
 
 외부 파이프라인용 **Export CSV** / **Import CSV**도 그대로 사용할 수 있습니다. CSV는 Excel에서 더블클릭해 열면 값이 자동 변환될 수 있으므로, Excel 편집에는 `.xlsx`를 권장합니다. CSV에는 노드, 연결, 로케일별 번역 및 Localization 식별자가 포함됩니다. CSV는 `SpeakerTableGuid`, `TextTableGuid`, `SpeakerEntryId`, `TextEntryId` 열을 반드시 포함해야 하며, `SpeakerPresent[...]` / `TextPresent[...]` 열은 지원하지 않습니다. **빈 번역 칸은 기존 로케일 엔트리가 있으면 빈 문자열로 덮어쓰고, 엔트리가 없으면 새로 만들지 않습니다.** 새로 생성하지 않는 빈 번역은 최종 변경 내역에서도 제외합니다. `EntryId`는 모든 로케일이 공유하는 식별자이므로, ID가 있어도 특정 언어의 번역 엔트리는 없을 수 있습니다.
 

@@ -215,6 +215,17 @@ namespace Yang.Dialogue.Editor
             previewButton.SetEnabled(HasPreviewStructure());
             footer.Add(previewButton);
 
+            int missingNodeIds = review.GetMissingNodeIdCount();
+
+            if (missingNodeIds > 0 && HasPreviewStructure())
+            {
+                Button generateIds = new(GenerateAndSaveNodeIds) { text = $"Generate {missingNodeIds} missing node IDs and save..." };
+                generateIds.tooltip = "Save a new file with IDs for new nodes. Does not import or modify the Dialogue asset. Start and detail rows are not assigned new IDs.";
+                generateIds.style.alignSelf = Align.FlexStart;
+                generateIds.style.marginTop = 8;
+                footer.Add(generateIds);
+            }
+
             VisualElement actions = new();
             actions.style.flexDirection = FlexDirection.Row;
             actions.style.marginTop = 8;
@@ -856,6 +867,29 @@ namespace Yang.Dialogue.Editor
             Close();
         }
 
+        private void GenerateAndSaveNodeIds()
+        {
+            if (!HasPreviewStructure() || review.GetMissingNodeIdCount() == 0) return;
+
+            bool excel = Path.GetExtension(sourcePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
+            string extension = excel ? "xlsx" : "csv";
+            string folder = Path.GetDirectoryName(sourcePath);
+            string name = Path.GetFileNameWithoutExtension(sourcePath);
+            string filename = (name.EndsWith("_ids", StringComparison.OrdinalIgnoreCase) ? name : name + "_ids") + "." + extension;
+            string path = EditorUtility.SaveFilePanel("Save Dialogue with generated node IDs", folder, filename, extension);
+
+            if (string.IsNullOrEmpty(path)) return;
+
+            int generated = review.GenerateMissingNodeIds();
+
+            if (!TrySaveCorrections(path)) return;
+
+            sourcePath = path;
+            savedCsv = review.csv;
+            resultMessage = $"Saved {generated} node IDs to {path}. No Dialogue assets were changed. Finish editing this file, then import it.";
+            BuildWindow();
+        }
+
         private void SaveCorrections()
         {
             bool excel = Path.GetExtension(sourcePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
@@ -864,23 +898,28 @@ namespace Yang.Dialogue.Editor
             string filename = Path.GetFileNameWithoutExtension(sourcePath) + "." + extension;
             string path = EditorUtility.SaveFilePanel("Save corrected Dialogue " + extension.ToUpperInvariant(), folder, filename, extension);
 
-            if (string.IsNullOrEmpty(path)) return;
-
-            try
-            {
-                if (excel) DialogueExcelUtility.Save(path, CsvUtility.FromCsv(review.csv));
-                else File.WriteAllText(path, review.csv, new UTF8Encoding(true));
-            }
-            catch (Exception exception)
-            {
-                EditorUtility.DisplayDialog("Save corrections failed", exception.Message, "OK");
-                return;
-            }
+            if (string.IsNullOrEmpty(path) || !TrySaveCorrections(path)) return;
 
             sourcePath = path;
             savedCsv = review.csv;
             resultMessage = "Saved corrections: " + path;
             BuildWindow();
+        }
+
+        private bool TrySaveCorrections(string path)
+        {
+            try
+            {
+                if (Path.GetExtension(path).Equals(".xlsx", StringComparison.OrdinalIgnoreCase)) DialogueExcelUtility.Save(path, CsvUtility.FromCsv(review.csv));
+                else File.WriteAllText(path, review.csv, new UTF8Encoding(true));
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                EditorUtility.DisplayDialog("Save corrections failed", exception.Message, "OK");
+                return false;
+            }
         }
 
         private bool HasPreviewStructure()

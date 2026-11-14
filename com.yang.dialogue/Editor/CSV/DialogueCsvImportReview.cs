@@ -105,6 +105,59 @@ namespace Yang.Dialogue.Editor
             return rows[row][column];
         }
 
+        public int GetMissingNodeIdCount()
+        {
+            if (!parsed || GetColumnName(0) != "ID" || GetColumnName(1) != "Type") return 0;
+
+            int count = 0;
+
+            for (int row = 1; row < rows.Count; row++)
+            {
+                string type = GetCell(row, 1).Trim();
+
+                if (type != "Start" && DialogueCsvImporter.IsNodeType(type) && string.IsNullOrWhiteSpace(GetCell(row, 0))) count++;
+            }
+
+            return count;
+        }
+
+        public int GenerateMissingNodeIds()
+        {
+            int count = GetMissingNodeIdCount();
+
+            if (count == 0) return 0;
+
+            HashSet<string> used = new(StringComparer.Ordinal);
+            used.Add(asset.EditorStartNode.guid);
+
+            foreach (NodeData node in asset.EditorNodes) used.Add(node.guid);
+
+            for (int row = 1; row < rows.Count; row++)
+            {
+                string id = GetCell(row, 0).Trim();
+
+                if (!string.IsNullOrEmpty(id)) used.Add(id);
+            }
+
+            for (int row = 1; row < rows.Count; row++)
+            {
+                string type = GetCell(row, 1).Trim();
+
+                if (type == "Start" || !DialogueCsvImporter.IsNodeType(type) || !string.IsNullOrWhiteSpace(GetCell(row, 0))) continue;
+
+                string id;
+
+                do id = Guid.NewGuid().ToString();
+                while (!used.Add(id));
+
+                SetCellValue(row, 0, id);
+            }
+
+            SaveRows();
+
+            return count;
+        }
+
         public int GetColumnIndex(string name)
         {
             return Column(name);
