@@ -27,7 +27,7 @@ Unity에서 대화 흐름을 노드로 작성하고 실행하는 패키지입니
 | Wait | 시간 또는 View 신호 대기 |
 | Command | View에 명령과 인자 전달 |
 
-**Localization 참조 복구:** 그래프 에디터의 **↻ Refresh**는 변경된 테이블 이름·엔트리 키를 기존 GUID·ID로 동기화합니다. 자동으로 찾지 못한 참조가 있으면 **Resolve Missing (N)** 버튼이 나타납니다. 버튼을 열어 기존 테이블이나 엔트리로 연결할 수 있습니다. 같은 원본 참조가 여러 노드에서 사용되면 한 번에 변환하며, **Keep unresolved**를 선택한 데이터는 그대로 남습니다. 테이블을 먼저 연결한 뒤 엔트리가 여전히 누락되었다면 같은 창에서 엔트리를 이어서 연결할 수 있습니다. 참조 변경은 Dialogue 에셋에만 적용되고 String Table 자체는 수정하지 않으며, Undo를 지원합니다.
+**Localization 참조 복구:** 그래프 에디터의 **↻ Refresh**는 변경된 테이블 이름·엔트리 키를 기존 GUID·ID로 동기화합니다. 자동으로 찾지 못한 참조가 있으면 **Resolve Missing (N)** 버튼이 나타납니다. 버튼을 열어 기존 테이블이나 엔트리로 연결할 수 있습니다. 같은 GUID·Entry ID를 참조하는 노드들은 Key 표시값이나 Speaker/Text 사용 위치가 달라도 하나의 복구 항목으로 묶어 한 번에 변환하며, **Keep unresolved**를 선택한 데이터는 그대로 남습니다. 테이블을 먼저 연결한 뒤 엔트리가 여전히 누락되었다면 같은 창에서 엔트리를 이어서 연결할 수 있습니다. 참조 변경은 Dialogue 에셋에만 적용되고 String Table 자체는 수정하지 않으며, Undo를 지원합니다.
 
 그래프의 Ctrl+C/V와 우클릭 Copy/Paste는 같은 시스템 클립보드를 사용합니다. Dialogue 노드 데이터가 아닌 텍스트나 JSON은 붙여넣을 수 없습니다.
 
@@ -111,25 +111,30 @@ public class OpenDoorEvent
 
 Command / Event의 공개 필드는 Source Generator가 인자를 변환하고 런타임 팩토리를 등록합니다. ID는 다른 어셈블리를 포함하여 각 Command 또는 Event 종류 안에서 중복되면 안 됩니다. 지원 필드는 `string`, `int`, `float`, `long`, `bool`, `Color32`, `Guid`, `int` 기반 `enum`입니다.
 
-**필드 이름 변경:** Command/Event 필드의 저장 ID는 필드 이름으로 계산합니다. 이름이 변경되어 현재 스키마와 연결되지 않는 기존 인자 ID는 삭제하지 않고 노드에 경고와 **Resolve Unmatched IDs...** 버튼을 표시합니다. 버튼에서 저장된 ID·타입·값을 확인하고 같은 타입의 현재 필드로 옮기거나, 그대로 보류하거나, 명시적으로 삭제할 수 있습니다. 필요하면 동일 Command/Event ID의 다른 노드에도 선택한 매핑을 적용할 수 있습니다. 기존 필드에 기본값이 아닌 값이 있으면 매핑을 중단합니다. 적용한 변경은 Undo가 가능합니다.
+**필드 이름 변경:** Command/Event 필드의 저장 ID는 필드 이름으로 계산합니다. 이름이 변경되거나 저장된 값의 타입이 스키마와 맞지 않으면 기존 값을 보존하고 노드에 **Resolve fields...** 버튼을 표시합니다. 매핑 창에서는 이전 ID·타입·저장값과 현재 필드·ID·값을 비교하여 연결 대상을 선택합니다. 같은 타입의 안전한 대상이 하나뿐이면 추천 선택되지만 승인 전에는 데이터를 수정하지 않습니다. 매핑하지 않는 값을 유지하거나 명시적으로 삭제할 수 있으며, 타입이 다른 기존 필드는 기본값으로 초기화할 수 있습니다. 동일 Command/Event ID의 다른 노드에도 적용하려면 해당 옵션을 켭니다. 적용 대상 노드별 변경 전후와 충돌 위치를 미리 확인하고 문제 노드로 이동할 수 있으며, 충돌한 노드만 제외하고 나머지를 적용하려면 별도 옵션을 직접 선택해야 합니다. 중복 대상 선택은 차단하고, 최종 승인 후 Undo 가능한 변경으로 기록합니다. Command/Event 종류 변경으로 인자가 초기화될 때도 사전 확인을 요구합니다.
 
 ## CSV 내보내기 / 가져오기
 
-`DialogueSO`의 Inspector에서 **Export CSV** 또는 **Import CSV**를 사용합니다. CSV에는 노드·연결 정보와 로케일별 텍스트가 포함됩니다. Import는 **기존 노드와 링크를 교체**하고 참조 중인 String Table을 갱신할 수 있습니다.
+`DialogueSO`의 Inspector에서 **Export CSV** 또는 **Import CSV**를 사용합니다. CSV에는 노드, 연결, 로케일별 번역 및 Localization 식별자가 포함됩니다. CSV는 `SpeakerTableGuid`, `TextTableGuid`, `SpeakerEntryId`, `TextEntryId` 열을 반드시 포함해야 하며, `SpeakerPresent[...]` / `TextPresent[...]` 열은 지원하지 않습니다. **빈 번역 칸은 빈 문자열로 덮어씁니다.**
 
-Import를 선택하면 **Dialogue CSV Import** 검토 창이 열립니다.
+**CSV가 최종 기준**입니다. `SpeakerTableGuid` / `TextTableGuid`로 String Table 컬렉션을, `SpeakerEntryId` / `TextEntryId`로 엔트리를 식별합니다. 같은 GUID·Entry ID라면 기존 Key, 테이블 이름, 번역이 CSV와 달라도 오류가 아닙니다. CSV의 이름 및 번역으로 갱신하되 식별자는 유지합니다. 하나의 엔트리를 여러 노드에서 참조하면 같은 변경을 한 번 적용합니다.
 
-1. CSV 전체를 분석한 뒤 문제 개수, 실제 파일 줄 번호, 컬럼, 원인과 수정 방법을 표시합니다. 여러 줄로 된 텍스트가 있어도 파일의 실제 줄 번호를 사용합니다.
-2. 문제를 선택해 값을 수정합니다. 잘못된 노드 ID는 새 GUID를 만들 수 있고, 없는 연결 대상은 노드 검색으로 선택하거나 연결을 해제할 수 있습니다. 잘못된 타입은 선택 목록에서, 테이블 이름은 기존 String Table 목록에서 수정할 수 있습니다. 번역 충돌은 다른 행의 값으로 맞추거나 직접 수정합니다.
-3. 수정 후 검증이 다시 실행됩니다. 누락된 테이블과 엔트리는 **Create missing tables / Create missing entries** 옵션으로 명시적으로 생성할 수 있습니다. 새 테이블을 만들 때는 프로젝트의 `Assets` 하위 폴더를 지정합니다. `Use asset default tables`와 `Keep existing Start if missing`도 선택할 수 있습니다.
-4. 변경 요약에서 노드 수, 생성될 테이블·엔트리, 키 이름 변경과 번역 갱신 예상 건수를 확인합니다. 오류가 모두 해결된 경우에만 **Replace graph and import**가 활성화됩니다.
-5. **Save corrected CSV...**로 수정된 데이터를 CSV 파일에 저장할 수 있습니다. 저장하지 않아도 검토 창의 수정 내용은 이번 Import에 적용됩니다. 원본 CSV 파일을 자동 덮어쓰지 않습니다.
+**Dialogue CSV Import** 검토 창에서는 다음처럼 처리합니다.
 
-검토 중에는 그래프와 Localization 에셋을 수정하지 않습니다. 적용 단계에서 다시 검증한 뒤 변경을 하나의 Undo 그룹으로 기록하고, 실패 시 변경을 되돌립니다. 잘못된 데이터나 누락된 참조를 조용히 건너뛰지 않습니다. **Instruction에 현재 Command/Event 스키마에서 사용하지 않는 필드 ID가 포함되어 있으면 경고를 표시하지만 Import는 허용하며, 값과 ID를 유지합니다.** Import 후 해당 노드에서 직접 ID를 매핑할 수 있습니다.
+1. 유효한 변경은 자동 적용 대상으로 분류합니다. 기존 노드 ID에 대한 `Type`, 연결, 메시지, 데이터 변경과 기존 Localization 식별자에 대한 이름·Key·번역 변경은 별도 승인 없이 적용합니다. 같은 테이블 GUID 또는 엔트리 ID에 관한 문제는 한 번만 표시하고, Speaker와 Text 양쪽에서 참조하더라도 동일한 실체라면 관련 CSV 행을 함께 수정합니다. 여러 행이 동일한 존재하지 않는 `Next` ID를 참조하면 하나의 결정 항목으로 묶어 대상 연결이나 연결 해제를 일괄 적용합니다.
+2. **사용자 선택이 필요한 경우**에만 미해결 항목이 나타납니다. 새 노드 ID는 생성하거나 아직 사용하지 않은 기존 ID로 재연결하고, 존재하지 않는 테이블 GUID·Entry ID는 새 항목을 생성하거나 기존 항목을 선택해 연결할 수 있습니다. `Next`의 대상 ID가 없으면 다른 노드를 선택하거나 비웁니다. 새 타입에 필요한 값이 없거나 사용하지 않는 필드 값이 남아 있다면 해당 값을 보완·정리합니다. Choice에 Option이 없을 때는 Option 행을 추가할 수 있습니다.
+3. 명시적인 `SpeakerTableGuid` / `TextTableGuid` 또는 `SpeakerEntryId` / `TextEntryId`가 없거나 대상이 존재하지 않는 경우에는 이름·Key가 같다는 이유만으로 다른 기존 항목에 자동 연결하지 않습니다. 구형 CSV 형식은 지원하지 않습니다. 새 테이블을 생성하면 Unity가 GUID를 발급하므로 다음 CSV Export에 새 식별자가 기록됩니다. 필요한 로케일 테이블도 선택하여 생성할 수 있습니다.
+4. **실제 CSV 충돌이나 형식 오류**는 별도 검증합니다. 중복 노드 ID, 없는 연결 대상, 같은 엔트리 ID에 서로 다른 Key·번역 지정, 서로 다른 엔트리의 Key 충돌, 같은 테이블 GUID에 서로 다른 이름 지정, 필수 데이터 누락, 잘못된 데이터 형식 등이 해당합니다. 이미 존재하는 Key의 정상적인 이름 변경 또는 서로 맞바뀐 Key는 충돌로 취급하지 않습니다.
+5. 검토 창 왼쪽에서 **문제 제목, Localization 참조, CSV 줄·필드**를 검색하거나 알림 항목을 숨길 수 있습니다. 같은 참조를 공유하는 문제는 한 항목으로 표시하고 영향받는 행을 접어서 확인합니다. 동일 엔트리의 Key·Entry ID·번역 또는 동일 테이블의 이름이 충돌하면 모든 관련 CSV 행에서 후보를 모아 **값별 사용 건수와 기존 Localization 값**을 보여줍니다. 후보 버튼을 한 번 누르면 해당 참조의 모든 CSV 행을 즉시 통일하고 재검증합니다. 다른 값을 직접 입력할 수도 있으며, **이전/다음 문제**로 이동할 수 있습니다. 기존 노드·String Table·Localization 엔트리 선택은 검색 목록을 사용합니다. 테이블 이름이 CSV에서 변경되었더라도 GUID로 기존 테이블의 엔트리를 찾습니다.
+6. 변경 요약을 확인한 뒤 **Replace graph and import**를 실행합니다. 유효하지 않은 데이터가 남아 있는 경우 **Ignore invalid data and import**로 제외 대상을 확인하고 가능한 내용만 가져올 수 있습니다. 원본 CSV는 자동으로 수정되지 않으며, **Save CSV corrections...**로 현재 검토한 결과를 별도로 저장할 수 있습니다. 검토 중 CSV의 값을 바꾸면 저장 전까지 미저장 상태를 안내합니다.
 
-`SpeakerEntryId` / `TextEntryId`가 기존 엔트리와 일치하면 키 이름을 변경해도 ID와 번역 연결을 유지합니다. 다른 ID의 키 이름을 가로채거나 같은 엔트리에 충돌하는 번역을 설정하면 오류로 표시합니다. Entry ID가 없는 키의 이름 변경 여부는 추측하지 않습니다.
+새 테이블을 만들 때는 프로젝트 `Assets` 아래 저장 폴더를 선택합니다. 기존 Dialogue의 기본 테이블을 쓰는 **Use asset default tables**, CSV에 Start가 없을 때 유지하는 **Keep existing Start if missing** 옵션도 제공됩니다. 테이블 생성, 엔트리 생성, 로케일 테이블 생성 및 새 노드 ID 생성은 검토 창에서 명시적으로 선택합니다.
 
-`Choice`의 Option, `Condition`의 Branch, `Command/Event`의 Instruction은 부모 노드 바로 아래의 CSV 행으로 표현됩니다.
+**Preview changes (before → after)...**에서 임포트 전 변경 내용을 확인할 수 있습니다. 노드 생성·삭제·타입·메시지·데이터·좌표, `Next` 연결, Localization 테이블·엔트리 생성 및 이름·Key·로케일별 번역 변경을 현재 값과 CSV 값으로 비교해 보여줍니다. 항목 검색과 노드/연결/Localization 필터를 제공하며, 실제 임포트를 누르면 **최종 변경 확인 창**에서 적용을 승인해야 합니다. 오류가 남아 있을 때의 단순 미리보기는 확정 결과가 아니며, **Ignore invalid data and import**는 제외 처리된 CSV를 기준으로 최종 변경 내역과 제외 요약을 표시합니다. CSV에 Start가 없어서 ID를 새로 생성하거나 좌표를 자동 배치하는 경우에는 생성 예정으로 안내합니다.
+
+검토 중에는 에셋을 변경하지 않습니다. Import 적용 전에 재검증하고 변경을 Undo 그룹으로 묶으며, 실패 시 기존 데이터 및 생성 에셋의 복구를 시도합니다. Unity Localization 에셋의 이름 변경과 번역 갱신은 실제 Import 단계에서 실행합니다. **Instruction에 현재 Command/Event 스키마에서 사용하지 않는 필드 ID가 포함되어 있으면 경고하지만 그 값은 보존**하며, 이후 노드에서 직접 매핑할 수 있습니다.
+
+`Choice`의 Option, `Condition`의 Branch, `Command/Event`의 Instruction은 부모 노드 바로 아래의 CSV 행으로 표현됩니다. Choice의 모든 Option은 부모 Choice와 같은 `TextTableGuid`를 참조해야 합니다.
 
 ## 플레이 모드 디버깅
 

@@ -293,10 +293,10 @@ namespace Yang.Dialogue.Editor
 
             if (missing.Count > 0)
             {
-                Label warning = new($"{missing.Count} unmatched argument ID(s) are preserved. Resolve them before using this command.");
+                Label warning = new($"{missing.Count} unmatched or incompatible argument(s) need attention. Stored values are preserved.");
                 warning.AddToClassList("dlg-warning");
                 commandElement.Add(warning);
-                commandElement.Add(new Button(() => OpenFieldMapper(commandElement, schema)) { text = "Resolve Unmatched IDs..." });
+                commandElement.Add(new Button(() => OpenFieldMapper(commandElement, schema)) { text = "Resolve fields..." });
             }
 
             RefreshArgumentVisibility(commandElement, data);
@@ -311,6 +311,14 @@ namespace Yang.Dialogue.Editor
 
             int commandIndex = extensionContainer.IndexOf(commandElement);
             DialogueSO so = window.SO;
+            List<GenericData> previous = optionDatas[commandIndex].data;
+            string oldId = previous.Count > 0 ? previous[0].ToString() : "";
+
+            if (oldId != schema.id && previous.Count > 1 && !EditorUtility.DisplayDialog("Change Command/Event type?", "Switching the schema resets this instruction's saved arguments to the new defaults. You can undo the change. Continue?", "Reset and change", "Cancel"))
+            {
+                ((PopupField<string>)evt.target).SetValueWithoutNotify(evt.previousValue);
+                return;
+            }
 
             Undo.RecordObject(so, "Change Command Schema");
             optionDatas[commandIndex] = CreateSchemaData(schema, null);
@@ -570,17 +578,32 @@ namespace Yang.Dialogue.Editor
 
         private List<DialogueCommandFieldMapper.MissingField> FindUnmatchedFields(IReadOnlyList<GenericData> data, Schema schema)
         {
-            HashSet<int> ids = new();
-
-            foreach (SchemaField field in schema.fields) ids.Add(field.id);
-
             List<DialogueCommandFieldMapper.MissingField> missing = new();
 
             for (int i = 1; i + 1 < data.Count; i += 2)
             {
-                if (!data[i].TryGetInt(out int fieldId) || ids.Contains(fieldId)) continue;
+                if (!data[i].TryGetInt(out int fieldId)) continue;
 
-                missing.Add(new DialogueCommandFieldMapper.MissingField { id = fieldId, value = data[i + 1] });
+                SchemaField matchingField = null;
+
+                foreach (SchemaField field in schema.fields)
+                {
+                    if (field.id != fieldId) continue;
+
+                    matchingField = field;
+                    break;
+                }
+
+                if (matchingField != null && MatchesType(data[i + 1], matchingField.info.FieldType)) continue;
+
+                DialogueCommandFieldMapper.FieldOption incompatible = matchingField == null ? null : new DialogueCommandFieldMapper.FieldOption
+                {
+                    id = matchingField.id,
+                    name = matchingField.info.Name,
+                    type = DefaultValue(schema, matchingField.info).Type,
+                    defaultValue = DefaultValue(schema, matchingField.info)
+                };
+                missing.Add(new DialogueCommandFieldMapper.MissingField { id = fieldId, value = data[i + 1], incompatibleField = incompatible });
             }
 
             return missing;

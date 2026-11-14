@@ -125,7 +125,14 @@ namespace Yang.Dialogue.Editor
             section.style.borderBottomWidth = 1;
             section.style.borderBottomColor = new Color(0.35f, 0.35f, 0.35f);
 
-            string role = issue.speaker ? "Speaker" : "Text";
+            bool mixedRoles = false;
+
+            foreach (Reference reference in group.references)
+            {
+                if (reference.speaker != issue.speaker) mixedRoles = true;
+            }
+
+            string role = mixedRoles ? "Speaker / Text" : issue.speaker ? "Speaker" : "Text";
             string kind = issue.tableMissing ? "Missing table" : "Missing entry";
             section.Add(new Label($"{kind} · {role} · {group.references.Count} reference(s)") { style = { unityFontStyleAndWeight = FontStyle.Bold } });
             section.Add(new Label($"Stored table: {issue.tableName} · GUID: {issue.tableGuid}"));
@@ -342,10 +349,13 @@ namespace Yang.Dialogue.Editor
 
         private static (bool, bool, Guid, string, long, string) Identity(Reference reference)
         {
-            bool anonymousTable = reference.tableMissing && reference.tableGuid == Guid.Empty && string.IsNullOrEmpty(reference.tableName);
-            bool includeEntry = !reference.tableMissing || anonymousTable;
+            bool noTableIdentity = reference.tableGuid == Guid.Empty && string.IsNullOrEmpty(reference.tableName);
+            bool includeEntry = !reference.tableMissing || noTableIdentity;
+            string tableName = reference.tableGuid == Guid.Empty ? reference.tableName : "";
+            long entryId = includeEntry ? reference.entryId : 0;
+            string entryKey = includeEntry && entryId == 0 ? reference.entryKey : "";
 
-            return (reference.tableMissing, reference.speaker, reference.tableGuid, reference.tableName, includeEntry ? reference.entryId : 0, includeEntry ? reference.entryKey : "");
+            return (reference.tableMissing, noTableIdentity && reference.speaker, reference.tableGuid, tableName, entryId, entryKey);
         }
 
         private static LocalizationTableCollection FindCollection(IReadOnlyList<LocalizationTableCollection> collections, Guid guid)

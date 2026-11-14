@@ -212,7 +212,8 @@ namespace Yang.Dialogue
                 tokens.Add(key, token);
             }
 
-            TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<Exception> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            Exception failure = null;
 
             token.ExecutionCompletion = completion;
             token.IsExecuting = true;
@@ -244,8 +245,7 @@ namespace Yang.Dialogue
             catch (Exception exception)
             {
                 token.SetState(TokenState.Stopped);
-
-                throw new InvalidOperationException($"Dialogue flow '{key}' failed at node '{token.TargetNode}'.", exception);
+                failure = new InvalidOperationException($"Dialogue flow '{key}' failed at node '{token.TargetNode}'.", exception);
             }
             finally
             {
@@ -257,13 +257,14 @@ namespace Yang.Dialogue
                 }
                 catch (Exception exception)
                 {
-                    throw new InvalidOperationException($"Dialogue flow '{key}' failed while notifying Views at node '{token.TargetNode}'.", exception);
+                    Exception viewFailure = new InvalidOperationException($"Dialogue flow '{key}' failed while notifying Views at node '{token.TargetNode}'.", exception);
+                    failure = failure == null ? viewFailure : new AggregateException(failure, viewFailure);
                 }
-                finally
-                {
-                    completion.TrySetResult(true);
-                }
+
+                completion.TrySetResult(failure);
             }
+
+            if (failure != null) throw failure;
         }
 
         public bool IsRunning(string key) => tokens.TryGetValue(key, out RunnerToken token) && token.State == TokenState.Running;
@@ -312,7 +313,11 @@ namespace Yang.Dialogue
         {
             RunnerToken token = await BeginJumpAsync(key, nodeName);
 
-            if (token != null && token.IsExecuting) await token.ExecutionCompletion.Task;
+            if (token == null || token.ExecutionCompletion == null) return;
+
+            Exception failure = await token.ExecutionCompletion.Task;
+
+            if (failure != null) throw failure;
         }
 
         #region View

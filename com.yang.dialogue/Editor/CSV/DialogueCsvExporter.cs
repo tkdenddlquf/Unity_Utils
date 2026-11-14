@@ -28,12 +28,6 @@ namespace Yang.Dialogue.Editor
 
             header.AddRange(new[] { "SpeakerTableGuid", "TextTableGuid", "SpeakerEntryId", "TextEntryId" });
 
-            foreach (Locale locale in locales)
-            {
-                header.Add($"SpeakerPresent[{locale.Identifier.Code}]");
-                header.Add($"TextPresent[{locale.Identifier.Code}]");
-            }
-
             rows.Add(header);
             int localeCount = locales.Count;
             EmitNode(so.EditorStartNode, so, locales, collections, linkMap, rows, localeCount);
@@ -157,8 +151,6 @@ namespace Yang.Dialogue.Editor
 
             row.AddRange(new[] { "", "", "", "" });
 
-            for (int i = 0; i < localeCount * 2; i++) row.Add("");
-
             return row;
         }
 
@@ -209,9 +201,6 @@ namespace Yang.Dialogue.Editor
 
                 row[column] = speakerEntry?.Value ?? "";
                 row[column + 1] = textEntry?.Value ?? "";
-                int presenceColumn = 11 + locales.Count * 2 + 4 + i * 2;
-                row[presenceColumn] = speakerEntry == null ? "0" : "1";
-                row[presenceColumn + 1] = textEntry == null ? "0" : "1";
             }
         }
 

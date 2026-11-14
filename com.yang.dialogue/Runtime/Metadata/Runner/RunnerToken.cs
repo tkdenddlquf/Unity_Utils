@@ -14,7 +14,7 @@ namespace Yang.Dialogue
         private readonly List<IDialogueView> views = new();
         private readonly Dictionary<string, RunnerChoiceCollection> choiceCaches = new();
 
-        public TaskCompletionSource<bool> ExecutionCompletion { get; set; }
+        public TaskCompletionSource<Exception> ExecutionCompletion { get; set; }
         public bool IsExecuting { get; set; }
         public bool NotifyStoppedAfterRetire { get; set; }
         public int JumpRevision { get; set; }
