@@ -367,6 +367,11 @@ namespace Yang.Dialogue.Editor
                     }
                 }
 
+                StringTableEntry existing = currentEntry == null ? null : localeTable?.GetEntry(currentEntry.Id);
+
+                // An empty CSV cell clears an existing translation, but does not create a missing one.
+                if (existing == null && string.IsNullOrEmpty(after)) continue;
+
                 if (localeTable == null && collection != null)
                 {
                     if (options.createLocaleTables && localeChanges.Add(identity + ":" + locale))
@@ -375,11 +380,8 @@ namespace Yang.Dialogue.Editor
                     if (!options.createLocaleTables) continue;
                 }
 
-                StringTableEntry existing = currentEntry == null ? null : localeTable?.GetEntry(currentEntry.Id);
-
                 if (existing != null) before = existing.Value;
 
-                // A translation is only written when an entry can be resolved or created.
                 if (currentEntry == null && !options.createEntries) continue;
 
                 string translationIdentity = entryIdentity + ":" + locale;

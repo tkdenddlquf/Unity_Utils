@@ -117,7 +117,7 @@ Command / Event의 공개 필드는 Source Generator가 인자를 변환하고 �
 
 Excel에서 편집할 때는 `DialogueSO` Inspector의 **Export Excel (.xlsx)** → Excel 편집·저장 → **Import Excel (.xlsx)**를 사용합니다. 모든 셀을 **텍스트 형식**으로 내보내므로 긴 Entry ID, 숫자로 보이는 Key, 날짜처럼 보이는 문자열의 자동 변환을 방지합니다. Excel에서 셀을 수식이나 숫자 형식으로 변경한 경우에는 잘못된 값을 조용히 적용하지 않도록 가져오기를 중단하고 셀 위치를 알립니다. 여러 시트가 있다면 첫 시트가 Dialogue 데이터여야 합니다. Excel에서 검토 중 수정한 내용을 저장할 때도 `.xlsx` 형식을 유지합니다.
 
-외부 파이프라인용 **Export CSV** / **Import CSV**도 그대로 사용할 수 있습니다. CSV는 Excel에서 더블클릭해 열면 값이 자동 변환될 수 있으므로, Excel 편집에는 `.xlsx`를 권장합니다. CSV에는 노드, 연결, 로케일별 번역 및 Localization 식별자가 포함됩니다. CSV는 `SpeakerTableGuid`, `TextTableGuid`, `SpeakerEntryId`, `TextEntryId` 열을 반드시 포함해야 하며, `SpeakerPresent[...]` / `TextPresent[...]` 열은 지원하지 않습니다. **빈 번역 칸은 빈 문자열로 덮어씁니다.**
+외부 파이프라인용 **Export CSV** / **Import CSV**도 그대로 사용할 수 있습니다. CSV는 Excel에서 더블클릭해 열면 값이 자동 변환될 수 있으므로, Excel 편집에는 `.xlsx`를 권장합니다. CSV에는 노드, 연결, 로케일별 번역 및 Localization 식별자가 포함됩니다. CSV는 `SpeakerTableGuid`, `TextTableGuid`, `SpeakerEntryId`, `TextEntryId` 열을 반드시 포함해야 하며, `SpeakerPresent[...]` / `TextPresent[...]` 열은 지원하지 않습니다. **빈 번역 칸은 기존 로케일 엔트리가 있으면 빈 문자열로 덮어쓰고, 엔트리가 없으면 새로 만들지 않습니다.** 새로 생성하지 않는 빈 번역은 최종 변경 내역에서도 제외합니다. `EntryId`는 모든 로케일이 공유하는 식별자이므로, ID가 있어도 특정 언어의 번역 엔트리는 없을 수 있습니다.
 
 **가져온 파일(CSV 또는 XLSX)이 최종 기준**입니다. `SpeakerTableGuid` / `TextTableGuid`로 String Table 컬렉션을, `SpeakerEntryId` / `TextEntryId`로 엔트리를 식별합니다. 같은 GUID·Entry ID라면 기존 Key, 테이블 이름, 번역이 CSV와 달라도 오류가 아닙니다. CSV의 이름 및 번역으로 갱신하되 식별자는 유지합니다. 하나의 엔트리를 여러 노드에서 참조하면 같은 변경을 한 번 적용합니다.
 

@@ -1123,7 +1123,8 @@ namespace Yang.Dialogue.Editor
 
                 if (collection == null)
                 {
-                    changedTranslations.Add($"{name}:{entryIdentity}:{code}");
+                    if (!string.IsNullOrEmpty(value)) changedTranslations.Add($"{name}:{entryIdentity}:{code}");
+
                     continue;
                 }
 
@@ -1137,6 +1138,10 @@ namespace Yang.Dialogue.Editor
                     break;
                 }
 
+                StringTableEntry entry = existing == null ? null : localeTable?.GetEntry(existing.Id);
+
+                if (entry == null && string.IsNullOrEmpty(value)) continue;
+
                 if (localeTable == null)
                 {
                     if (!options.createLocaleTables)
@@ -1146,9 +1151,7 @@ namespace Yang.Dialogue.Editor
                     continue;
                 }
 
-                StringTableEntry entry = existing == null ? null : localeTable.GetEntry(existing.Id);
-
-                if (entry == null || entry.Value != value) changedTranslations.Add($"{name}:{entryIdentity}:{code}");
+                if (entry == null || (entry.Value ?? "") != value) changedTranslations.Add($"{name}:{entryIdentity}:{code}");
             }
         }
 

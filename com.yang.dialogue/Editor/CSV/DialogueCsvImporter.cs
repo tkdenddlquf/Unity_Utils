@@ -1156,7 +1156,7 @@ namespace Yang.Dialogue.Editor
                 if (!configuredLocales.Contains(translation.Key))
                     throw new FormatException($"CSV row {row.line}: locale '{translation.Key}' is not configured in Localization Settings.");
 
-                if (collection != null)
+                if (collection != null && !string.IsNullOrEmpty(translation.Value))
                 {
                     bool found = false;
 
@@ -1516,7 +1516,9 @@ namespace Yang.Dialogue.Editor
 
                 StringTableEntry existing = table.GetEntry(id);
 
-                if (existing != null && existing.Value == value) continue;
+                if (existing == null && string.IsNullOrEmpty(value)) continue;
+
+                if (existing != null && (existing.Value ?? "") == value) continue;
 
                 Undo.RecordObject(table, "Import Dialogue CSV Localization");
 
