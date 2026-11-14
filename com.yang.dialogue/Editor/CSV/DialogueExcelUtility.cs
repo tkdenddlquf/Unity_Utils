@@ -8,7 +8,7 @@ using System.Xml;
 
 namespace Yang.Dialogue.Editor
 {
-    // A single-sheet XLSX transport for the CSV model. Every cell is text to preserve identifiers in Excel.
+    // A single-sheet XLSX transport for the CSV model. Export text to preserve identifiers; accept numeric input.
     internal static class DialogueExcelUtility
     {
         private const string SheetNamespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -406,7 +406,7 @@ namespace Yang.Dialogue.Editor
 
                     if (values.ContainsKey(column)) throw new FormatException($"Duplicate Excel cell {address}.");
 
-                    values[column] = ReadCell(cell, namespaces, sharedStrings, address, row > 1 && (column == 9 || column == 10));
+                    values[column] = ReadCell(cell, namespaces, sharedStrings, address);
                 }
 
                 if (values.Count > 0) cells[row] = values;
@@ -474,7 +474,7 @@ namespace Yang.Dialogue.Editor
             return column - 1;
         }
 
-        private static string ReadCell(XmlNode cell, XmlNamespaceManager namespaces, List<string> sharedStrings, string address, bool coordinate)
+        private static string ReadCell(XmlNode cell, XmlNamespaceManager namespaces, List<string> sharedStrings, string address)
         {
             if (cell.SelectSingleNode("./s:f", namespaces) != null)
                 throw new FormatException($"Excel cell {address} contains a formula. Change the cell format to Text and enter a literal value.");
@@ -498,13 +498,60 @@ namespace Yang.Dialogue.Editor
             }
 
             if (type == "str") return value?.InnerText ?? "";
-            if (value == null && (type == null || type == "" || type == "n")) return "";
 
-            if (coordinate && (type == null || type == "" || type == "n") && value != null &&
-                float.TryParse(value.InnerText, NumberStyles.Float, CultureInfo.InvariantCulture, out float number) && !float.IsNaN(number) && !float.IsInfinity(number))
-                return value.InnerText;
+            if (type == null || type == "" || type == "n")
+            {
+                if (value == null) return "";
 
-            throw new FormatException($"Excel cell {address} is not text. Set the cell format to Text before entering values, then save again. Numeric conversion can damage IDs. Only X and Y accept numeric cells.");
+                string number = value.InnerText;
+
+                if (!double.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out double numeric) || double.IsNaN(numeric) || double.IsInfinity(numeric))
+                    throw new FormatException($"Excel cell {address} contains an invalid numeric value.");
+
+                return NormalizeNumericCell(number);
+            }
+
+            throw new FormatException($"Excel cell {address} has an unsupported cell type '{type}'. Use text or numeric values.");
+        }
+
+        private static string NormalizeNumericCell(string number)
+        {
+            int exponentIndex = number.IndexOfAny(new[] { 'e', 'E' });
+            string significand = exponentIndex < 0 ? number : number.Substring(0, exponentIndex);
+            int exponent = 0;
+
+            if (exponentIndex >= 0 && !int.TryParse(number.Substring(exponentIndex + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out exponent)) return number;
+
+            bool negative = significand.StartsWith("-", StringComparison.Ordinal);
+            string unsigned = negative || significand.StartsWith("+", StringComparison.Ordinal) ? significand.Substring(1) : significand;
+            int decimalIndex = unsigned.IndexOf('.');
+            int decimalPlaces = decimalIndex < 0 ? 0 : unsigned.Length - decimalIndex - 1;
+            string digits = decimalIndex < 0 ? unsigned : unsigned.Remove(decimalIndex, 1);
+            long shift = (long)exponent - decimalPlaces;
+
+            if (shift < 0)
+            {
+                long fractionLength = -shift;
+
+                if (fractionLength > digits.Length) return number;
+
+                for (int i = digits.Length - (int)fractionLength; i < digits.Length; i++)
+                {
+                    if (digits[i] != '0') return number;
+                }
+
+                digits = digits.Substring(0, digits.Length - (int)fractionLength);
+            }
+            else if (shift > 0)
+            {
+                if (shift > 32 || digits.Length + shift > 32) return number;
+
+                digits += new string('0', (int)shift);
+            }
+
+            digits = digits.TrimStart('0');
+
+            return digits.Length == 0 ? "0" : negative ? "-" + digits : digits;
         }
     }
 }

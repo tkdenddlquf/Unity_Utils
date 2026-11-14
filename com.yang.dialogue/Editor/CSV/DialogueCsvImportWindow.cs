@@ -74,15 +74,21 @@ namespace Yang.Dialogue.Editor
             root.style.paddingTop = 10;
             root.style.paddingBottom = 10;
 
+            ScrollView content = new(ScrollViewMode.Vertical);
+            content.style.flexGrow = 1;
+            content.style.flexShrink = 1;
+            content.style.minHeight = 0;
+            root.Add(content);
+
             Label title = new("Dialogue CSV Import");
             title.style.fontSize = 18;
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            root.Add(title);
-            root.Add(new Label($"{asset.name}  ·  {Path.GetFileName(sourcePath)}"));
+            content.Add(title);
+            content.Add(new Label($"{asset.name}  ·  {Path.GetFileName(sourcePath)}"));
             Label introduction = new("The imported file is authoritative. Valid changes are applied automatically; only unresolved decisions are shown below.");
             introduction.style.whiteSpace = WhiteSpace.Normal;
-            root.Add(introduction);
-            root.Add(Spacer(8));
+            content.Add(introduction);
+            content.Add(Spacer(8));
 
             VisualElement statistics = new();
             statistics.style.flexDirection = FlexDirection.Row;
@@ -96,7 +102,7 @@ namespace Yang.Dialogue.Editor
             statistics.Add(Statistic($"{warningGroups} notices"));
             statistics.Add(Statistic($"{review.nodeCount} nodes"));
             statistics.Add(Statistic($"{review.detailCount} detail rows"));
-            root.Add(statistics);
+            content.Add(statistics);
 
             Foldout advancedOptions = new() { text = "Import options · creation and fallback", value = optionsExpanded };
             advancedOptions.RegisterValueChangedCallback(evt => optionsExpanded = evt.newValue);
@@ -131,11 +137,12 @@ namespace Yang.Dialogue.Editor
                 advancedOptions.Add(folderRow);
             }
 
-            root.Add(advancedOptions);
+            content.Add(advancedOptions);
 
             TwoPaneSplitView panes = new(0, 330, TwoPaneSplitViewOrientation.Horizontal);
-            panes.style.flexGrow = 1;
+            panes.style.height = 380;
             panes.style.minHeight = 290;
+            panes.style.flexShrink = 0;
 
             VisualElement left = new();
             left.style.flexGrow = 1;
@@ -198,42 +205,73 @@ namespace Yang.Dialogue.Editor
             detailPanel = new VisualElement();
             right.Add(detailPanel);
             panes.Add(right);
-            root.Add(panes);
+            content.Add(panes);
 
             VisualElement footer = new();
             footer.style.marginTop = 10;
             footer.style.paddingTop = 8;
+            footer.style.paddingBottom = 8;
             footer.style.borderTopWidth = 1;
             footer.style.borderTopColor = EditorGUIUtility.isProSkin ? new Color(0.34f, 0.36f, 0.39f) : new Color(0.7f, 0.72f, 0.75f);
             footer.Add(SectionTitle("Changes to apply"));
             footer.Add(new Label($"Graph: {review.currentNodes} → {review.nodeCount + (HasCsvStart() ? 0 : 1)} nodes, {review.currentLinks} → up to {review.linkCount + (HasCsvStart() ? 0 : 1)} links"));
             footer.Add(new Label($"Localization: {review.newTableCount} new tables, {review.newEntryCount} new entries, {review.tableRenameCount} table renames, {review.renameCount} key renames, {review.translationCount} translated values to write"));
-            footer.Add(new Label("Import rebuilds the graph and writes CSV values. Review before-and-after values before confirming."));
+            Label rebuildNotice = new("Import rebuilds the graph and writes CSV values. Review before-and-after values before confirming.");
+            rebuildNotice.style.whiteSpace = WhiteSpace.Normal;
+            footer.Add(rebuildNotice);
             Button previewButton = new(ShowChangePreview) { text = "Preview changes (before → after)..." };
             previewButton.style.alignSelf = Align.FlexStart;
             previewButton.style.marginTop = 5;
             previewButton.SetEnabled(HasPreviewStructure());
             footer.Add(previewButton);
+            content.Add(footer);
+
+            VisualElement bottomBar = new();
+            bottomBar.style.flexShrink = 0;
+            bottomBar.style.paddingTop = 8;
+            bottomBar.style.marginTop = 6;
+            bottomBar.style.borderTopWidth = 1;
+            bottomBar.style.borderTopColor = EditorGUIUtility.isProSkin ? new Color(0.34f, 0.36f, 0.39f) : new Color(0.7f, 0.72f, 0.75f);
 
             int missingNodeIds = review.GetMissingNodeIdCount();
+            (int missingTableGuids, int missingEntryIds) = review.GetCompletableLocalizationCounts();
+            int unapprovedNodeIds = review.GetUnapprovedNodeIdCount();
 
-            if (missingNodeIds > 0 && HasPreviewStructure())
+            if ((missingNodeIds + missingTableGuids + missingEntryIds > 0 && HasPreviewStructure()) || unapprovedNodeIds > 0)
             {
-                Button generateIds = new(GenerateAndSaveNodeIds) { text = $"Generate {missingNodeIds} missing node IDs and save..." };
-                generateIds.tooltip = "Save a new file with IDs for new nodes. Does not import or modify the Dialogue asset. Start and detail rows are not assigned new IDs.";
-                generateIds.style.alignSelf = Align.FlexStart;
-                generateIds.style.marginTop = 8;
-                footer.Add(generateIds);
+                VisualElement bulkActions = new();
+                bulkActions.style.flexDirection = FlexDirection.Row;
+                bulkActions.style.flexWrap = Wrap.Wrap;
+                bulkActions.style.marginBottom = 7;
+
+                if (missingNodeIds + missingTableGuids + missingEntryIds > 0 && HasPreviewStructure())
+                {
+                    Button generateIds = new(GenerateAndSaveIds) { text = $"Fill IDs and save... ({missingNodeIds} nodes, {missingTableGuids} table GUIDs, {missingEntryIds} entries)" };
+                    generateIds.tooltip = "Generate missing node IDs and fill exact matches for existing Localization table GUIDs and entry IDs. Explicit IDs are preserved. Save without changing Unity assets.";
+                    generateIds.style.unityFontStyleAndWeight = FontStyle.Bold;
+                    generateIds.style.marginRight = 8;
+                    bulkActions.Add(generateIds);
+                }
+
+                if (unapprovedNodeIds > 0)
+                {
+                    Button approveIds = new(ApproveAllNewNodeIds) { text = $"Allow creation of all {unapprovedNodeIds} new nodes" };
+                    approveIds.tooltip = "Resolve all New node ID decisions at once. The nodes are created only after you review and confirm the final import.";
+                    bulkActions.Add(approveIds);
+                }
+
+                bottomBar.Add(bulkActions);
             }
 
             VisualElement actions = new();
             actions.style.flexDirection = FlexDirection.Row;
-            actions.style.marginTop = 8;
+            actions.style.flexWrap = Wrap.Wrap;
             actions.Add(new Button(SaveCorrections) { text = "Save corrections..." });
             actions.Add(new Button(CancelReview) { text = "Cancel" });
             VisualElement push = new();
             push.style.flexGrow = 1;
             actions.Add(push);
+
             if (review.errorCount > 0)
             {
                 Button ignoreButton = new(ApplyImportIgnoringErrors) { text = "Ignore invalid data and import" };
@@ -244,14 +282,17 @@ namespace Yang.Dialogue.Editor
             importButton = new Button(ApplyImport) { text = "Replace graph and import" };
             importButton.SetEnabled(review.errorCount == 0 && review.parsed && review.nodeCount > 0);
             actions.Add(importButton);
-            footer.Add(actions);
+            bottomBar.Add(actions);
 
             string editStatus = review.csv == savedCsv ? "" : "CSV edits are not saved to disk.  ";
             statusLabel = new Label(editStatus + (resultMessage ?? (review.errorCount == 0 ? "Ready to import. Review the changes above." : "Resolve the outstanding decisions, or explicitly ignore invalid data.")));
             statusLabel.style.marginTop = 5;
             statusLabel.style.whiteSpace = WhiteSpace.Normal;
-            footer.Add(statusLabel);
-            root.Add(footer);
+            ScrollView statusScroll = new(ScrollViewMode.Vertical);
+            statusScroll.style.maxHeight = 60;
+            statusScroll.Add(statusLabel);
+            bottomBar.Add(statusScroll);
+            root.Add(bottomBar);
 
             RestoreSelection();
         }
@@ -867,26 +908,46 @@ namespace Yang.Dialogue.Editor
             Close();
         }
 
-        private void GenerateAndSaveNodeIds()
+        private void ApproveAllNewNodeIds()
         {
-            if (!HasPreviewStructure() || review.GetMissingNodeIdCount() == 0) return;
+            if (review.GetUnapprovedNodeIdCount() == 0) return;
+
+            review.options.createNodes = true;
+            review.Scan();
+            resultMessage = "All new node IDs approved for creation. No assets are changed until the final import is confirmed.";
+            BuildWindow();
+        }
+
+        private void GenerateAndSaveIds()
+        {
+            (int tableGuids, int entryIds) = review.GetCompletableLocalizationCounts();
+
+            if (!HasPreviewStructure() || review.GetMissingNodeIdCount() + tableGuids + entryIds == 0) return;
 
             bool excel = Path.GetExtension(sourcePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
             string extension = excel ? "xlsx" : "csv";
             string folder = Path.GetDirectoryName(sourcePath);
             string name = Path.GetFileNameWithoutExtension(sourcePath);
             string filename = (name.EndsWith("_ids", StringComparison.OrdinalIgnoreCase) ? name : name + "_ids") + "." + extension;
-            string path = EditorUtility.SaveFilePanel("Save Dialogue with generated node IDs", folder, filename, extension);
+            string path = EditorUtility.SaveFilePanel("Save Dialogue with completed IDs", folder, filename, extension);
 
             if (string.IsNullOrEmpty(path)) return;
 
+            string previousCsv = review.csv;
             int generated = review.GenerateMissingNodeIds();
+            (int filledTables, int filledEntries) = review.FillExistingLocalizationReferences();
 
-            if (!TrySaveCorrections(path)) return;
+            if (!TrySaveCorrections(path))
+            {
+                review.csv = previousCsv;
+                review.Scan();
+                BuildWindow();
+                return;
+            }
 
             sourcePath = path;
             savedCsv = review.csv;
-            resultMessage = $"Saved {generated} node IDs to {path}. No Dialogue assets were changed. Finish editing this file, then import it.";
+            resultMessage = $"Saved {generated} node IDs, {filledTables} table GUIDs, and {filledEntries} existing entry IDs to {path}. No Unity assets were changed.";
             BuildWindow();
         }
 

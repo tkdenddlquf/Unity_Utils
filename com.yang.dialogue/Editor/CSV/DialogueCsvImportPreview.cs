@@ -515,6 +515,7 @@ namespace Yang.Dialogue.Editor
             root.style.paddingTop = 10;
             root.style.paddingBottom = 10;
             root.style.flexDirection = FlexDirection.Column;
+            root.style.minHeight = 0;
             Label title = new(canImport ? "Review final CSV import changes" : "Preview CSV import changes");
             title.style.fontSize = 17;
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -530,8 +531,10 @@ namespace Yang.Dialogue.Editor
 
             if (!string.IsNullOrEmpty(contextMessage))
             {
-                HelpBox notices = new(contextMessage, HelpBoxMessageType.Info);
-                root.Add(notices);
+                ScrollView noticeScroll = new(ScrollViewMode.Vertical);
+                noticeScroll.style.maxHeight = 105;
+                noticeScroll.Add(new HelpBox(contextMessage, HelpBoxMessageType.Info));
+                root.Add(noticeScroll);
             }
 
             VisualElement filters = new() { style = { flexDirection = FlexDirection.Row, marginBottom = 8 } };
@@ -547,6 +550,8 @@ namespace Yang.Dialogue.Editor
 
             TwoPaneSplitView panes = new(0, 525, TwoPaneSplitViewOrientation.Horizontal);
             panes.style.flexGrow = 1;
+            panes.style.flexShrink = 1;
+            panes.style.minHeight = 0;
             list = new ListView { itemsSource = visible, fixedItemHeight = 65, showBorder = true, selectionType = SelectionType.Single };
             list.makeItem = () =>
             {
@@ -588,7 +593,7 @@ namespace Yang.Dialogue.Editor
             panes.Add(right);
             root.Add(panes);
 
-            VisualElement buttons = new() { style = { flexDirection = FlexDirection.Row, marginTop = 9 } };
+            VisualElement buttons = new() { style = { flexDirection = FlexDirection.Row, marginTop = 9, flexShrink = 0 } };
             buttons.Add(new Label("No assets are changed until you confirm the import.") { style = { flexGrow = 1 } });
             buttons.Add(new Button(Close) { text = canImport ? "Back" : "Close" });
 

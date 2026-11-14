@@ -1035,13 +1035,7 @@ namespace Yang.Dialogue.Editor
                 if (string.IsNullOrEmpty(key))
                     throw new FormatException($"CSV row {row.line}, {kind}Key: an entry with ID {id} requires a non-empty CSV key.");
             }
-            else if (!string.IsNullOrEmpty(key))
-            {
-                SharedTableData.SharedTableEntry byKey = collection?.SharedData.GetEntry(key);
-
-                if (byKey != null)
-                    throw new FormatException($"CSV row {row.line}, {kind}EntryId: key '{key}' already exists at ID {byKey.Id}. Select this existing entry to fill the CSV ID.");
-            }
+            else if (!string.IsNullOrEmpty(key)) existing = collection?.SharedData.GetEntry(key);
 
             if (existing != null)
             {

@@ -302,7 +302,7 @@ namespace Yang.Dialogue.Editor
 
         private static bool IsLocalizationIssue(string title)
         {
-            return title == "Missing table name" || title == "Missing Localization table" || title == "Missing table GUID reference" || title == "Entry ID not selected" || title == "Missing Localization entry" ||
+            return title == "Missing table name" || title == "Missing Localization table" || title == "Missing table GUID reference" || title == "Missing Localization entry" ||
                    title == "Missing Localization entry ID" || title == "Missing key name" ||
                    title == "Entry ID mismatch" || title == "Key name conflict" || title == "Conflicting entry keys" || title == "Conflicting entry IDs";
         }

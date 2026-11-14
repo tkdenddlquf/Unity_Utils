@@ -121,6 +121,18 @@ namespace Yang.Dialogue.Editor
             return count;
         }
 
+        public int GetUnapprovedNodeIdCount()
+        {
+            int count = 0;
+
+            foreach (DialogueCsvIssue issue in issues)
+            {
+                if (issue.title == "New node ID") count++;
+            }
+
+            return count;
+        }
+
         public int GenerateMissingNodeIds()
         {
             int count = GetMissingNodeIdCount();
@@ -156,6 +168,123 @@ namespace Yang.Dialogue.Editor
             SaveRows();
 
             return count;
+        }
+
+        public (int tableGuids, int entryIds) GetCompletableLocalizationCounts()
+        {
+            List<(int row, int column, string value)> tableGuids = new();
+            List<(int row, int column, string value)> entryIds = new();
+            CollectExistingLocalizationReferences(tableGuids, entryIds);
+
+            return (tableGuids.Count, entryIds.Count);
+        }
+
+        public (int tableGuids, int entryIds) FillExistingLocalizationReferences()
+        {
+            List<(int row, int column, string value)> tableGuids = new();
+            List<(int row, int column, string value)> entryIds = new();
+            CollectExistingLocalizationReferences(tableGuids, entryIds);
+
+            foreach ((int row, int column, string value) field in tableGuids) SetCellValue(field.row, field.column, field.value);
+            foreach ((int row, int column, string value) field in entryIds) SetCellValue(field.row, field.column, field.value);
+
+            if (tableGuids.Count > 0 || entryIds.Count > 0) SaveRows();
+
+            return (tableGuids.Count, entryIds.Count);
+        }
+
+        private void CollectExistingLocalizationReferences(List<(int row, int column, string value)> tableGuids, List<(int row, int column, string value)> entryIds)
+        {
+            if (!parsed || Column("SpeakerTableGuid") < 0 || Column("TextTableGuid") < 0 || Column("SpeakerEntryId") < 0 || Column("TextEntryId") < 0) return;
+
+            IReadOnlyList<StringTableCollection> collections = LocalizationEditorSettings.GetStringTableCollections();
+            int owner = -1;
+
+            for (int row = 1; row < rows.Count; row++)
+            {
+                string type = GetCell(row, 1).Trim();
+
+                if (DialogueCsvImporter.IsNodeType(type)) owner = row;
+
+                if (type == "Dialogue" || type == "Choice")
+                {
+                    CollectExistingTableGuid(collections, row, row, true, tableGuids);
+                    CollectExistingTableGuid(collections, row, row, false, tableGuids);
+                    CollectExistingEntryId(collections, row, row, true, entryIds);
+
+                    if (type == "Dialogue") CollectExistingEntryId(collections, row, row, false, entryIds);
+                }
+                else if (type == "Option" && owner > 0 && GetCell(owner, 1) == "Choice")
+                {
+                    CollectExistingTableGuid(collections, owner, row, false, tableGuids);
+                    CollectExistingEntryId(collections, owner, row, false, entryIds);
+                }
+            }
+        }
+
+        private void CollectExistingTableGuid(IReadOnlyList<StringTableCollection> collections, int owner, int row, bool speaker, List<(int row, int column, string value)> changes)
+        {
+            int column = Column(speaker ? "SpeakerTableGuid" : "TextTableGuid");
+
+            if (!string.IsNullOrWhiteSpace(GetCell(row, column)) || string.IsNullOrWhiteSpace(GetCell(owner, speaker ? 5 : 6))) return;
+
+            StringTableCollection collection = FindExistingLocalizationTable(collections, owner, speaker);
+
+            if (collection == null) return;
+
+            changes.Add((row, column, collection.TableCollectionNameReference.TableCollectionNameGuid.ToString("N")));
+        }
+
+        private void CollectExistingEntryId(IReadOnlyList<StringTableCollection> collections, int owner, int row, bool speaker, List<(int row, int column, string value)> changes)
+        {
+            int column = Column(speaker ? "SpeakerEntryId" : "TextEntryId");
+
+            if (!string.IsNullOrWhiteSpace(GetCell(row, column))) return;
+
+            string key = GetCell(row, speaker ? 7 : 8).Trim();
+
+            if (string.IsNullOrEmpty(key)) return;
+
+            StringTableCollection collection = FindExistingLocalizationTable(collections, owner, speaker);
+
+            if (collection == null) return;
+
+            if (owner != row)
+            {
+                string optionGuid = GetCell(row, Column("TextTableGuid")).Trim();
+
+                if (!string.IsNullOrEmpty(optionGuid))
+                {
+                    if (!Guid.TryParse(optionGuid, out Guid parsedOptionGuid) || parsedOptionGuid != collection.TableCollectionNameReference.TableCollectionNameGuid) return;
+                }
+            }
+
+            SharedTableData.SharedTableEntry entry = collection.SharedData.GetEntry(key);
+
+            if (entry != null) changes.Add((row, column, entry.Id.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        private StringTableCollection FindExistingLocalizationTable(IReadOnlyList<StringTableCollection> collections, int owner, bool speaker)
+        {
+            string guidText = GetCell(owner, Column(speaker ? "SpeakerTableGuid" : "TextTableGuid")).Trim();
+
+            if (!string.IsNullOrEmpty(guidText))
+            {
+                if (!Guid.TryParse(guidText, out Guid guid)) return null;
+
+                return collections.ResolveCollection("", guid) as StringTableCollection;
+            }
+
+            string name = GetCell(owner, speaker ? 5 : 6).Trim();
+
+            if (string.IsNullOrEmpty(name) && options.useDefaultTables) name = DefaultTableName(speaker);
+
+            foreach (StringTableCollection collection in collections)
+            {
+                if (collection.TableCollectionName == name) return collection;
+            }
+
+            return null;
         }
 
         public int GetColumnIndex(string name)
@@ -1130,7 +1259,11 @@ namespace Yang.Dialogue.Editor
             else
             {
                 if (byKey != null)
-                    Add(row, Column(kind + "EntryId"), "Entry ID not selected", $"Key '{key}' exists at ID {byKey.Id}. Select the entry to store this ID in the CSV.");
+                {
+                    existing = byKey;
+                    id = byKey.Id;
+                    localizationReferences[localizationReferences.Count - 1].id = id;
+                }
 
                 if (byKey == null && (collection != null || options.createTables))
                 {
@@ -1284,7 +1417,7 @@ namespace Yang.Dialogue.Editor
             foreach (DialogueCsvIssue issue in issues)
             {
                 bool tableIssue = issue.title == "Missing table name" || issue.title == "Missing Localization table" || issue.title == "Missing table GUID" || issue.title == "Invalid table GUID" || issue.title == "Missing table GUID reference" || issue.title == "Conflicting table names" || issue.title == "Table name conflict";
-                bool entryIssue = issue.title == "Missing Localization entry" || issue.title == "Missing Localization entry ID" || issue.title == "Entry ID not selected" || issue.title == "Missing key name" ||
+                bool entryIssue = issue.title == "Missing Localization entry" || issue.title == "Missing Localization entry ID" || issue.title == "Missing key name" ||
                     issue.title == "Entry ID mismatch" || issue.title == "Key name conflict" ||
                     issue.title == "Conflicting entry keys" || issue.title == "Conflicting entry IDs" ||
                     issue.title == "Conflicting translation" || issue.title == "Locale table missing" ||
@@ -1329,7 +1462,7 @@ namespace Yang.Dialogue.Editor
             if ((title == "Missing Localization table" || title == "Missing table GUID reference") && !string.IsNullOrEmpty(reference.table) && !hasGuid)
                 return "shared-table-name:" + reference.table;
 
-            bool entryIssue = title == "Missing Localization entry ID" || title == "Missing Localization entry" || title == "Entry ID not selected" || title == "Missing key name" || title == "Key name conflict" || title == "Entry ID mismatch" || title == "Invalid entry ID";
+            bool entryIssue = title == "Missing Localization entry ID" || title == "Missing Localization entry" || title == "Missing key name" || title == "Key name conflict" || title == "Entry ID mismatch" || title == "Invalid entry ID";
 
             if (entryIssue && hasGuid)
             {
